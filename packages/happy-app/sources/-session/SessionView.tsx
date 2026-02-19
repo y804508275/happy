@@ -278,6 +278,23 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         gitStatusSync.getSync(sessionId);
     }, [sessionId, realtimeStatus]);
 
+    // Global ESC key handler for aborting on Web (works even when input is not focused)
+    React.useEffect(() => {
+        if (Platform.OS !== 'web') return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                const state = sessionStatus.state;
+                if (state === 'thinking' || state === 'waiting') {
+                    sessionAbort(sessionId);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [sessionId, sessionStatus.state]);
+
     let content = (
         <>
             <Deferred>
