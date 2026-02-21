@@ -81,7 +81,7 @@ function HeaderRightTablet() {
         <Pressable
             onPress={() => {
                 trackFriendsSearch();
-                router.push('/friends/search');
+                router.push('/friends/search' as any);
             }}
             hitSlop={15}
             style={{
@@ -213,7 +213,7 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
                                     user={friend}
                                     onPress={() => {
                                         trackFriendsProfileView();
-                                        router.push(`/user/${friend.id}`);
+                                        router.push(`/user/${friend.id}` as any);
                                     }}
                                 />
                             ))}
@@ -230,7 +230,7 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
                                     user={friend}
                                     onPress={() => {
                                         trackFriendsProfileView();
-                                        router.push(`/user/${friend.id}`);
+                                        router.push(`/user/${friend.id}` as any);
                                     }}
                                 />
                             ))}
@@ -247,7 +247,7 @@ export const InboxView = React.memo(({}: InboxViewProps) => {
                                     user={friend}
                                     onPress={() => {
                                         trackFriendsProfileView();
-                                        router.push(`/user/${friend.id}`);
+                                        router.push(`/user/${friend.id}` as any);
                                     }}
                                 />
                             ))}

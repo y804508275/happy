@@ -44,7 +44,7 @@ export function UserSearchResult({
     return (
         <Pressable 
             style={styles.container}
-            onPress={() => router.push(`/user/${user.id}`)}
+            onPress={() => router.push(`/user/${user.id}` as any)}
         >
             <View style={styles.content}>
                 <Avatar

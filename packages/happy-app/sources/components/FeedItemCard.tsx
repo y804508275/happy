@@ -54,7 +54,7 @@ export const FeedItemCard = React.memo(({ item }: FeedItemCardProps) => {
                     title={t('feed.friendRequestFrom', { name: user!.firstName || user!.username })}
                     subtitle={getTimeAgo(item.createdAt)}
                     leftElement={avatarElement}
-                    onPress={() => router.push(`/user/${user!.id}`)}
+                    onPress={() => router.push(`/user/${user!.id}` as any)}
                     showChevron={true}
                 />
             );
@@ -76,7 +76,7 @@ export const FeedItemCard = React.memo(({ item }: FeedItemCardProps) => {
                     title={t('feed.friendAccepted', { name: user!.firstName || user!.username })}
                     subtitle={getTimeAgo(item.createdAt)}
                     leftElement={avatarElement}
-                    onPress={() => router.push(`/user/${user!.id}`)}
+                    onPress={() => router.push(`/user/${user!.id}` as any)}
                     showChevron={true}
                 />
             );
