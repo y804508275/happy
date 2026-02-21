@@ -485,10 +485,25 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     /**
+     * Emit a stream text delta to the server (volatile, fire-and-forget)
+     */
+    emitStreamDelta(text: string) {
+        this.socket.volatile.emit('stream-delta', { sid: this.sessionId, text });
+    }
+
+    /**
      * Send session death message
      */
     sendSessionDeath() {
         this.socket.emit('session-end', { sid: this.sessionId, time: Date.now() });
+    }
+
+    /**
+     * Send a push notification request to the server.
+     * The server will forward it to all registered devices for this account.
+     */
+    sendPush(category: string, title: string, body: string, data?: Record<string, unknown>) {
+        this.socket.emit('send-push', { category, title, body, data });
     }
 
     /**

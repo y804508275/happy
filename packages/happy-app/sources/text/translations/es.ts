@@ -915,6 +915,24 @@ export const es: TranslationStructure = {
             confirm: 'Eliminar',
             cancel: 'Cancelar',
         },
+    },
+
+    notifications: {
+        title: 'Notifications',
+        subtitle: 'Configure push notification rules',
+        categories: 'Notification Categories',
+        categoriesFooter: 'Choose which events trigger push notifications to your device.',
+        permissionRequest: 'Permission Request',
+        permissionRequestDesc: 'When Claude needs your approval for tool or file operations',
+        taskComplete: 'Task Complete',
+        taskCompleteDesc: 'When Claude finishes processing and enters idle state',
+        error: 'Error',
+        errorDesc: 'When a session encounters an error or connection failure',
+        idleTimeout: 'Idle Timeout',
+        idleTimeoutFooter: 'Get notified when a session has been idle for too long.',
+        enableIdleTimeout: 'Enable Idle Timeout',
+        enableIdleTimeoutDesc: 'Notify when session is idle beyond threshold',
+        minutesOption: ({ count }: { count: number }) => `${count} minutes`,
     }
 } as const;
 

@@ -90,6 +90,7 @@ interface StorageState {
     feedHasMore: boolean;
     feedLoaded: boolean;  // True after initial feed fetch
     friendsLoaded: boolean;  // True after initial friends fetch
+    streamingTexts: Record<string, string>;  // key=sessionId, value=accumulated streaming text
     realtimeStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
     realtimeMode: 'idle' | 'speaking';
     socketStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -146,6 +147,8 @@ interface StorageState {
     // Feed methods
     applyFeedItems: (items: FeedItem[]) => void;
     clearFeed: () => void;
+    appendStreamingText: (sessionId: string, text: string) => void;
+    clearStreamingText: (sessionId: string) => void;
 }
 
 // Helper function to build unified list view data from sessions and machines
@@ -268,6 +271,7 @@ export const storage = create<StorageState>()((set, get) => {
         feedHasMore: false,
         feedLoaded: false,  // Initialize as false
         friendsLoaded: false,  // Initialize as false
+        streamingTexts: {},
         sessionsData: null,  // Legacy - to be removed
         sessionListViewData: null,
         sessionMessages: {},
@@ -1065,6 +1069,18 @@ export const storage = create<StorageState>()((set, get) => {
             feedLoaded: false,  // Reset loading flag
             friendsLoaded: false  // Reset loading flag
         })),
+        appendStreamingText: (sessionId: string, text: string) => set((state) => ({
+            ...state,
+            streamingTexts: {
+                ...state.streamingTexts,
+                [sessionId]: (state.streamingTexts[sessionId] ?? '') + text
+            }
+        })),
+        clearStreamingText: (sessionId: string) => set((state) => {
+            if (!state.streamingTexts[sessionId]) return state;
+            const { [sessionId]: _, ...rest } = state.streamingTexts;
+            return { ...state, streamingTexts: rest };
+        }),
     }
 });
 
@@ -1293,4 +1309,8 @@ export function useRequestedFriends() {
         // Filter friends to get sent requests (where status is 'requested')
         return Object.values(state.friends).filter(friend => friend.status === 'requested');
     }));
+}
+
+export function useStreamingText(sessionId: string): string | undefined {
+    return storage((state) => state.streamingTexts[sessionId]);
 }

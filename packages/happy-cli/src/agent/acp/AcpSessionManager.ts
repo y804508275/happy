@@ -31,6 +31,7 @@ function parseThinkingPayload(payload: unknown): { text: string; streaming: bool
 export class AcpSessionManager {
   private currentTurnId: string | null = null;
   private readonly acpCallToSessionCall = new Map<string, string>();
+  private readonly onDelta?: (text: string) => void;
 
   /** Monotonic clock: max(lastTime + 1, Date.now()) */
   private lastTime = 0;
@@ -38,6 +39,10 @@ export class AcpSessionManager {
   /** Pending text waiting to be flushed when the stream type changes */
   private pendingText = '';
   private pendingType: 'thinking' | 'output' | null = null;
+
+  constructor(opts?: { onDelta?: (text: string) => void }) {
+    this.onDelta = opts?.onDelta;
+  }
 
   private nextTime(): number {
     this.lastTime = Math.max(this.lastTime + 1, Date.now());
@@ -139,6 +144,7 @@ export class AcpSessionManager {
       const flushed = this.pendingType !== 'output' ? this.flush() : [];
       this.pendingType = 'output';
       this.pendingText += text;
+      this.onDelta?.(text);
       return flushed;
     }
 

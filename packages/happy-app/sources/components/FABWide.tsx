@@ -35,14 +35,14 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     },
 }));
 
-export const FABWide = React.memo(({ onPress }: { onPress: () => void }) => {
+export const FABWide = React.memo(({ onPress, extraBottomOffset = 0 }: { onPress: () => void; extraBottomOffset?: number }) => {
     const styles = stylesheet;
     const safeArea = useSafeAreaInsets();
     return (
         <View
             style={[
                 styles.container,
-                { bottom: safeArea.bottom + 16 }
+                { bottom: safeArea.bottom + 16 + extraBottomOffset }
             ]}
         >
             <Pressable

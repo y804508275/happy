@@ -1,39 +1,56 @@
 /**
- * Installation script for Happy daemon using macOS LaunchDaemons
- * 
- * NOTE: This installation method is currently NOT USED in favor of auto-starting 
- * the daemon when the user runs the happy command. 
- * 
- * Why we're not using this approach:
- * 1. Installing a LaunchDaemon requires sudo permissions, which users might not be comfortable with
- * 2. We assume users will run happy frequently (every time they open their laptop)
- * 3. The auto-start approach provides the same functionality without requiring elevated permissions
- * 
- * This code is kept for potential future use if we decide to offer system-level installation as an option.
+ * Installation script for Happy daemon using macOS LaunchAgents (user-level)
+ *
+ * Installs a LaunchAgent that auto-starts the daemon on login and keeps it alive.
+ * No sudo required — runs as the current user under ~/Library/LaunchAgents/.
  */
 
-import { writeFileSync, chmodSync, existsSync } from 'fs';
+import { writeFileSync, chmodSync, existsSync, mkdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { logger } from '@/ui/logger';
 import { trimIdent } from '@/utils/trimIdent';
 import os from 'os';
+import { join } from 'path';
+import { projectPath } from '@/projectPath';
 
 const PLIST_LABEL = 'com.happy-cli.daemon';
-const PLIST_FILE = `/Library/LaunchDaemons/${PLIST_LABEL}.plist`;
 
-// NOTE: Local installation like --local does not make too much sense I feel like
+export function getPlistPath(): string {
+    return join(os.homedir(), 'Library', 'LaunchAgents', `${PLIST_LABEL}.plist`);
+}
 
 export async function install(): Promise<void> {
     try {
-        // Check if already installed
-        if (existsSync(PLIST_FILE)) {
-            logger.info('Daemon plist already exists. Uninstalling first...');
-            execSync(`launchctl unload ${PLIST_FILE}`, { stdio: 'inherit' });
+        const plistFile = getPlistPath();
+
+        // Ensure ~/Library/LaunchAgents exists
+        const launchAgentsDir = join(os.homedir(), 'Library', 'LaunchAgents');
+        if (!existsSync(launchAgentsDir)) {
+            mkdirSync(launchAgentsDir, { recursive: true });
         }
 
-        // Get the path to the happy CLI executable
-        const happyPath = process.argv[0]; // Node.js executable
-        const scriptPath = process.argv[1]; // Script path
+        // Unload existing plist if present
+        if (existsSync(plistFile)) {
+            logger.info('Daemon plist already exists. Unloading first...');
+            try {
+                execSync(`launchctl unload ${plistFile}`, { stdio: 'pipe' });
+            } catch {
+                // May not be loaded, that's fine
+            }
+        }
+
+        // Resolve the node binary and the Happy CLI entrypoint
+        const nodePath = process.argv[0];
+        const entrypoint = join(projectPath(), 'dist', 'index.mjs');
+
+        // Collect PATH so the daemon can find node/npm/etc.
+        const currentPath = process.env.PATH || '/usr/local/bin:/usr/bin:/bin';
+
+        // Ensure ~/.happy directory exists for logs
+        const happyDir = join(os.homedir(), '.happy');
+        if (!existsSync(happyDir)) {
+            mkdirSync(happyDir, { recursive: true });
+        }
 
         // Create plist content
         const plistContent = trimIdent(`
@@ -43,48 +60,57 @@ export async function install(): Promise<void> {
             <dict>
                 <key>Label</key>
                 <string>${PLIST_LABEL}</string>
-                
+
                 <key>ProgramArguments</key>
                 <array>
-                    <string>${happyPath}</string>
-                    <string>${scriptPath}</string>
-                    <string>happy-daemon</string>
+                    <string>${nodePath}</string>
+                    <string>--no-warnings</string>
+                    <string>--no-deprecation</string>
+                    <string>${entrypoint}</string>
+                    <string>daemon</string>
+                    <string>start-sync</string>
                 </array>
-                
+
                 <key>EnvironmentVariables</key>
                 <dict>
                     <key>HAPPY_DAEMON_MODE</key>
                     <string>true</string>
+                    <key>PATH</key>
+                    <string>${currentPath}</string>
                 </dict>
-                
+
                 <key>RunAtLoad</key>
                 <true/>
-                
+
                 <key>KeepAlive</key>
                 <true/>
-                
+
+                <key>LimitLoadToSessionType</key>
+                <string>Aqua</string>
+
                 <key>StandardErrorPath</key>
                 <string>${os.homedir()}/.happy/daemon.err</string>
-                
+
                 <key>StandardOutPath</key>
                 <string>${os.homedir()}/.happy/daemon.log</string>
-                
+
                 <key>WorkingDirectory</key>
-                <string>/tmp</string>
+                <string>${os.homedir()}</string>
             </dict>
             </plist>
         `);
 
         // Write plist file
-        writeFileSync(PLIST_FILE, plistContent);
-        chmodSync(PLIST_FILE, 0o644);
+        writeFileSync(plistFile, plistContent);
+        chmodSync(plistFile, 0o644);
 
-        logger.info(`Created daemon plist at ${PLIST_FILE}`);
+        logger.info(`Created daemon plist at ${plistFile}`);
 
-        // Load the daemon
-        execSync(`launchctl load ${PLIST_FILE}`, { stdio: 'inherit' });
+        // Load the agent
+        execSync(`launchctl load ${plistFile}`, { stdio: 'inherit' });
 
         logger.info('Daemon installed and started successfully');
+        logger.info('The daemon will auto-start on login and restart if it crashes.');
         logger.info('Check logs at ~/.happy/daemon.log');
 
     } catch (error) {

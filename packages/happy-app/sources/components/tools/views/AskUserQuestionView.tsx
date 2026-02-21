@@ -24,6 +24,13 @@ interface AskUserQuestionInput {
     questions: Question[];
 }
 
+/**
+ * Shared cache for selections made in FixedAskUserQuestionBar.
+ * Keyed by permission ID. Used to display the correct submitted answer
+ * when the inline view renders after the tool completes.
+ */
+export const askQuestionSelectionsCache = new Map<string, Map<number, Set<number>>>();
+
 // Styles MUST be defined outside the component to prevent infinite re-renders
 // with react-native-unistyles. The theme is passed as a function parameter.
 const styles = StyleSheet.create((theme) => ({
@@ -253,13 +260,19 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
         }
     }, [sessionId, questions, selections, allQuestionsAnswered, isSubmitting, tool.permission?.id]);
 
-    // Show submitted state
+    // Show submitted state (completed or locally submitted)
     if (isSubmitted || tool.state === 'completed') {
+        // Check fixed bar cache first, then fall back to local selections
+        const cachedSelections = tool.permission?.id
+            ? askQuestionSelectionsCache.get(tool.permission.id)
+            : undefined;
+        const effectiveSelections = cachedSelections || selections;
+
         return (
             <ToolSectionView>
                 <View style={styles.submittedContainer}>
                     {questions.map((q, qIndex) => {
-                        const selected = selections.get(qIndex);
+                        const selected = effectiveSelections.get(qIndex);
                         const selectedLabels = selected
                             ? Array.from(selected)
                                 .map(optIndex => q.options[optIndex]?.label)
@@ -276,6 +289,12 @@ export const AskUserQuestionView = React.memo<ToolViewProps>(({ tool, sessionId 
                 </View>
             </ToolSectionView>
         );
+    }
+
+    // When running, the FixedAskUserQuestionBar handles interaction.
+    // Don't show the interactive form inline to avoid duplicate UI.
+    if (isRunning) {
+        return null;
     }
 
     return (

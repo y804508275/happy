@@ -8,8 +8,6 @@ import { ca } from './translations/ca';
 import { zhHans } from './translations/zh-Hans';
 import { zhHant } from './translations/zh-Hant';
 import { ja } from './translations/ja';
-import * as Localization from 'expo-localization';
-import { loadSettings } from '@/sync/persistence';
 import { type SupportedLanguage, SUPPORTED_LANGUAGES, SUPPORTED_LANGUAGE_CODES, DEFAULT_LANGUAGE } from './_all';
 
 /**
@@ -89,61 +87,11 @@ const translations: Record<SupportedLanguage, TranslationStructure> = {
 const _typeCheck: Record<SupportedLanguage, TranslationStructure> = translations;
 
 //
-// Resolve language
+// Resolve language — forced to zh-Hans for this customized build
 //
 
-let currentLanguage: SupportedLanguage = DEFAULT_LANGUAGE;
-
-// Read from settings
-let settings = loadSettings();
-let found = false;
-if (settings.settings.preferredLanguage && settings.settings.preferredLanguage in translations) {
-    currentLanguage = settings.settings.preferredLanguage as SupportedLanguage;
-    found = true;
-    console.log(`[i18n] Using preferred language: ${currentLanguage}`);
-}
-
-// Read from device
-if (!found) {
-    let locales = Localization.getLocales();
-    console.log(`[i18n] Device locales:`, locales.map(l => l.languageCode));
-    for (let l of locales) {
-        if (l.languageCode) {
-            // Expo added special handling for Chinese variants using script code https://github.com/expo/expo/pull/34984
-            if (l.languageCode === 'zh') {
-                let chineseVariant: string | null = null;
-
-                // We only have translations for simplified Chinese right now, but looking for help with traditional Chinese.
-                if (l.languageScriptCode === 'Hans') {
-                    chineseVariant = 'zh-Hans';
-                } else if (l.languageScriptCode === 'Hant') {
-                    chineseVariant = 'zh-Hant';
-                }
-
-                console.log(`[i18n] Chinese script code: ${l.languageScriptCode} -> ${chineseVariant}`);
-
-                if (chineseVariant && chineseVariant in translations) {
-                    currentLanguage = chineseVariant as SupportedLanguage;
-                    console.log(`[i18n] Using Chinese variant: ${currentLanguage}`);
-                    break;
-                }
-
-                currentLanguage = 'zh-Hans';
-                console.log(`[i18n] Falling back to simplified Chinese: zh-Hans`);
-                break;
-            }
-
-            // Direct match for non-Chinese languages
-            if (l.languageCode in translations) {
-                currentLanguage = l.languageCode as SupportedLanguage;
-                console.log(`[i18n] Using device locale: ${currentLanguage}`);
-                break;
-            }
-        }
-    }
-}
-
-console.log(`[i18n] Final language: ${currentLanguage}`);
+let currentLanguage: SupportedLanguage = 'zh-Hans';
+console.log(`[i18n] Language forced to: ${currentLanguage}`);
 
 /**
  * Main translation function with strict typing

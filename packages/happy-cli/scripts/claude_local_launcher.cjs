@@ -1,5 +1,8 @@
 const fs = require('fs');
 
+// Remove CLAUDECODE env var to prevent "nested session" detection
+delete process.env.CLAUDECODE;
+
 // Disable autoupdater (never works really)
 process.env.DISABLE_AUTOUPDATER = '1';
 

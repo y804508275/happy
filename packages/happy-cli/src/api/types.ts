@@ -108,6 +108,13 @@ export interface ClientToServerEvents {
       [key: string]: number
     }
   }) => void
+  'send-push': (data: {
+    category: string
+    title: string
+    body: string
+    data?: Record<string, unknown>
+  }) => void
+  'stream-delta': (data: { sid: string; text: string }) => void
 }
 
 /**

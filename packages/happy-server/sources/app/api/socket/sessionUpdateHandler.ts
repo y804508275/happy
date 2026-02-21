@@ -1,6 +1,7 @@
 import { sessionAliveEventsCounter, websocketEventsCounter } from "@/app/monitoring/metrics2";
 import { activityCache } from "@/app/presence/sessionCache";
 import { buildNewMessageUpdate, buildSessionActivityEphemeral, buildUpdateSessionUpdate, ClientConnection, eventRouter } from "@/app/events/eventRouter";
+import { sendPushNotification } from "@/app/push/sendPushNotification";
 import { db } from "@/storage/db";
 import { allocateSessionSeq, allocateUserSeq } from "@/storage/seq";
 import { AsyncLock } from "@/utils/lock";
@@ -284,6 +285,42 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
             });
         } catch (error) {
             log({ module: 'websocket', level: 'error' }, `Error in session-end: ${error}`);
+        }
+    });
+
+    socket.on('stream-delta', (data: { sid: string; text: string }) => {
+        if (!data || !data.sid || typeof data.text !== 'string') {
+            return;
+        }
+        eventRouter.emitEphemeral({
+            userId,
+            payload: { type: 'text-delta', sessionId: data.sid, text: data.text },
+            recipientFilter: { type: 'user-scoped-only' },
+            skipSenderConnection: connection
+        });
+    });
+
+    /**
+     * Handle push notification requests from CLI daemon.
+     * The CLI knows the decrypted agent state and determines when to notify.
+     */
+    socket.on('send-push', async (data: {
+        category: string;
+        title: string;
+        body: string;
+        data?: Record<string, unknown>;
+    }) => {
+        try {
+            if (!data || !data.title || !data.body) {
+                return;
+            }
+
+            await sendPushNotification(userId, data.title, data.body, {
+                ...data.data,
+                category: data.category
+            });
+        } catch (error) {
+            log({ module: 'push', level: 'error' }, `Error in send-push: ${error}`);
         }
     });
 

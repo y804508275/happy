@@ -915,5 +915,23 @@ export const zhHant: TranslationStructure = {
             confirm: '刪除',
             cancel: '取消',
         },
+    },
+
+    notifications: {
+        title: '通知設定',
+        subtitle: '設定推送通知規則',
+        categories: '通知類別',
+        categoriesFooter: '選擇哪些事件會觸發推送通知到您的裝置。',
+        permissionRequest: '權限請求',
+        permissionRequestDesc: '當 Claude 需要您批准工具或檔案操作時',
+        taskComplete: '任務完成',
+        taskCompleteDesc: '當 Claude 完成處理並進入閒置狀態時',
+        error: '錯誤通知',
+        errorDesc: '當對話出錯或連線失敗時',
+        idleTimeout: '閒置逾時',
+        idleTimeoutFooter: '當對話閒置時間過長時收到通知。',
+        enableIdleTimeout: '啟用閒置逾時',
+        enableIdleTimeoutDesc: '當對話閒置超過設定時間時通知',
+        minutesOption: ({ count }: { count: number }) => `${count} 分鐘`,
     }
 } as const;

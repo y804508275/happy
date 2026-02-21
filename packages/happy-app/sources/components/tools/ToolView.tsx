@@ -253,9 +253,11 @@ export const ToolView = React.memo<ToolViewProps>((props) => {
                 );
             })()}
 
-            {/* Permission footer - always renders when permission exists to maintain consistent height */}
+            {/* Permission footer - renders for completed/denied permissions inline.
+                Pending permissions are shown in the fixed FixedPermissionBar above the input,
+                so we skip them here to avoid duplicate buttons and layout-shift mis-clicks. */}
             {/* AskUserQuestion has its own Submit button UI - no permission footer needed */}
-            {tool.permission && sessionId && tool.name !== 'AskUserQuestion' && (
+            {tool.permission && tool.permission.status !== 'pending' && sessionId && tool.name !== 'AskUserQuestion' && (
                 <PermissionFooter permission={tool.permission} sessionId={sessionId} toolName={tool.name} toolInput={tool.input} metadata={props.metadata} />
             )}
         </View>

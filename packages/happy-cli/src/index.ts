@@ -30,6 +30,7 @@ import { spawnHappyCLI } from './utils/spawnHappyCLI'
 import { claudeCliPath } from './claude/claudeLocal'
 import { execFileSync } from 'node:child_process'
 import { extractNoSandboxFlag } from './utils/sandboxFlags'
+import { formatSecretKeyForBackup } from './utils/backupKey'
 
 
 (async () => {
@@ -58,6 +59,93 @@ import { extractNoSandboxFlag } from './utils/sandboxFlags'
       process.exit(0)
     }
     await runDoctorCommand();
+    return;
+  } else if (subcommand === 'setup') {
+    // One-click setup: authenticate, register machine, install LaunchAgent, start daemon, show recovery key
+    try {
+      console.log(chalk.bold('\nHappy Coder Setup\n'));
+
+      // Step 1: Authenticate and register machine
+      console.log(chalk.blue('Step 1/4:') + ' Authenticating...');
+      const { credentials, machineId } = await authAndSetupMachineIfNeeded();
+      console.log(chalk.green('  ✓ Authentication complete'));
+      console.log(chalk.gray(`  Machine ID: ${machineId}`));
+
+      // Step 2: Install LaunchAgent for auto-start on login
+      console.log(chalk.blue('\nStep 2/4:') + ' Installing LaunchAgent (auto-start on login)...');
+      try {
+        await install();
+        console.log(chalk.green('  ✓ LaunchAgent installed'));
+      } catch (error) {
+        console.log(chalk.yellow('  ⚠ LaunchAgent installation failed (daemon will still work manually)'));
+        if (process.env.DEBUG) {
+          console.error(error);
+        }
+      }
+
+      // Step 3: Start daemon
+      console.log(chalk.blue('\nStep 3/4:') + ' Starting daemon...');
+      if (!(await isDaemonRunningCurrentlyInstalledHappyVersion())) {
+        const daemonProcess = spawnHappyCLI(['daemon', 'start-sync'], {
+          detached: true,
+          stdio: 'ignore',
+          env: process.env
+        });
+        daemonProcess.unref();
+
+        let started = false;
+        for (let i = 0; i < 50; i++) {
+          if (await checkIfDaemonRunningAndCleanupStaleState()) {
+            started = true;
+            break;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        if (started) {
+          console.log(chalk.green('  ✓ Daemon started'));
+        } else {
+          console.log(chalk.yellow('  ⚠ Daemon may still be starting...'));
+        }
+      } else {
+        console.log(chalk.green('  ✓ Daemon already running'));
+      }
+
+      // Step 4: Display recovery key for mobile app
+      console.log(chalk.blue('\nStep 4/4:') + ' Recovery key for mobile app\n');
+
+      let secretBytes: Uint8Array | null = null;
+      if (credentials.encryption.type === 'legacy') {
+        secretBytes = credentials.encryption.secret;
+      }
+
+      if (secretBytes) {
+        const formattedKey = formatSecretKeyForBackup(secretBytes);
+        console.log(chalk.bold('  Your recovery key:'));
+        console.log('');
+        console.log(chalk.cyan(`  ${formattedKey}`));
+        console.log('');
+        console.log(chalk.gray('  Enter this key in your Happy mobile app:'));
+        console.log(chalk.gray('  Settings → Account → Restore with Secret Key'));
+        console.log('');
+        console.log(chalk.yellow('  ⚠ Keep this key safe! It grants full access to your account.'));
+      } else {
+        console.log(chalk.gray('  Using DataKey encryption — pair via QR code in the mobile app.'));
+        console.log(chalk.gray('  Run `happy auth` and scan the QR code with the Happy app.'));
+      }
+
+      console.log(chalk.green('\n✓ Setup complete!\n'));
+      console.log('Your Mac is ready. The daemon will auto-start on login.');
+      console.log('Use the recovery key above to connect your phone.\n');
+
+      process.exit(0);
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error');
+      if (process.env.DEBUG) {
+        console.error(error);
+      }
+      process.exit(1);
+    }
     return;
   } else if (subcommand === 'auth') {
     // Handle auth subcommands
@@ -523,8 +611,10 @@ ${chalk.bold('Usage:')}
   happy daemon stop               Stop the daemon (sessions stay alive)
   happy daemon status             Show daemon status
   happy daemon list               List active sessions
+  happy daemon install            Install as LaunchAgent (auto-start on login)
+  happy daemon uninstall          Remove LaunchAgent
 
-  If you want to kill all happy related processes run 
+  If you want to kill all happy related processes run
   ${chalk.cyan('happy doctor clean')}
 
 ${chalk.bold('Note:')} The daemon runs in the background and manages Claude sessions.
@@ -631,6 +721,7 @@ ${chalk.bold('happy')} - Claude Code On the Go
 
 ${chalk.bold('Usage:')}
   happy [options]         Start Claude with mobile control
+  happy setup             One-click setup (auth + daemon + recovery key)
   happy auth              Manage authentication
   happy codex             Start Codex mode
   happy gemini            Start Gemini mode (ACP)

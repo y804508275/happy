@@ -1817,6 +1817,9 @@ class Sync {
                 }
             }
 
+            // Clear streaming text now that persistent message has arrived
+            storage.getState().clearStreamingText(updateData.body.sid);
+
             // Ping session
             this.onSessionVisible(updateData.body.sid);
 
@@ -2195,6 +2198,11 @@ class Sync {
         if (updateData.type === 'activity') {
             // console.log('adding activity update ' + updateData.id);
             this.activityAccumulator.addUpdate(updateData);
+        }
+
+        // Handle text-delta streaming updates
+        if (updateData.type === 'text-delta') {
+            storage.getState().appendStreamingText(updateData.sessionId, updateData.text);
         }
 
         // Handle machine activity updates

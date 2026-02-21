@@ -1,5 +1,8 @@
 import { AgentContentView } from '@/components/AgentContentView';
 import { AgentInput } from '@/components/AgentInput';
+import { FixedAskUserQuestionBar } from '@/components/tools/FixedAskUserQuestionBar';
+import { FixedOptionsBar } from '@/components/tools/FixedOptionsBar';
+import { FixedPermissionBar } from '@/components/tools/FixedPermissionBar';
 import {
     getAvailableModels,
     getAvailablePermissionModes,
@@ -278,23 +281,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         gitStatusSync.getSync(sessionId);
     }, [sessionId, realtimeStatus]);
 
-    // Global ESC key handler for aborting on Web (works even when input is not focused)
-    React.useEffect(() => {
-        if (Platform.OS !== 'web') return;
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-                const state = sessionStatus.state;
-                if (state === 'thinking' || state === 'waiting') {
-                    sessionAbort(sessionId);
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [sessionId, sessionStatus.state]);
-
     let content = (
         <>
             <Deferred>
@@ -315,6 +301,10 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     ) : null;
 
     const input = (
+        <>
+        <FixedOptionsBar sessionId={sessionId} metadata={session.metadata} />
+        <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} />
+        <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} />
         <AgentInput
             placeholder={t('session.inputPlaceholder')}
             value={message}
@@ -364,6 +354,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             } : undefined}
             alwaysShowContextSize={alwaysShowContextSize}
         />
+        </>
     );
 
 

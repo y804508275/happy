@@ -915,5 +915,23 @@ export const zhHans: TranslationStructure = {
         friendRequestGeneric: '新的好友请求',
         friendAccepted: ({ name }: { name: string }) => `您现在与 ${name} 成为了好友`,
         friendAcceptedGeneric: '好友请求已接受',
+    },
+
+    notifications: {
+        title: '通知设置',
+        subtitle: '配置推送通知规则',
+        categories: '通知类别',
+        categoriesFooter: '选择哪些事件会触发推送通知到您的设备。',
+        permissionRequest: '权限请求',
+        permissionRequestDesc: '当 Claude 需要您批准工具或文件操作时',
+        taskComplete: '任务完成',
+        taskCompleteDesc: '当 Claude 完成处理并进入空闲状态时',
+        error: '错误通知',
+        errorDesc: '当会话出错或连接失败时',
+        idleTimeout: '空闲超时',
+        idleTimeoutFooter: '当会话空闲时间过长时收到通知。',
+        enableIdleTimeout: '启用空闲超时',
+        enableIdleTimeoutDesc: '当会话空闲超过设定时间时通知',
+        minutesOption: ({ count }: { count: number }) => `${count} 分钟`,
     }
 } as const;

@@ -11,24 +11,16 @@ import { AgentEvent } from "@/sync/typesRaw";
 import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { useSetting } from "@/sync/storage";
-import { Typography } from '@/constants/Typography';
-import Animated, { FadeIn } from 'react-native-reanimated';
 
-// Threshold: messages created within the last 2 seconds get entrance animation
-const ANIMATION_THRESHOLD_MS = 2000;
-
-export const MessageView = (props: {
+export const MessageView = React.memo((props: {
   message: Message;
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
 }) => {
-  const isNew = (Date.now() / 1000 - props.message.createdAt) < (ANIMATION_THRESHOLD_MS / 1000);
-  const isPending = 'localId' in props.message && props.message.localId !== null && props.message.id === props.message.localId;
-
-  const content = (
+  return (
     <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
-      <View style={[styles.messageContent, isPending && styles.pendingMessage]}>
+      <View style={styles.messageContent}>
         <RenderBlock
           message={props.message}
           metadata={props.metadata}
@@ -38,17 +30,7 @@ export const MessageView = (props: {
       </View>
     </View>
   );
-
-  if (isNew) {
-    return (
-      <Animated.View entering={FadeIn.duration(200)}>
-        {content}
-      </Animated.View>
-    );
-  }
-
-  return content;
-};
+});
 
 // RenderBlock function that dispatches to the correct component based on message kind
 function RenderBlock(props: {
@@ -93,11 +75,11 @@ function UserTextBlock(props: {
 
   return (
     <View style={styles.userMessageContainer}>
-      <View style={styles.userMessageRow}>
-        <Text style={styles.userPromptSymbol}>❯</Text>
-        <View style={styles.userMessageContent}>
-          <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
-        </View>
+      <View style={styles.userMessageBubble}>
+        <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
+        {/* {__DEV__ && (
+          <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
+        )} */}
       </View>
     </View>
   );
@@ -200,50 +182,38 @@ const styles = StyleSheet.create((theme) => ({
     flexBasis: 0,
     maxWidth: layout.maxWidth,
   },
-  pendingMessage: {
-    opacity: 0.5,
-  },
   userMessageContainer: {
     maxWidth: '100%',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
     paddingHorizontal: 16,
   },
-  userMessageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+  userMessageBubble: {
+    backgroundColor: theme.colors.userMessageBackground,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 12,
     maxWidth: '100%',
-  },
-  userPromptSymbol: {
-    ...Typography.mono(),
-    color: theme.colors.textLink,
-    fontSize: 16,
-    lineHeight: 24,
-    marginRight: 8,
-    marginTop: 8,
-  },
-  userMessageContent: {
-    flex: 1,
   },
   agentMessageContainer: {
     marginHorizontal: 16,
-    marginBottom: 4,
+    marginBottom: 12,
+    borderRadius: 16,
     alignSelf: 'flex-start',
   },
   agentEventContainer: {
     marginHorizontal: 8,
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 8,
   },
   agentEventText: {
-    ...Typography.mono(),
     color: theme.colors.agentEventText,
-    fontSize: 13,
+    fontSize: 14,
   },
   toolContainer: {
-    marginHorizontal: 4,
+    marginHorizontal: 8,
   },
   debugText: {
     color: theme.colors.agentEventText,

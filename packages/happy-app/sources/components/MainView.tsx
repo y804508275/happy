@@ -20,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { isUsingCustomServer } from '@/sync/serverConfig';
-import { trackFriendsSearch } from '@/track';
 
 interface MainViewProps {
     variant: 'phone' | 'sidebar';
@@ -190,18 +189,7 @@ const HeaderRight = React.memo(({ activeTab }: { activeTab: ActiveTabType }) => 
     }
 
     if (activeTab === 'inbox') {
-        return (
-            <Pressable
-                onPress={() => {
-                    trackFriendsSearch();
-                    router.push('/friends/search');
-                }}
-                hitSlop={15}
-                style={styles.headerButton}
-            >
-                <Ionicons name="person-add-outline" size={24} color={theme.colors.header.tint} />
-            </Pressable>
-        );
+        return <View style={styles.headerButton} />;
     }
 
     if (activeTab === 'settings') {
@@ -313,6 +301,9 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
                     )}
                 </View>
                 {renderTabContent()}
+                {activeTab === 'sessions' && (
+                    <FABWide onPress={handleNewSession} extraBottomOffset={50} />
+                )}
             </View>
             <TabBar
                 activeTab={activeTab}

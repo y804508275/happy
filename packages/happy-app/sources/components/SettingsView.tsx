@@ -245,16 +245,6 @@ export const SettingsView = React.memo(function SettingsView() {
                 />
             </ItemGroup>
 
-            {/* Social */}
-            {/* <ItemGroup title={t('settings.social')}>
-                <Item
-                    title={t('navigation.friends')}
-                    subtitle={t('friends.manageFriends')}
-                    icon={<Ionicons name="people-outline" size={29} color="#007AFF" />}
-                    onPress={() => router.push('/friends')}
-                />
-            </ItemGroup> */}
-
             {/* Machines (sorted: online first, then last seen desc) */}
             {allMachines.length > 0 && (
                 <ItemGroup title={t('settings.machines')}>
@@ -311,10 +301,10 @@ export const SettingsView = React.memo(function SettingsView() {
                     onPress={() => router.push('/settings/appearance')}
                 />
                 <Item
-                    title={t('settings.voiceAssistant')}
-                    subtitle={t('settings.voiceAssistantSubtitle')}
-                    icon={<Ionicons name="mic-outline" size={29} color="#34C759" />}
-                    onPress={() => router.push('/settings/voice')}
+                    title={t('notifications.title')}
+                    subtitle={t('notifications.subtitle')}
+                    icon={<Ionicons name="notifications-outline" size={29} color="#FF9500" />}
+                    onPress={() => router.push('/settings/notifications')}
                 />
                 <Item
                     title={t('settings.featuresTitle')}

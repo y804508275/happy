@@ -13,6 +13,12 @@ export const LocalSettingsSchema = z.object({
     markdownCopyV2: z.boolean().describe('Replace native paragraph selection with long-press modal for full markdown copy'),
     // CLI version acknowledgments - keyed by machineId
     acknowledgedCliVersions: z.record(z.string(), z.string()).describe('Acknowledged CLI versions per machine'),
+    // Push notification preferences
+    notifyPermissionRequest: z.boolean().describe('Notify when Claude needs permission approval'),
+    notifyTaskComplete: z.boolean().describe('Notify when Claude finishes processing'),
+    notifyError: z.boolean().describe('Notify on session errors'),
+    notifyIdleTimeout: z.boolean().describe('Notify when session is idle too long'),
+    notifyIdleTimeoutMinutes: z.number().describe('Idle timeout threshold in minutes'),
 });
 
 //
@@ -35,6 +41,11 @@ export const localSettingsDefaults: LocalSettings = {
     themePreference: 'adaptive',
     markdownCopyV2: false,
     acknowledgedCliVersions: {},
+    notifyPermissionRequest: true,
+    notifyTaskComplete: true,
+    notifyError: true,
+    notifyIdleTimeout: false,
+    notifyIdleTimeoutMinutes: 10,
 };
 Object.freeze(localSettingsDefaults);
 

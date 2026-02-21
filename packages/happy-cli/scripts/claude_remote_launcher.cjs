@@ -1,3 +1,8 @@
+// Remove CLAUDECODE env var to prevent "nested session" detection
+// When the daemon is started from within a Claude Code session, this env var
+// propagates and causes the spawned Claude binary to refuse to start
+delete process.env.CLAUDECODE;
+
 // Intercept setTimeout for the Claude Code SDK
 const originalSetTimeout = global.setTimeout;
 

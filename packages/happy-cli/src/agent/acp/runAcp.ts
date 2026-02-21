@@ -505,7 +505,11 @@ export async function runAcp(opts: {
   }
 
   permissionHandler = new GenericAcpPermissionHandler(session, opts.agentName);
-  const sessionManager = new AcpSessionManager();
+  const sessionManager = new AcpSessionManager({
+    onDelta: (text) => {
+      session.emitStreamDelta(text);
+    },
+  });
   const messageQueue = new MessageQueue2<AcpSwitchMode>((mode) => hashObject(mode));
   let currentPermissionMode: string | undefined;
   let currentModel: string | null | undefined;
@@ -745,7 +749,7 @@ export async function runAcp(opts: {
         if (verbose) {
           logAcp('muted', `Outgoing modes from ${opts.agentName} (${modes.availableModes.length}), current=${modes.currentModeId}:`);
           for (const mode of modes.availableModes) {
-            logAcp('muted', `  mode=${mode.id} name=${mode.name}${formatOptionalDetail(mode.description, 160)}`);
+            logAcp('muted', `  mode=${mode.id} name=${mode.name}${formatOptionalDetail(mode.description ?? undefined, 160)}`);
           }
         }
         session.updateMetadata((currentMetadata) =>
@@ -803,8 +807,12 @@ export async function runAcp(opts: {
       }
       if (msg.status === 'idle') {
         clearPendingTurn();
+        // Send push notification for task completion
+        session.sendPush('task_complete', 'Task Complete', 'Claude has finished processing and is waiting for input.');
       }
       if (msg.status === 'error' || msg.status === 'stopped') {
+        // Send push notification for errors
+        session.sendPush('error', 'Session Error', `Session ${msg.status}${suffix}`);
         stopRunnerFromBackendStatus(msg.status, msg.detail);
       }
     }

@@ -1080,13 +1080,13 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             {isAborting ? (
                                                 <ActivityIndicator
                                                     size="small"
-                                                    color={theme.colors.warningCritical}
+                                                    color={theme.colors.button.secondary.tint}
                                                 />
                                             ) : (
                                                 <Octicons
-                                                    name={"x-circle"}
+                                                    name={"stop"}
                                                     size={16}
-                                                    color={theme.colors.warningCritical}
+                                                    color={theme.colors.button.secondary.tint}
                                                 />
                                             )}
                                         </Pressable>

@@ -916,5 +916,23 @@ export const ja: TranslationStructure = {
         friendRequestGeneric: '新しい友達リクエスト',
         friendAccepted: ({ name }: { name: string }) => `${name}さんと友達になりました`,
         friendAcceptedGeneric: '友達リクエストが承認されました',
+    },
+
+    notifications: {
+        title: '通知',
+        subtitle: 'プッシュ通知ルールを設定',
+        categories: '通知カテゴリ',
+        categoriesFooter: 'どのイベントがデバイスにプッシュ通知を送信するかを選択します。',
+        permissionRequest: '権限リクエスト',
+        permissionRequestDesc: 'Claude がツールまたはファイル操作の承認を必要とする場合',
+        taskComplete: 'タスク完了',
+        taskCompleteDesc: 'Claude が処理を完了しアイドル状態になった場合',
+        error: 'エラー',
+        errorDesc: 'セッションでエラーまたは接続障害が発生した場合',
+        idleTimeout: 'アイドルタイムアウト',
+        idleTimeoutFooter: 'セッションが長時間アイドル状態の場合に通知を受け取ります。',
+        enableIdleTimeout: 'アイドルタイムアウトを有効にする',
+        enableIdleTimeoutDesc: 'セッションがしきい値を超えてアイドル状態の場合に通知',
+        minutesOption: ({ count }: { count: number }) => `${count} 分`,
     }
 } as const;

@@ -291,9 +291,9 @@ const style = StyleSheet.create((theme) => ({
     text: {
         ...Typography.default(),
         fontSize: 16,
-        lineHeight: 24,
-        marginTop: 4,
-        marginBottom: 4,
+        lineHeight: 24, // Reduced from 28 to 24
+        marginTop: 8,
+        marginBottom: 8,
         color: theme.colors.text,
         fontWeight: '400',
     },
@@ -328,31 +328,31 @@ const style = StyleSheet.create((theme) => ({
     },
     header1: {
         fontSize: 16,
-        lineHeight: 24,
+        lineHeight: 24,  // Reduced from 36 to 24
         fontWeight: '900',
-        marginTop: 8,
-        marginBottom: 4
+        marginTop: 16,
+        marginBottom: 8
     },
     header2: {
         fontSize: 20,
-        lineHeight: 24,
+        lineHeight: 24,  // Reduced from 36 to 32
         fontWeight: '600',
-        marginTop: 8,
-        marginBottom: 4
+        marginTop: 16,
+        marginBottom: 8
     },
     header3: {
         fontSize: 16,
-        lineHeight: 28,
+        lineHeight: 28,  // Reduced from 32 to 28
         fontWeight: '600',
-        marginTop: 8,
-        marginBottom: 4,
+        marginTop: 16,
+        marginBottom: 8,
     },
     header4: {
         fontSize: 16,
         lineHeight: 24,
         fontWeight: '600',
         marginTop: 8,
-        marginBottom: 4,
+        marginBottom: 8,
     },
     header5: {
         fontSize: 16,
@@ -394,7 +394,7 @@ const style = StyleSheet.create((theme) => ({
     codeBlock: {
         backgroundColor: theme.colors.surfaceHighest,
         borderRadius: 8,
-        marginVertical: 4,
+        marginVertical: 8,
         position: 'relative',
         zIndex: 1,
     },

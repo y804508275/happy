@@ -180,6 +180,10 @@ export type EphemeralEvent = {
     machineId: string;
     online: boolean;
     timestamp: number;
+} | {
+    type: 'text-delta';
+    sessionId: string;
+    text: string;
 };
 
 // === EVENT PAYLOAD TYPES ===

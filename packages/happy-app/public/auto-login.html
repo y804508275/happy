@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><title>Auto Login (Dev)</title></head>
+<body>
+<script>
+localStorage.setItem("auth_credentials", JSON.stringify({"token":"eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJjbWxydG4zdjAwMDAwdDlmcDdyYmx5YmFsIiwiaWF0IjoxNzcxNjIyNDk3LCJuYmYiOjE3NzE2MjI0OTcsImlzcyI6ImhhbmR5IiwianRpIjoiNDQwMjRjOGUtMzk2ZS00MmFmLTlmMjQtYmU4N2U2YWE2M2YxIn0.RZJptrMVoRGKTdAbgKkGdAiUh6DeU-BQqpYOrAm6otRQ252TreOUm7fgRP-98VEo4vLiZGEimMJeGx65SlPODw","secret":"5qnbHR3ZFdHNdI2pvq05MShRZfkmE2kxd5pO76iGtRo"}));
+localStorage.setItem("server-config\\custom-server-url", "http://localhost:3005");
+document.write("Done! Redirecting...");
+window.location.href = "/";
+</script>
+</body>
+</html>

@@ -121,7 +121,7 @@ export abstract class BasePermissionHandler {
     }
 
     /**
-     * Add a pending request to the agent state.
+     * Add a pending request to the agent state and send a push notification.
      */
     protected addPendingRequestToState(toolCallId: string, toolName: string, input: unknown): void {
         this.session.updateAgentState((currentState) => ({
@@ -135,6 +135,14 @@ export abstract class BasePermissionHandler {
                 }
             }
         }));
+
+        // Send push notification for permission request
+        this.session.sendPush(
+            'permission_request',
+            'Permission Required',
+            `Claude wants to use: ${toolName}`,
+            { toolCallId, toolName }
+        );
     }
 
     /**

@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { sessionAllow, sessionDeny } from '@/sync/ops';
 import { useUnistyles } from 'react-native-unistyles';
 import { storage } from '@/sync/storage';
 import { t } from '@/text';
+
+/**
+ * Minimum time (ms) after mount before clicks are accepted.
+ * Prevents mis-clicks caused by layout shifts in the inverted FlatList
+ * (especially on web where maintainVisibleContentPosition is unsupported).
+ */
+const CLICK_GUARD_MS = 300;
+
+/**
+ * Cache which button the user actually clicked, keyed by permission ID.
+ * The server response may not preserve allowedTools/decision correctly,
+ * so we track the decision locally to display the correct selected state.
+ */
+type PermissionDecisionType = 'allow' | 'allowAllEdits' | 'allowForSession' | 'deny' | 'codexApprove' | 'codexApproveForSession' | 'codexAbort';
+const permissionDecisionCache = new Map<string, PermissionDecisionType>();
 
 interface PermissionFooterProps {
     permission: {
@@ -19,20 +34,32 @@ interface PermissionFooterProps {
     toolName: string;
     toolInput?: any;
     metadata?: any;
+    /** When true, enables keyboard navigation (up/down/enter) and disables click guard */
+    enableKeyboard?: boolean;
 }
 
-export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, sessionId, toolName, toolInput, metadata }) => {
+export const PermissionFooter: React.FC<PermissionFooterProps> = React.memo(({ permission, sessionId, toolName, toolInput, metadata, enableKeyboard }) => {
     const { theme } = useUnistyles();
     const [loadingButton, setLoadingButton] = useState<'allow' | 'deny' | 'abort' | null>(null);
     const [loadingAllEdits, setLoadingAllEdits] = useState(false);
     const [loadingForSession, setLoadingForSession] = useState(false);
-    
+    const [focusedIndex, setFocusedIndex] = useState(0);
+
+    // Guard against mis-clicks caused by layout shifts.
+    // Only applies on mount (not every render) to avoid blocking legitimate clicks.
+    // When enableKeyboard is true (FixedPermissionBar), guard is skipped entirely
+    // since the component is outside the FlatList and not affected by layout shifts.
+    const mountedAt = useRef(Date.now());
+    const isClickTooSoon = () => !enableKeyboard && Date.now() - mountedAt.current < CLICK_GUARD_MS;
+
     // Check if this is a Codex session - check both metadata.flavor and tool name prefix
     const isCodex = metadata?.flavor === 'codex' || toolName.startsWith('Codex');
 
     const handleApprove = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingAllEdits || loadingForSession) return;
 
+        permissionDecisionCache.set(permission.id, 'allow');
         setLoadingButton('allow');
         try {
             await sessionAllow(sessionId, permission.id);
@@ -44,8 +71,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     };
 
     const handleApproveAllEdits = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingAllEdits || loadingForSession) return;
 
+        permissionDecisionCache.set(permission.id, 'allowAllEdits');
         setLoadingAllEdits(true);
         try {
             await sessionAllow(sessionId, permission.id, 'acceptEdits');
@@ -59,8 +88,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     };
 
     const handleApproveForSession = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingAllEdits || loadingForSession || !toolName) return;
 
+        permissionDecisionCache.set(permission.id, 'allowForSession');
         setLoadingForSession(true);
         try {
             // Special handling for Bash tool - include exact command
@@ -79,8 +110,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     };
 
     const handleDeny = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingAllEdits || loadingForSession) return;
 
+        permissionDecisionCache.set(permission.id, 'deny');
         setLoadingButton('deny');
         try {
             await sessionDeny(sessionId, permission.id);
@@ -93,8 +126,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     
     // Codex-specific handlers
     const handleCodexApprove = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingForSession) return;
-        
+
+        permissionDecisionCache.set(permission.id, 'codexApprove');
         setLoadingButton('allow');
         try {
             await sessionAllow(sessionId, permission.id, undefined, undefined, 'approved');
@@ -106,8 +141,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     };
     
     const handleCodexApproveForSession = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingForSession) return;
-        
+
+        permissionDecisionCache.set(permission.id, 'codexApproveForSession');
         setLoadingForSession(true);
         try {
             await sessionAllow(sessionId, permission.id, undefined, undefined, 'approved_for_session');
@@ -119,8 +156,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     };
     
     const handleCodexAbort = async () => {
+        if (isClickTooSoon()) return;
         if (permission.status !== 'pending' || loadingButton !== null || loadingForSession) return;
-        
+
+        permissionDecisionCache.set(permission.id, 'codexAbort');
         setLoadingButton('abort');
         try {
             await sessionDeny(sessionId, permission.id, undefined, undefined, 'abort');
@@ -151,15 +190,86 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
         return false;
     };
 
-    // Detect which button was used based on mode (for Claude) or decision (for Codex)
-    const isApprovedViaAllow = isApproved && permission.mode !== 'acceptEdits' && !isToolAllowed(toolName, toolInput, permission.allowedTools);
-    const isApprovedViaAllEdits = isApproved && permission.mode === 'acceptEdits';
-    const isApprovedForSession = isApproved && isToolAllowed(toolName, toolInput, permission.allowedTools);
-    
-    // Codex-specific status detection with fallback
-    const isCodexApproved = isCodex && isApproved && (permission.decision === 'approved' || !permission.decision);
-    const isCodexApprovedForSession = isCodex && isApproved && permission.decision === 'approved_for_session';
-    const isCodexAborted = isCodex && isDenied && permission.decision === 'abort';
+    // Detect which button was used based on local cache first, then server data as fallback
+    const cachedDecision = permissionDecisionCache.get(permission.id);
+
+    const isApprovedViaAllow = isApproved && (
+        cachedDecision === 'allow' ||
+        (!cachedDecision && permission.mode !== 'acceptEdits' && !isToolAllowed(toolName, toolInput, permission.allowedTools))
+    );
+    const isApprovedViaAllEdits = isApproved && (
+        cachedDecision === 'allowAllEdits' ||
+        (!cachedDecision && permission.mode === 'acceptEdits')
+    );
+    const isApprovedForSession = isApproved && (
+        cachedDecision === 'allowForSession' ||
+        (!cachedDecision && isToolAllowed(toolName, toolInput, permission.allowedTools))
+    );
+
+    // Codex-specific status detection with local cache and server fallback
+    const isCodexApproved = isCodex && isApproved && (
+        cachedDecision === 'codexApprove' ||
+        (!cachedDecision && (permission.decision === 'approved' || !permission.decision))
+    );
+    const isCodexApprovedForSession = isCodex && isApproved && (
+        cachedDecision === 'codexApproveForSession' ||
+        (!cachedDecision && permission.decision === 'approved_for_session')
+    );
+    const isCodexAborted = isCodex && isDenied && (
+        cachedDecision === 'codexAbort' ||
+        (!cachedDecision && permission.decision === 'abort')
+    );
+
+    // Build list of action handlers for keyboard navigation
+    // Use a ref so the keyboard handler always calls the latest version
+    const buttonActionsRef = useRef<(() => void)[]>([]);
+    const buttonCount = (() => {
+        if (isCodex) {
+            buttonActionsRef.current = [handleCodexApprove, handleCodexApproveForSession, handleCodexAbort];
+            return 3;
+        }
+        const actions: (() => void)[] = [handleApprove];
+        const isEditTool = toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'NotebookEdit' || toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode';
+        if (isEditTool) {
+            actions.push(handleApproveAllEdits);
+        } else if (toolName) {
+            actions.push(handleApproveForSession);
+        }
+        actions.push(handleDeny);
+        buttonActionsRef.current = actions;
+        return actions.length;
+    })();
+    const focusedIndexRef = useRef(focusedIndex);
+    focusedIndexRef.current = focusedIndex;
+
+    // Keyboard navigation: up/down to select, enter to confirm (web only)
+    useEffect(() => {
+        if (Platform.OS !== 'web' || !enableKeyboard || !isPending) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setFocusedIndex(i => {
+                    const next = (i - 1 + buttonCount) % buttonCount;
+                    focusedIndexRef.current = next;
+                    return next;
+                });
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setFocusedIndex(i => {
+                    const next = (i + 1) % buttonCount;
+                    focusedIndexRef.current = next;
+                    return next;
+                });
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                buttonActionsRef.current[focusedIndexRef.current]?.();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [enableKeyboard, isPending, buttonCount]);
 
     const styles = StyleSheet.create({
         container: {
@@ -196,6 +306,10 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
         buttonSelected: {
             backgroundColor: 'transparent',
             borderLeftColor: theme.colors.text,
+        },
+        buttonFocused: {
+            backgroundColor: theme.colors.surfaceHigh,
+            borderLeftColor: theme.colors.textSecondary,
         },
         buttonInactive: {
             opacity: 0.3,
@@ -267,6 +381,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         style={[
                             styles.button,
                             isPending && styles.buttonAllow,
+                            enableKeyboard && isPending && focusedIndex === 0 && styles.buttonFocused,
                             isCodexApproved && styles.buttonSelected,
                             (isCodexAborted || isCodexApprovedForSession) && styles.buttonInactive
                         ]}
@@ -296,6 +411,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         style={[
                             styles.button,
                             isPending && styles.buttonForSession,
+                            enableKeyboard && isPending && focusedIndex === 1 && styles.buttonFocused,
                             isCodexApprovedForSession && styles.buttonSelected,
                             (isCodexAborted || isCodexApproved) && styles.buttonInactive
                         ]}
@@ -325,6 +441,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         style={[
                             styles.button,
                             isPending && styles.buttonDeny,
+                            enableKeyboard && isPending && focusedIndex === 2 && styles.buttonFocused,
                             isCodexAborted && styles.buttonSelected,
                             (isCodexApproved || isCodexApprovedForSession) && styles.buttonInactive
                         ]}
@@ -361,6 +478,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                     style={[
                         styles.button,
                         isPending && styles.buttonAllow,
+                        enableKeyboard && isPending && focusedIndex === 0 && styles.buttonFocused,
                         isApprovedViaAllow && styles.buttonSelected,
                         (isDenied || isApprovedViaAllEdits || isApprovedForSession) && styles.buttonInactive
                     ]}
@@ -391,6 +509,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         style={[
                             styles.button,
                             isPending && styles.buttonAllowAll,
+                            enableKeyboard && isPending && focusedIndex === 1 && styles.buttonFocused,
                             isApprovedViaAllEdits && styles.buttonSelected,
                             (isDenied || isApprovedViaAllow || isApprovedForSession) && styles.buttonInactive
                         ]}
@@ -422,6 +541,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                         style={[
                             styles.button,
                             isPending && styles.buttonForSession,
+                            enableKeyboard && isPending && focusedIndex === 1 && styles.buttonFocused,
                             isApprovedForSession && styles.buttonSelected,
                             (isDenied || isApprovedViaAllow || isApprovedViaAllEdits) && styles.buttonInactive
                         ]}
@@ -451,6 +571,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                     style={[
                         styles.button,
                         isPending && styles.buttonDeny,
+                        enableKeyboard && isPending && focusedIndex === 2 && styles.buttonFocused,
                         isDenied && styles.buttonSelected,
                         (isApproved) && styles.buttonInactive
                     ]}
@@ -477,4 +598,4 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
             </View>
         </View>
     );
-};
+});
