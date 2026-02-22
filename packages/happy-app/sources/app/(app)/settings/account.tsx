@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/auth/AuthContext';
@@ -22,6 +22,7 @@ import { Image } from 'expo-image';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { disconnectGitHub } from '@/sync/apiGithub';
 import { disconnectService } from '@/sync/apiServices';
+import { getServerUrl } from '@/sync/serverConfig';
 
 export default React.memo(() => {
     const { theme } = useUnistyles();
@@ -89,6 +90,22 @@ export default React.memo(() => {
             Modal.alert(t('common.error'), t('settingsAccount.secretKeyCopyFailed'));
         }
     };
+
+    // Feishu linking (web only)
+    const handleLinkFeishu = useCallback(async () => {
+        if (Platform.OS !== 'web' || !auth.credentials) return;
+        const response = await fetch(`${getServerUrl()}/v1/auth/feishu/prepare-link`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${auth.credentials.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ secret: auth.credentials.secret })
+        });
+        const data = await response.json() as { linkToken: string };
+        const appUrl = encodeURIComponent(window.location.origin);
+        window.location.href = `${getServerUrl()}/v1/auth/feishu/authorize?link_token=${data.linkToken}&app_url=${appUrl}`;
+    }, [auth.credentials]);
 
     const handleLogout = async () => {
         const confirmed = await Modal.confirm(
@@ -215,6 +232,19 @@ export default React.memo(() => {
                         </ItemGroup>
                     );
                 })()}
+
+                {/* Feishu Linking (web only) */}
+                {Platform.OS === 'web' && (
+                    <ItemGroup title={t('settingsAccount.feishu')}>
+                        <Item
+                            title={t('settingsAccount.linkFeishu')}
+                            subtitle={t('settingsAccount.linkFeishuSubtitle')}
+                            icon={<Ionicons name="link-outline" size={29} color="#007AFF" />}
+                            onPress={handleLinkFeishu}
+                            showChevron={false}
+                        />
+                    </ItemGroup>
+                )}
 
                 {/* Backup Section */}
                 <ItemGroup

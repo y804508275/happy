@@ -14,6 +14,8 @@ import { trackAccountCreated, trackAccountRestored } from '@/track';
 import { HomeHeaderNotAuth } from "@/components/HomeHeader";
 import { MainView } from "@/components/MainView";
 import { t } from '@/text';
+import { getServerUrl } from "@/sync/serverConfig";
+import axios from "axios";
 
 export default function Home() {
     const auth = useAuth();
@@ -35,6 +37,26 @@ function NotAuthenticated() {
     const router = useRouter();
     const isLandscape = useIsLandscape();
     const insets = useSafeAreaInsets();
+
+    // Handle Feishu OAuth callback on web
+    React.useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const params = new URLSearchParams(window.location.search);
+        const feishuCode = params.get('feishu_auth');
+        if (!feishuCode) return;
+
+        window.history.replaceState({}, '', window.location.pathname);
+
+        (async () => {
+            try {
+                const response = await axios.post(`${getServerUrl()}/v1/auth/feishu/exchange`, { code: feishuCode });
+                const { token, secret } = response.data;
+                await auth.login(token, secret);
+            } catch (error) {
+                console.error('Feishu auth exchange failed', error);
+            }
+        })();
+    }, []);
 
     const createAccount = async () => {
         try {
@@ -66,11 +88,21 @@ function NotAuthenticated() {
                 <>
                     <View style={styles.buttonContainer}>
                         <RoundButton
+                            title={t('welcome.loginWithFeishu')}
+                            onPress={() => {
+                                window.location.href = `${getServerUrl()}/v1/auth/feishu/authorize?app_url=${encodeURIComponent(window.location.origin)}`;
+                            }}
+                        />
+                    </View>
+                    <View style={styles.buttonContainerSecondary}>
+                        <RoundButton
+                            size="normal"
                             title={t('welcome.loginWithMobileApp')}
                             onPress={() => {
                                 trackAccountRestored();
                                 router.push('/restore');
                             }}
+                            display="inverted"
                         />
                     </View>
                     <View style={styles.buttonContainerSecondary}>
@@ -127,11 +159,21 @@ function NotAuthenticated() {
                         ? (<>
                             <View style={styles.landscapeButtonContainer}>
                                 <RoundButton
+                                    title={t('welcome.loginWithFeishu')}
+                                    onPress={() => {
+                                        window.location.href = `${getServerUrl()}/v1/auth/feishu/authorize?app_url=${encodeURIComponent(window.location.origin)}`;
+                                    }}
+                                />
+                            </View>
+                            <View style={styles.landscapeButtonContainerSecondary}>
+                                <RoundButton
+                                    size="normal"
                                     title={t('welcome.loginWithMobileApp')}
                                     onPress={() => {
                                         trackAccountRestored();
                                         router.push('/restore');
                                     }}
+                                    display="inverted"
                                 />
                             </View>
                             <View style={styles.landscapeButtonContainerSecondary}>

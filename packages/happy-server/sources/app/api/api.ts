@@ -22,6 +22,7 @@ import { userRoutes } from "./routes/userRoutes";
 import { feedRoutes } from "./routes/feedRoutes";
 import { kvRoutes } from "./routes/kvRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
+import { feishuAuthRoutes } from "./routes/feishuAuthRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import * as path from "path";
 import * as fs from "fs";
@@ -35,6 +36,7 @@ export async function startApi() {
     const app = fastify({
         loggerInstance: logger,
         bodyLimit: 1024 * 1024 * 100, // 100MB
+        trustProxy: true,
     });
     app.register(import('@fastify/cors'), {
         origin: '*',
@@ -90,6 +92,7 @@ export async function startApi() {
     feedRoutes(typed);
     kvRoutes(typed);
     v3SessionRoutes(typed);
+    feishuAuthRoutes(typed);
 
     // Start HTTP 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

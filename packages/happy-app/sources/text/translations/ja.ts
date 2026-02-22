@@ -634,6 +634,9 @@ export const ja: TranslationStructure = {
         logout: 'ログアウト',
         logoutSubtitle: 'サインアウトしてローカルデータを消去',
         logoutConfirm: 'ログアウトしてもよろしいですか？シークレットキーのバックアップを取っていることを確認してください！',
+        feishu: 'Feishu',
+        linkFeishu: 'Feishuアカウントを連携',
+        linkFeishuSubtitle: 'Feishuアカウントを連携してクロスデバイスログインを有効化',
     },
 
     settingsLanguage: {
@@ -733,6 +736,7 @@ export const ja: TranslationStructure = {
         createAccount: 'アカウントを作成',
         linkOrRestoreAccount: 'アカウントをリンクまたは復元',
         loginWithMobileApp: 'モバイルアプリでログイン',
+        loginWithFeishu: 'Feishuでログイン',
     },
 
     review: {

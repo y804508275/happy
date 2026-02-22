@@ -602,6 +602,9 @@ export const ca: TranslationStructure = {
         logout: 'Tanca la sessió',
         logoutSubtitle: 'Tanca la sessió i esborra les dades locals',
         logoutConfirm: 'Estàs segur que vols tancar la sessió? Assegura\'t d\'haver fet una còpia de seguretat de la teva clau secreta!',
+        feishu: 'Feishu',
+        linkFeishu: 'Enllaça el compte de Feishu',
+        linkFeishuSubtitle: 'Enllaça Feishu per iniciar sessió en diferents dispositius',
     },
 
     settingsLanguage: {
@@ -701,6 +704,7 @@ export const ca: TranslationStructure = {
         createAccount: 'Crea un compte',
         linkOrRestoreAccount: 'Enllaça o restaura un compte',
         loginWithMobileApp: 'Inicia sessió amb l\'aplicació mòbil',
+        loginWithFeishu: 'Inicia sessió amb Feishu',
     },
 
     review: {

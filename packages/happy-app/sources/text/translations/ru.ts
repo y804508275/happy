@@ -612,6 +612,9 @@ export const ru: TranslationStructure = {
         logout: 'Выйти',
         logoutSubtitle: 'Выйти из аккаунта и очистить локальные данные',
         logoutConfirm: 'Вы уверены, что хотите выйти? Убедитесь, что вы сохранили резервную копию секретного ключа!',
+        feishu: 'Feishu',
+        linkFeishu: 'Привязать аккаунт Feishu',
+        linkFeishuSubtitle: 'Привяжите Feishu для входа на разных устройствах',
     },
 
     connectButton: {
@@ -699,6 +702,7 @@ export const ru: TranslationStructure = {
         createAccount: 'Создать аккаунт',
         linkOrRestoreAccount: 'Связать или восстановить аккаунт',
         loginWithMobileApp: 'Войти через мобильное приложение',
+        loginWithFeishu: 'Войти через Feishu',
     },
 
     review: {

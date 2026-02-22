@@ -602,6 +602,9 @@ export const pt: TranslationStructure = {
         logout: 'Sair',
         logoutSubtitle: 'Sair e limpar dados locais',
         logoutConfirm: 'Tem certeza de que quer sair? Certifique-se de ter feito backup da sua chave secreta!',
+        feishu: 'Feishu',
+        linkFeishu: 'Vincular conta Feishu',
+        linkFeishuSubtitle: 'Vincule o Feishu para login em diferentes dispositivos',
     },
 
     settingsLanguage: {
@@ -701,6 +704,7 @@ export const pt: TranslationStructure = {
         createAccount: 'Criar conta',
         linkOrRestoreAccount: 'Vincular ou restaurar conta',
         loginWithMobileApp: 'Fazer login com aplicativo móvel',
+        loginWithFeishu: 'Fazer login com Feishu',
     },
 
     review: {

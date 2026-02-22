@@ -603,6 +603,9 @@ export const zhHant: TranslationStructure = {
         logout: '登出',
         logoutSubtitle: '登出並清除本機資料',
         logoutConfirm: '您確定要登出嗎？請確保您已備份金鑰！',
+        feishu: '飛書',
+        linkFeishu: '關聯飛書帳號',
+        linkFeishuSubtitle: '關聯飛書帳號以實現跨裝置登入',
     },
 
     settingsLanguage: {
@@ -702,6 +705,7 @@ export const zhHant: TranslationStructure = {
         createAccount: '建立帳戶',
         linkOrRestoreAccount: '連結或恢復帳戶',
         loginWithMobileApp: '使用行動應用程式登入',
+        loginWithFeishu: '飛書登入',
     },
 
     review: {

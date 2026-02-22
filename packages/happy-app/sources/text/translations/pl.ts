@@ -612,6 +612,9 @@ export const pl: TranslationStructure = {
         logout: 'Wyloguj',
         logoutSubtitle: 'Wyloguj się i wyczyść dane lokalne',
         logoutConfirm: 'Czy na pewno chcesz się wylogować? Upewnij się, że masz kopię zapasową klucza tajnego!',
+        feishu: 'Feishu',
+        linkFeishu: 'Połącz konto Feishu',
+        linkFeishuSubtitle: 'Połącz Feishu, aby logować się na różnych urządzeniach',
     },
 
     settingsLanguage: {
@@ -711,6 +714,7 @@ export const pl: TranslationStructure = {
         createAccount: 'Utwórz konto',
         linkOrRestoreAccount: 'Połącz lub przywróć konto',
         loginWithMobileApp: 'Zaloguj się przez aplikację mobilną',
+        loginWithFeishu: 'Zaloguj się przez Feishu',
     },
 
     review: {

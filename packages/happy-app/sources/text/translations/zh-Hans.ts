@@ -604,6 +604,9 @@ export const zhHans: TranslationStructure = {
         logout: '登出',
         logoutSubtitle: '登出并清除本地数据',
         logoutConfirm: '您确定要登出吗？请确保您已备份密钥！',
+        feishu: '飞书',
+        linkFeishu: '关联飞书账号',
+        linkFeishuSubtitle: '关联飞书账号以实现跨设备登录',
     },
 
     settingsLanguage: {
@@ -703,6 +706,7 @@ export const zhHans: TranslationStructure = {
         createAccount: '创建账户',
         linkOrRestoreAccount: '链接或恢复账户',
         loginWithMobileApp: '使用移动应用登录',
+        loginWithFeishu: '飞书登录',
     },
 
     review: {
