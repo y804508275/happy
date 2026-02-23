@@ -65,6 +65,7 @@ export function rpcHandler(
     socket.on('rpc-call', async (data: any, callback: (response: any) => void) => {
         try {
             const { method, params } = data;
+            log({ module: 'websocket-rpc' }, `RPC call: method=${method}, userId=${userId}, localMethods=[${Array.from(rpcListeners.keys()).join(',')}]`);
 
             if (!method || typeof method !== 'string') {
                 if (callback) {
@@ -91,6 +92,7 @@ export function rpcHandler(
 
             // Try local socket first
             if (targetSocket && targetSocket.connected) {
+                log({ module: 'websocket-rpc' }, `RPC call: found local target for ${method}`);
                 try {
                     const response = await targetSocket.timeout(30000).emitWithAck('rpc-request', {
                         method,
@@ -118,9 +120,11 @@ export function rpcHandler(
 
             // Try cross-instance forwarding via Redis pub/sub
             const forwarder = getForwarder();
+            log({ module: 'websocket-rpc' }, `RPC call: no local target for ${method}, forwarder=${forwarder ? 'available' : 'null'}`);
             if (forwarder) {
                 try {
                     const response = await forwarder(userId, method, params);
+                    log({ module: 'websocket-rpc' }, `RPC forward response: ${JSON.stringify(response)}`);
                     if (response) {
                         if (callback) {
                             callback(response);
@@ -128,10 +132,11 @@ export function rpcHandler(
                         return;
                     }
                 } catch (e) {
-                    // Cross-instance forwarding failed, fall through
+                    log({ module: 'websocket-rpc', level: 'error' }, `RPC forward error: ${e}`);
                 }
             }
 
+            log({ module: 'websocket-rpc' }, `RPC call failed: method ${method} not available anywhere`);
             if (callback) {
                 callback({
                     ok: false,

@@ -67,20 +67,24 @@ export function startSocket(app: Fastify) {
 
                     const userRpcListeners = rpcListeners.get(userId);
                     const targetSocket = userRpcListeners?.get(method);
+                    log({ module: 'websocket-rpc' }, `RPC forward received: method=${method}, userId=${userId}, hasTarget=${!!targetSocket?.connected}, localUsers=[${Array.from(rpcListeners.keys()).join(',')}]`);
 
                     if (!targetSocket?.connected) return; // We don't have the target
 
                     try {
+                        log({ module: 'websocket-rpc' }, `RPC forwarding to local daemon: method=${method}`);
                         const response = await targetSocket.timeout(30000).emitWithAck('rpc-request', {
                             method,
                             params
                         });
+                        log({ module: 'websocket-rpc' }, `RPC forward success: method=${method}`);
                         redisPub.publish(`rpc-response:${replyTo}`, JSON.stringify({
                             requestId,
                             ok: true,
                             result: response
                         }));
                     } catch (error) {
+                        log({ module: 'websocket-rpc', level: 'error' }, `RPC forward to daemon failed: ${error}`);
                         redisPub.publish(`rpc-response:${replyTo}`, JSON.stringify({
                             requestId,
                             ok: false,
@@ -90,11 +94,14 @@ export function startSocket(app: Fastify) {
                 } else if (channel === `rpc-response:${instanceId}`) {
                     // Response to our cross-instance RPC call
                     const { requestId, ...response } = JSON.parse(message);
+                    log({ module: 'websocket-rpc' }, `RPC response received: requestId=${requestId}, response=${JSON.stringify(response)}`);
                     const pending = pendingRpcCalls.get(requestId);
                     if (pending) {
                         clearTimeout(pending.timer);
                         pendingRpcCalls.delete(requestId);
                         pending.resolve(response);
+                    } else {
+                        log({ module: 'websocket-rpc', level: 'warn' }, `RPC response for unknown requestId: ${requestId}`);
                     }
                 }
             });
