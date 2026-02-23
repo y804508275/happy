@@ -67,7 +67,8 @@ export function startSocket(app: Fastify) {
 
                     const userRpcListeners = rpcListeners.get(userId);
                     const targetSocket = userRpcListeners?.get(method);
-                    log({ module: 'websocket-rpc' }, `RPC forward received: method=${method}, userId=${userId}, hasTarget=${!!targetSocket?.connected}, localUsers=[${Array.from(rpcListeners.keys()).join(',')}]`);
+                    const methods = userRpcListeners ? Array.from(userRpcListeners.keys()) : [];
+                    log({ module: 'websocket-rpc' }, `RPC forward received: method=${method}, userId=${userId}, hasTarget=${!!targetSocket?.connected}, localUsers=[${Array.from(rpcListeners.keys()).join(',')}], userMethods=[${methods.join(',')}]`);
 
                     if (!targetSocket?.connected) return; // We don't have the target
 

@@ -28,6 +28,7 @@ export function rpcHandler(
 
             // Register this socket as the listener for this method
             rpcListeners.set(method, socket);
+            log({ module: 'websocket-rpc' }, `RPC method registered: ${method} on socket ${socket.id} (user: ${userId}), total methods: [${Array.from(rpcListeners.keys()).join(',')}]`);
 
             socket.emit('rpc-registered', { method });
         } catch (error) {
