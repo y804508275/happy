@@ -12,6 +12,7 @@ import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
+import * as crypto from "crypto";
 
 export function startSocket(app: Fastify) {
     const io = new Server(app.server, {
@@ -28,10 +29,104 @@ export function startSocket(app: Fastify) {
         allowUpgrades: true,
         upgradeTimeout: 10000,
         connectTimeout: 20000,
-        serveClient: false // Don't serve the client files
+        serveClient: false
     });
 
+    // Initialize eventRouter with io reference for room-based emission
+    eventRouter.init(io);
+
     let rpcListeners = new Map<string, Map<string, Socket>>();
+
+    // Cross-instance RPC forwarding via Redis pub/sub
+    let forwardRpcCrossInstance: ((userId: string, method: string, params: any) => Promise<any>) | null = null;
+
+    if (process.env.REDIS_URL) {
+        // Add Redis adapter for cross-instance Socket.IO broadcasting
+        import("@socket.io/redis-streams-adapter").then(({ createAdapter }) => {
+            import("ioredis").then(({ default: Redis }) => {
+                const adapterClient = new Redis(process.env.REDIS_URL!);
+                io.adapter(createAdapter(adapterClient));
+                log({ module: 'websocket' }, `Redis streams adapter connected`);
+            });
+        });
+
+        // Setup Redis pub/sub for cross-instance RPC forwarding
+        import("ioredis").then(({ default: Redis }) => {
+            const instanceId = crypto.randomUUID();
+            const redisPub = new Redis(process.env.REDIS_URL!);
+            const redisSub = new Redis(process.env.REDIS_URL!);
+            const pendingRpcCalls = new Map<string, { resolve: (value: any) => void; timer: ReturnType<typeof setTimeout> }>();
+
+            redisSub.subscribe('rpc-forward', `rpc-response:${instanceId}`);
+
+            redisSub.on('message', async (channel, message) => {
+                if (channel === 'rpc-forward') {
+                    // Another instance is asking us to forward an RPC call
+                    const { userId, method, params, requestId, replyTo } = JSON.parse(message);
+                    if (replyTo === instanceId) return; // Skip self
+
+                    const userRpcListeners = rpcListeners.get(userId);
+                    const targetSocket = userRpcListeners?.get(method);
+
+                    if (!targetSocket?.connected) return; // We don't have the target
+
+                    try {
+                        const response = await targetSocket.timeout(30000).emitWithAck('rpc-request', {
+                            method,
+                            params
+                        });
+                        redisPub.publish(`rpc-response:${replyTo}`, JSON.stringify({
+                            requestId,
+                            ok: true,
+                            result: response
+                        }));
+                    } catch (error) {
+                        redisPub.publish(`rpc-response:${replyTo}`, JSON.stringify({
+                            requestId,
+                            ok: false,
+                            error: error instanceof Error ? error.message : 'RPC call failed'
+                        }));
+                    }
+                } else if (channel === `rpc-response:${instanceId}`) {
+                    // Response to our cross-instance RPC call
+                    const { requestId, ...response } = JSON.parse(message);
+                    const pending = pendingRpcCalls.get(requestId);
+                    if (pending) {
+                        clearTimeout(pending.timer);
+                        pendingRpcCalls.delete(requestId);
+                        pending.resolve(response);
+                    }
+                }
+            });
+
+            forwardRpcCrossInstance = (userId: string, method: string, params: any): Promise<any> => {
+                return new Promise((resolve) => {
+                    const requestId = crypto.randomUUID();
+                    const timer = setTimeout(() => {
+                        pendingRpcCalls.delete(requestId);
+                        resolve(null);
+                    }, 30000);
+
+                    pendingRpcCalls.set(requestId, { resolve, timer });
+                    redisPub.publish('rpc-forward', JSON.stringify({
+                        userId,
+                        method,
+                        params,
+                        requestId,
+                        replyTo: instanceId
+                    }));
+                });
+            };
+
+            onShutdown('redis-rpc', async () => {
+                redisSub.disconnect();
+                redisPub.disconnect();
+            });
+
+            log({ module: 'websocket' }, `Redis RPC forwarding ready (instance: ${instanceId.slice(0, 8)})`);
+        });
+    }
+
     io.on("connection", async (socket) => {
         log({ module: 'websocket' }, `New connection attempt from socket: ${socket.id}`);
         const token = socket.handshake.auth.token as string;
@@ -137,7 +232,7 @@ export function startSocket(app: Fastify) {
             userRpcListeners = new Map<string, Socket>();
             rpcListeners.set(userId, userRpcListeners);
         }
-        rpcHandler(userId, socket, userRpcListeners);
+        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance);
         usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);
         pingHandler(socket);

@@ -1,4 +1,4 @@
-import { Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
 import { log } from "@/utils/log";
 import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
@@ -207,6 +207,13 @@ export interface EphemeralPayload {
 
 class EventRouter {
     private userConnections = new Map<string, Set<ClientConnection>>();
+    private io: Server | null = null;
+
+    // === INITIALIZATION ===
+
+    init(io: Server): void {
+        this.io = io;
+    }
 
     // === CONNECTION MANAGEMENT ===
 
@@ -215,6 +222,16 @@ class EventRouter {
             this.userConnections.set(userId, new Set());
         }
         this.userConnections.get(userId)!.add(connection);
+
+        // Join Socket.IO rooms for cross-instance broadcasting
+        connection.socket.join(`user:${userId}`);
+        if (connection.connectionType === 'user-scoped') {
+            connection.socket.join(`user:${userId}:user-scoped`);
+        } else if (connection.connectionType === 'session-scoped') {
+            connection.socket.join(`user:${userId}:session:${connection.sessionId}`);
+        } else if (connection.connectionType === 'machine-scoped') {
+            connection.socket.join(`user:${userId}:machine:${connection.machineId}`);
+        }
     }
 
     removeConnection(userId: string, connection: ClientConnection): void {
@@ -225,6 +242,7 @@ class EventRouter {
                 this.userConnections.delete(userId);
             }
         }
+        // Room cleanup is automatic when socket disconnects
     }
 
     getConnections(userId: string): Set<ClientConnection> | undefined {
@@ -265,46 +283,43 @@ class EventRouter {
 
     // === PRIVATE ROUTING LOGIC ===
 
-    private shouldSendToConnection(
-        connection: ClientConnection,
-        filter: RecipientFilter
-    ): boolean {
+    private getTargetRooms(userId: string, filter: RecipientFilter): string[] {
         switch (filter.type) {
             case 'all-interested-in-session':
-                // Send to session-scoped with matching session + all user-scoped
-                if (connection.connectionType === 'session-scoped') {
-                    if (connection.sessionId !== filter.sessionId) {
-                        return false;  // Wrong session
-                    }
-                } else if (connection.connectionType === 'machine-scoped') {
-                    return false;  // Machines don't need session updates
-                }
-                // user-scoped always gets it
-                return true;
-
+                return [`user:${userId}:session:${filter.sessionId}`, `user:${userId}:user-scoped`];
             case 'user-scoped-only':
-                return connection.connectionType === 'user-scoped';
-
+                return [`user:${userId}:user-scoped`];
             case 'machine-scoped-only':
-                // Send to user-scoped (mobile/web needs all machine updates) + only the specific machine
-                if (connection.connectionType === 'user-scoped') {
-                    return true;
-                }
-                if (connection.connectionType === 'machine-scoped') {
-                    return connection.machineId === filter.machineId;
-                }
-                return false;  // session-scoped doesn't need machine updates
-
+                return [`user:${userId}:user-scoped`, `user:${userId}:machine:${filter.machineId}`];
             case 'all-user-authenticated-connections':
-                // Send to all connection types (default behavior)
-                return true;
-
+                return [`user:${userId}`];
             default:
-                return false;
+                return [`user:${userId}`];
         }
     }
 
     private emit(params: {
+        userId: string;
+        eventName: 'update' | 'ephemeral';
+        payload: any;
+        recipientFilter: RecipientFilter;
+        skipSenderConnection?: ClientConnection;
+    }): void {
+        if (this.io) {
+            // Room-based emission (works across instances via Redis adapter)
+            const rooms = this.getTargetRooms(params.userId, params.recipientFilter);
+            if (params.skipSenderConnection) {
+                params.skipSenderConnection.socket.to(rooms).emit(params.eventName, params.payload);
+            } else {
+                this.io.to(rooms).emit(params.eventName, params.payload);
+            }
+        } else {
+            // Fallback: local-only emission (no io initialized)
+            this.emitLocal(params);
+        }
+    }
+
+    private emitLocal(params: {
         userId: string;
         eventName: 'update' | 'ephemeral';
         payload: any;
@@ -318,17 +333,48 @@ class EventRouter {
         }
 
         for (const connection of connections) {
-            // Skip message echo
             if (params.skipSenderConnection && connection === params.skipSenderConnection) {
                 continue;
             }
-
-            // Apply recipient filter
             if (!this.shouldSendToConnection(connection, params.recipientFilter)) {
                 continue;
             }
-
             connection.socket.emit(params.eventName, params.payload);
+        }
+    }
+
+    private shouldSendToConnection(
+        connection: ClientConnection,
+        filter: RecipientFilter
+    ): boolean {
+        switch (filter.type) {
+            case 'all-interested-in-session':
+                if (connection.connectionType === 'session-scoped') {
+                    if (connection.sessionId !== filter.sessionId) {
+                        return false;
+                    }
+                } else if (connection.connectionType === 'machine-scoped') {
+                    return false;
+                }
+                return true;
+
+            case 'user-scoped-only':
+                return connection.connectionType === 'user-scoped';
+
+            case 'machine-scoped-only':
+                if (connection.connectionType === 'user-scoped') {
+                    return true;
+                }
+                if (connection.connectionType === 'machine-scoped') {
+                    return connection.machineId === filter.machineId;
+                }
+                return false;
+
+            case 'all-user-authenticated-connections':
+                return true;
+
+            default:
+                return false;
         }
     }
 }
