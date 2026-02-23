@@ -606,6 +606,9 @@ export const zhHant: TranslationStructure = {
         feishu: '飛書',
         linkFeishu: '關聯飛書帳號',
         linkFeishuSubtitle: '關聯飛書帳號以實現跨裝置登入',
+        feishuLinked: '飛書帳號',
+        feishuLinkedUnknown: '已關聯',
+        feishuLinkedSubtitle: '點擊重新關聯其他帳號',
     },
 
     settingsLanguage: {

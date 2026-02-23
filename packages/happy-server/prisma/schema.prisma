@@ -31,6 +31,7 @@ model Account {
     githubUserId    String?     @unique
     githubUser      GithubUser? @relation(fields: [githubUserId], references: [id])
     feishuUnionId   String?     @unique
+    feishuName      String?
     encryptedSecret String?
 
     // Profile

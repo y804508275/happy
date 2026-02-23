@@ -637,6 +637,9 @@ export const ja: TranslationStructure = {
         feishu: 'Feishu',
         linkFeishu: 'Feishuアカウントを連携',
         linkFeishuSubtitle: 'Feishuアカウントを連携してクロスデバイスログインを有効化',
+        feishuLinked: 'Feishuアカウント',
+        feishuLinkedUnknown: '連携済み',
+        feishuLinkedSubtitle: 'タップして別のアカウントを再連携',
     },
 
     settingsLanguage: {

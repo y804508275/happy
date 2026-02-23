@@ -605,6 +605,9 @@ export const es: TranslationStructure = {
         feishu: 'Feishu',
         linkFeishu: 'Vincular cuenta de Feishu',
         linkFeishuSubtitle: 'Vincula Feishu para iniciar sesión en diferentes dispositivos',
+        feishuLinked: 'Cuenta de Feishu',
+        feishuLinkedUnknown: 'Vinculada',
+        feishuLinkedSubtitle: 'Toca para vincular otra cuenta',
     },
 
     settingsLanguage: {

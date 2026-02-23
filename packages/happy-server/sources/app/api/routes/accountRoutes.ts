@@ -20,7 +20,9 @@ export function accountRoutes(app: Fastify) {
                 lastName: true,
                 username: true,
                 avatar: true,
-                githubUser: true
+                githubUser: true,
+                feishuUnionId: true,
+                feishuName: true
             }
         });
         const connectedVendors = new Set((await db.serviceAccountToken.findMany({ where: { accountId: userId } })).map(t => t.vendor));
@@ -32,6 +34,7 @@ export function accountRoutes(app: Fastify) {
             username: user.username,
             avatar: user.avatar ? { ...user.avatar, url: getPublicUrl(user.avatar.path) } : null,
             github: user.githubUser ? user.githubUser.profile : null,
+            feishu: user.feishuUnionId ? { name: user.feishuName } : null,
             connectedServices: Array.from(connectedVendors)
         });
     });

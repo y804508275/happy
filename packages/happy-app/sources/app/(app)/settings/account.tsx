@@ -236,13 +236,24 @@ export default React.memo(() => {
                 {/* Feishu Linking (web only) */}
                 {Platform.OS === 'web' && (
                     <ItemGroup title={t('settingsAccount.feishu')}>
-                        <Item
-                            title={t('settingsAccount.linkFeishu')}
-                            subtitle={t('settingsAccount.linkFeishuSubtitle')}
-                            icon={<Ionicons name="link-outline" size={29} color="#007AFF" />}
-                            onPress={handleLinkFeishu}
-                            showChevron={false}
-                        />
+                        {profile.feishu ? (
+                            <Item
+                                title={t('settingsAccount.feishuLinked')}
+                                detail={profile.feishu.name || t('settingsAccount.feishuLinkedUnknown')}
+                                subtitle={t('settingsAccount.feishuLinkedSubtitle')}
+                                icon={<Ionicons name="checkmark-circle" size={29} color="#34C759" />}
+                                onPress={handleLinkFeishu}
+                                showChevron={false}
+                            />
+                        ) : (
+                            <Item
+                                title={t('settingsAccount.linkFeishu')}
+                                subtitle={t('settingsAccount.linkFeishuSubtitle')}
+                                icon={<Ionicons name="link-outline" size={29} color="#007AFF" />}
+                                onPress={handleLinkFeishu}
+                                showChevron={false}
+                            />
+                        )}
                     </ItemGroup>
                 )}
 

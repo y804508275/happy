@@ -607,6 +607,9 @@ export const zhHans: TranslationStructure = {
         feishu: '飞书',
         linkFeishu: '关联飞书账号',
         linkFeishuSubtitle: '关联飞书账号以实现跨设备登录',
+        feishuLinked: '飞书账号',
+        feishuLinkedUnknown: '已关联',
+        feishuLinkedSubtitle: '点击重新关联其他账号',
     },
 
     settingsLanguage: {

@@ -167,6 +167,7 @@ export function feishuAuthRoutes(app: Fastify) {
                     where: { id: linkData.userId },
                     data: {
                         feishuUnionId: unionId,
+                        feishuName: name || undefined,
                         encryptedSecret: linkData.encryptedSecret,
                     }
                 });
@@ -199,6 +200,7 @@ export function feishuAuthRoutes(app: Fastify) {
                         data: {
                             publicKey: publicKeyHex,
                             feishuUnionId: unionId,
+                            feishuName: name || undefined,
                             encryptedSecret: encrypted,
                             firstName: name || undefined,
                         }

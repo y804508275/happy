@@ -604,6 +604,9 @@ export const en = {
         feishu: 'Feishu',
         linkFeishu: 'Link Feishu Account',
         linkFeishuSubtitle: 'Link your Feishu account for cross-device login',
+        feishuLinked: 'Feishu Account',
+        feishuLinkedUnknown: 'Linked',
+        feishuLinkedSubtitle: 'Tap to re-link a different account',
     },
 
     settingsLanguage: {

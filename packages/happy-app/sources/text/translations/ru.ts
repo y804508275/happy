@@ -615,6 +615,9 @@ export const ru: TranslationStructure = {
         feishu: 'Feishu',
         linkFeishu: 'Привязать аккаунт Feishu',
         linkFeishuSubtitle: 'Привяжите Feishu для входа на разных устройствах',
+        feishuLinked: 'Аккаунт Feishu',
+        feishuLinkedUnknown: 'Привязан',
+        feishuLinkedSubtitle: 'Нажмите для привязки другого аккаунта',
     },
 
     connectButton: {

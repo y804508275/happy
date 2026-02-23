@@ -21,6 +21,10 @@ export const ImageRefSchema = z.object({
     url: z.string()
 });
 
+export const FeishuProfileSchema = z.object({
+    name: z.string().nullable()
+});
+
 export const ProfileSchema = z.object({
     id: z.string(),
     timestamp: z.number(),
@@ -28,6 +32,7 @@ export const ProfileSchema = z.object({
     lastName: z.string().nullable(),
     avatar: ImageRefSchema.nullable(),
     github: GitHubProfileSchema.nullable(),
+    feishu: FeishuProfileSchema.nullable().default(null),
     connectedServices: z.array(z.string()).default([])
 });
 
@@ -46,6 +51,7 @@ export const profileDefaults: Profile = {
     lastName: null,
     avatar: null,
     github: null,
+    feishu: null,
     connectedServices: []
 };
 Object.freeze(profileDefaults);
