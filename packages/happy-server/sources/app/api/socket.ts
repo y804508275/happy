@@ -135,45 +135,41 @@ export function startSocket(app: Fastify) {
         });
     }
 
-    io.on("connection", async (socket) => {
-        log({ module: 'websocket' }, `New connection attempt from socket: ${socket.id}`);
+    // Auth middleware: runs BEFORE the connection event fires, so all socket.on()
+    // listeners are set up synchronously and no incoming events are lost.
+    io.use(async (socket, next) => {
         const token = socket.handshake.auth.token as string;
-        const clientType = socket.handshake.auth.clientType as 'session-scoped' | 'user-scoped' | 'machine-scoped' | undefined;
+        const clientType = socket.handshake.auth.clientType as string | undefined;
         const sessionId = socket.handshake.auth.sessionId as string | undefined;
         const machineId = socket.handshake.auth.machineId as string | undefined;
 
         if (!token) {
-            log({ module: 'websocket' }, `No token provided`);
-            socket.emit('error', { message: 'Missing authentication token' });
-            socket.disconnect();
-            return;
+            return next(new Error('Missing authentication token'));
         }
 
-        // Validate session-scoped clients have sessionId
         if (clientType === 'session-scoped' && !sessionId) {
-            log({ module: 'websocket' }, `Session-scoped client missing sessionId`);
-            socket.emit('error', { message: 'Session ID required for session-scoped clients' });
-            socket.disconnect();
-            return;
+            return next(new Error('Session ID required for session-scoped clients'));
         }
 
-        // Validate machine-scoped clients have machineId
         if (clientType === 'machine-scoped' && !machineId) {
-            log({ module: 'websocket' }, `Machine-scoped client missing machineId`);
-            socket.emit('error', { message: 'Machine ID required for machine-scoped clients' });
-            socket.disconnect();
-            return;
+            return next(new Error('Machine ID required for machine-scoped clients'));
         }
 
         const verified = await auth.verifyToken(token);
         if (!verified) {
-            log({ module: 'websocket' }, `Invalid token provided`);
-            socket.emit('error', { message: 'Invalid authentication token' });
-            socket.disconnect();
-            return;
+            return next(new Error('Invalid authentication token'));
         }
 
-        const userId = verified.userId;
+        socket.data.userId = verified.userId;
+        next();
+    });
+
+    io.on("connection", (socket) => {
+        const userId = socket.data.userId as string;
+        const clientType = socket.handshake.auth.clientType as 'session-scoped' | 'user-scoped' | 'machine-scoped' | undefined;
+        const sessionId = socket.handshake.auth.sessionId as string | undefined;
+        const machineId = socket.handshake.auth.machineId as string | undefined;
+
         log({ module: 'websocket' }, `Token verified: ${userId}, clientType: ${clientType || 'user-scoped'}, sessionId: ${sessionId || 'none'}, machineId: ${machineId || 'none'}, socketId: ${socket.id}`);
 
         // Store connection based on type
@@ -200,19 +196,22 @@ export function startSocket(app: Fastify) {
                 userId
             };
         }
-        eventRouter.addConnection(userId, connection);
-        incrementWebSocketConnection(connection.connectionType);
 
-        // Broadcast daemon online status
-        if (connection.connectionType === 'machine-scoped') {
-            // Broadcast daemon online
-            const machineActivity = buildMachineActivityEphemeral(machineId!, true, Date.now());
-            eventRouter.emitEphemeral({
-                userId,
-                payload: machineActivity,
-                recipientFilter: { type: 'user-scoped-only' }
-            });
+        // Set up ALL event handlers SYNCHRONOUSLY before any events can arrive.
+        // This prevents race conditions where the daemon sends rpc-register
+        // before the listener is ready.
+        let userRpcListeners = rpcListeners.get(userId);
+        if (!userRpcListeners) {
+            userRpcListeners = new Map<string, Socket>();
+            rpcListeners.set(userId, userRpcListeners);
         }
+        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance);
+        usageHandler(userId, socket);
+        sessionUpdateHandler(userId, socket, connection);
+        pingHandler(socket);
+        machineUpdateHandler(userId, socket);
+        artifactUpdateHandler(userId, socket);
+        accessKeyHandler(userId, socket);
 
         socket.on('disconnect', () => {
             websocketEventsCounter.inc({ event_type: 'disconnect' });
@@ -234,21 +233,20 @@ export function startSocket(app: Fastify) {
             }
         });
 
-        // Handlers
-        let userRpcListeners = rpcListeners.get(userId);
-        if (!userRpcListeners) {
-            userRpcListeners = new Map<string, Socket>();
-            rpcListeners.set(userId, userRpcListeners);
-        }
-        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance);
-        usageHandler(userId, socket);
-        sessionUpdateHandler(userId, socket, connection);
-        pingHandler(socket);
-        machineUpdateHandler(userId, socket);
-        artifactUpdateHandler(userId, socket);
-        accessKeyHandler(userId, socket);
+        // Now add connection to router and broadcast (after handlers are ready)
+        eventRouter.addConnection(userId, connection);
+        incrementWebSocketConnection(connection.connectionType);
 
-        // Ready
+        // Broadcast daemon online status
+        if (connection.connectionType === 'machine-scoped') {
+            const machineActivity = buildMachineActivityEphemeral(machineId!, true, Date.now());
+            eventRouter.emitEphemeral({
+                userId,
+                payload: machineActivity,
+                recipientFilter: { type: 'user-scoped-only' }
+            });
+        }
+
         log({ module: 'websocket' }, `User connected: ${userId}`);
     });
 
