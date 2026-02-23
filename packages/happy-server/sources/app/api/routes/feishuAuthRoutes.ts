@@ -256,7 +256,7 @@ export function feishuAuthRoutes(app: Fastify) {
             })
         }
     }, async (request, reply) => {
-        const secretBytes = privacyKit.decodeBase64(request.body.secret) as Uint8Array<ArrayBuffer>;
+        const secretBytes = new Uint8Array(Buffer.from(request.body.secret, 'base64url')) as Uint8Array<ArrayBuffer>;
         const encrypted = encryptSecret(secretBytes);
 
         const linkToken = crypto.randomBytes(32).toString('hex');
