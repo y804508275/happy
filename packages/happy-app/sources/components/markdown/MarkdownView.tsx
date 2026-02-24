@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { MermaidRenderer } from './MermaidRenderer';
 import { t } from '@/text';
+import { useInlineOptions } from '@/hooks/useInlineOptions';
 
 // Option type for callback
 export type Option = {
@@ -181,33 +182,42 @@ function RenderCodeBlock(props: { content: string, language: string | null, firs
     );
 }
 
-function RenderOptionsBlock(props: { 
-    items: string[], 
-    first: boolean, 
-    last: boolean, 
+function RenderOptionsBlock(props: {
+    items: string[],
+    first: boolean,
+    last: boolean,
     selectable: boolean,
-    onOptionPress?: (option: Option) => void 
+    onOptionPress?: (option: Option) => void
 }) {
+    const { activeItems, focusedIndex } = useInlineOptions();
+
+    // Check if this block is the currently active options block
+    const isActive = activeItems !== null
+        && props.items.length === activeItems.length
+        && props.items.every((item, i) => item === activeItems[i]);
+
     return (
         <View style={[style.optionsContainer, props.first && style.first, props.last && style.last]}>
             {props.items.map((item, index) => {
+                const isFocused = isActive && focusedIndex === index;
                 if (props.onOptionPress) {
                     return (
-                        <Pressable 
-                            key={index} 
+                        <Pressable
+                            key={index}
                             style={({ pressed }) => [
                                 style.optionItem,
-                                pressed && style.optionItemPressed
+                                isFocused && style.optionItemFocused,
+                                pressed && style.optionItemPressed,
                             ]}
                             onPress={() => props.onOptionPress?.({ title: item })}
                         >
-                            <Text selectable={props.selectable} style={style.optionText}>{item}</Text>
+                            <Text selectable={props.selectable} style={[style.optionText, isFocused && style.optionTextFocused]}>{item}</Text>
                         </Pressable>
                     );
                 } else {
                     return (
-                        <View key={index} style={style.optionItem}>
-                            <Text selectable={props.selectable} style={style.optionText}>{item}</Text>
+                        <View key={index} style={[style.optionItem, isFocused && style.optionItemFocused]}>
+                            <Text selectable={props.selectable} style={[style.optionText, isFocused && style.optionTextFocused]}>{item}</Text>
                         </View>
                     );
                 }
@@ -482,6 +492,12 @@ const style = StyleSheet.create((theme) => ({
         paddingVertical: 12,
         borderWidth: 1,
         borderColor: theme.colors.divider,
+        borderLeftWidth: 3,
+        borderLeftColor: 'transparent',
+    },
+    optionItemFocused: {
+        backgroundColor: theme.colors.surfaceHigh,
+        borderLeftColor: theme.colors.textSecondary,
     },
     optionItemPressed: {
         opacity: 0.7,
@@ -492,6 +508,9 @@ const style = StyleSheet.create((theme) => ({
         fontSize: 16,
         lineHeight: 24,
         color: theme.colors.text,
+    },
+    optionTextFocused: {
+        fontWeight: '500',
     },
 
     //

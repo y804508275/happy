@@ -1,7 +1,7 @@
 import { AgentContentView } from '@/components/AgentContentView';
 import { AgentInput } from '@/components/AgentInput';
 import { FixedAskUserQuestionBar } from '@/components/tools/FixedAskUserQuestionBar';
-import { FixedOptionsBar } from '@/components/tools/FixedOptionsBar';
+import { InlineOptionsProvider } from '@/hooks/useInlineOptions';
 import { FixedPermissionBar } from '@/components/tools/FixedPermissionBar';
 import {
     getAvailableModels,
@@ -302,7 +302,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     const input = (
         <>
-        <FixedOptionsBar sessionId={sessionId} metadata={session.metadata} />
         <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} />
         <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} />
         <AgentInput
@@ -396,11 +395,17 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
             {/* Main content area - no padding since header is overlay */}
             <View style={{ flexBasis: 0, flexGrow: 1, paddingBottom: safeArea.bottom + ((isRunningOnMac() || Platform.OS === 'web') ? 32 : 0) }}>
-                <AgentContentView
-                    content={content}
-                    input={input}
-                    placeholder={placeholder}
-                />
+                <InlineOptionsProvider
+                    messages={messages}
+                    sessionId={sessionId}
+                    inputValue={message}
+                >
+                    <AgentContentView
+                        content={content}
+                        input={input}
+                        placeholder={placeholder}
+                    />
+                </InlineOptionsProvider>
             </View >
 
             {/* Back button for landscape phone mode when header is hidden */}

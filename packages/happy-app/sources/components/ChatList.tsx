@@ -95,25 +95,47 @@ const ChatListInternal = React.memo((props: {
     // Web: compensate scrollTop when content size changes to prevent layout shift.
     // react-native-web does not support maintainVisibleContentPosition, so without
     // this the inverted (scaleY(-1)) FlatList jumps when new items are inserted.
-    // We only compensate when the user is browsing old messages; when at the bottom,
-    // we keep scrollTop=0 so new content appears naturally.
+    //
+    // IMPORTANT: We only compensate when new messages are actually added (data length
+    // increases). Without this guard, FlatList virtualization causes spurious content
+    // size changes as items are recycled, and blindly compensating for those pushes
+    // the scroll position far into old messages.
     const flatListRef = useRef<FlatList>(null);
     const prevContentHeight = useRef<number>(0);
+    const prevMessageCountRef = useRef<number>(props.messages.length);
+    const hasNewMessagesRef = useRef(false);
+
+    // Detect when new messages are prepended to the list
+    if (props.messages.length > prevMessageCountRef.current) {
+        hasNewMessagesRef.current = true;
+    }
+    prevMessageCountRef.current = props.messages.length;
+
     const handleContentSizeChange = useCallback((_w: number, h: number) => {
         if (Platform.OS !== 'web') return;
         const prev = prevContentHeight.current;
         prevContentHeight.current = h;
-        if (prev > 0 && h > prev) {
-            const node = (flatListRef.current as any)?.getScrollableNode?.();
-            if (!node) return;
-            if (isNearBottomRef.current) {
-                // User is at the bottom watching new messages → keep scrollTop=0
-                node.scrollTop = 0;
-            } else {
-                // User is browsing old messages → compensate to prevent jump
-                node.scrollTop += h - prev;
-            }
+        if (prev === 0 || h === prev) return;
+
+        const node = (flatListRef.current as any)?.getScrollableNode?.();
+        if (!node) return;
+
+        // Read scrollTop directly from DOM to avoid stale isNearBottomRef
+        // (which lags behind due to scrollEventThrottle)
+        const currentScrollTop = node.scrollTop;
+        const nearBottom = currentScrollTop < 100;
+
+        if (nearBottom) {
+            // User is at the bottom watching new messages → keep scrollTop=0
+            node.scrollTop = 0;
+        } else if (h > prev && hasNewMessagesRef.current) {
+            // New messages were added → compensate to prevent jump
+            node.scrollTop = currentScrollTop + (h - prev);
+            hasNewMessagesRef.current = false;
         }
+        // When content size changes from virtualization (item recycling) or
+        // content shrinking (streaming text cleared), do NOT compensate.
+        // This prevents the cascading scroll jump bug.
     }, []);
 
     const scrollToBottom = useCallback(() => {
@@ -137,7 +159,7 @@ const ChatListInternal = React.memo((props: {
                     autoscrollToTopThreshold: 10,
                 }}
                 onScroll={handleScroll}
-                scrollEventThrottle={100}
+                scrollEventThrottle={16}
                 onContentSizeChange={handleContentSizeChange}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}

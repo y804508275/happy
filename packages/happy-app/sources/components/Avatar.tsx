@@ -4,6 +4,10 @@ import { Image } from "expo-image";
 import { AvatarSkia } from "./AvatarSkia";
 import { AvatarGradient } from "./AvatarGradient";
 import { AvatarBrutalist } from "./AvatarBrutalist";
+import { AvatarMarble } from "./AvatarMarble";
+import { AvatarRings } from "./AvatarRings";
+import { AvatarSunset } from "./AvatarSunset";
+import { AvatarBauhaus } from "./AvatarBauhaus";
 import { useSetting } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 
@@ -105,6 +109,14 @@ export const Avatar = React.memo((props: AvatarProps) => {
         AvatarComponent = AvatarSkia;
     } else if (avatarStyle === 'brutalist') {
         AvatarComponent = AvatarBrutalist;
+    } else if (avatarStyle === 'marble') {
+        AvatarComponent = AvatarMarble;
+    } else if (avatarStyle === 'rings') {
+        AvatarComponent = AvatarRings;
+    } else if (avatarStyle === 'sunset') {
+        AvatarComponent = AvatarSunset;
+    } else if (avatarStyle === 'bauhaus') {
+        AvatarComponent = AvatarBauhaus;
     } else {
         AvatarComponent = AvatarGradient;
     }

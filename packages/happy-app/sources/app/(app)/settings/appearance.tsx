@@ -13,10 +13,12 @@ import { darkTheme, lightTheme } from '@/theme';
 import { t, getLanguageNativeName, SUPPORTED_LANGUAGES } from '@/text';
 
 // Define known avatar styles for this version of the app
-type KnownAvatarStyle = 'pixelated' | 'gradient' | 'brutalist';
+type KnownAvatarStyle = 'pixelated' | 'gradient' | 'brutalist' | 'marble' | 'rings' | 'sunset' | 'bauhaus';
+
+const AVATAR_STYLES: KnownAvatarStyle[] = ['pixelated', 'gradient', 'brutalist', 'marble', 'rings', 'sunset', 'bauhaus'];
 
 const isKnownAvatarStyle = (style: string): style is KnownAvatarStyle => {
-    return style === 'pixelated' || style === 'gradient' || style === 'brutalist';
+    return AVATAR_STYLES.includes(style as KnownAvatarStyle);
 };
 
 export default function AppearanceSettingsScreen() {
@@ -202,12 +204,19 @@ export default function AppearanceSettingsScreen() {
                     title={t('settingsAppearance.avatarStyle')}
                     subtitle={t('settingsAppearance.avatarStyleDescription')}
                     icon={<Ionicons name="person-circle-outline" size={29} color="#5856D6" />}
-                    detail={displayStyle === 'pixelated' ? t('settingsAppearance.avatarOptions.pixelated') : displayStyle === 'brutalist' ? t('settingsAppearance.avatarOptions.brutalist') : t('settingsAppearance.avatarOptions.gradient')}
+                    detail={{
+                        pixelated: t('settingsAppearance.avatarOptions.pixelated'),
+                        gradient: t('settingsAppearance.avatarOptions.gradient'),
+                        brutalist: t('settingsAppearance.avatarOptions.brutalist'),
+                        marble: t('settingsAppearance.avatarOptions.marble'),
+                        rings: t('settingsAppearance.avatarOptions.rings'),
+                        sunset: t('settingsAppearance.avatarOptions.sunset'),
+                        bauhaus: t('settingsAppearance.avatarOptions.bauhaus'),
+                    }[displayStyle] || displayStyle}
                     onPress={() => {
-                        const currentIndex = displayStyle === 'pixelated' ? 0 : displayStyle === 'gradient' ? 1 : 2;
-                        const nextIndex = (currentIndex + 1) % 3;
-                        const nextStyle = nextIndex === 0 ? 'pixelated' : nextIndex === 1 ? 'gradient' : 'brutalist';
-                        setAvatarStyle(nextStyle);
+                        const currentIndex = AVATAR_STYLES.indexOf(displayStyle);
+                        const nextIndex = (currentIndex + 1) % AVATAR_STYLES.length;
+                        setAvatarStyle(AVATAR_STYLES[nextIndex]);
                     }}
                 />
                 <Item
