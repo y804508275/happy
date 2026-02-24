@@ -200,7 +200,7 @@ function RenderOptionsBlock(props: {
         <View style={[style.optionsContainer, props.first && style.first, props.last && style.last]}>
             {props.items.map((item, index) => {
                 const isFocused = isActive && focusedIndex === index;
-                if (props.onOptionPress) {
+                if (isActive && props.onOptionPress) {
                     return (
                         <Pressable
                             key={index}
@@ -216,8 +216,8 @@ function RenderOptionsBlock(props: {
                     );
                 } else {
                     return (
-                        <View key={index} style={[style.optionItem, isFocused && style.optionItemFocused]}>
-                            <Text selectable={props.selectable} style={[style.optionText, isFocused && style.optionTextFocused]}>{item}</Text>
+                        <View key={index} style={[style.optionItem, !isActive && style.optionItemMuted]}>
+                            <Text selectable={props.selectable} style={[style.optionText, !isActive && style.optionTextMuted]}>{item}</Text>
                         </View>
                     );
                 }
@@ -511,6 +511,12 @@ const style = StyleSheet.create((theme) => ({
     },
     optionTextFocused: {
         fontWeight: '500',
+    },
+    optionItemMuted: {
+        opacity: 0.5,
+    },
+    optionTextMuted: {
+        color: theme.colors.textSecondary,
     },
 
     //

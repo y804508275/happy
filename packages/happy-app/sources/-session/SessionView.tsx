@@ -15,6 +15,7 @@ import { ChatHeaderView } from '@/components/ChatHeaderView';
 import { ChatList } from '@/components/ChatList';
 import { Deferred } from '@/components/Deferred';
 import { EmptyMessages } from '@/components/EmptyMessages';
+import { PreviewPanel } from '@/components/PreviewPanel';
 import { VoiceAssistantStatusBar } from '@/components/VoiceAssistantStatusBar';
 import { useDraft } from '@/hooks/useDraft';
 import { Modal } from '@/modal';
@@ -167,6 +168,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const isLandscape = useIsLandscape();
     const deviceType = useDeviceType();
     const [message, setMessage] = React.useState('');
+    const [previewVisible, setPreviewVisible] = React.useState(false);
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
@@ -334,6 +336,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             isMicActive={micButtonState.isMicActive}
             onAbort={() => sessionAbort(sessionId)}
             showAbortButton={sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting'}
+            onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => !v) : undefined}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
             // Autocomplete configuration
             autocompletePrefixes={['@', '/']}
@@ -358,93 +361,108 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
 
     return (
-        <>
-            {/* CLI Version Warning Overlay - Subtle centered pill */}
-            {shouldShowCliWarning && !(isLandscape && deviceType === 'phone') && (
-                <Pressable
-                    onPress={handleDismissCliWarning}
-                    style={{
-                        position: 'absolute',
-                        top: 8, // Position at top of content area (padding handled by parent)
-                        alignSelf: 'center',
-                        backgroundColor: '#FFF3CD',
-                        borderRadius: 100, // Fully rounded pill
-                        paddingHorizontal: 14,
-                        paddingVertical: 7,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        zIndex: 998, // Below voice bar but above content
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.15,
-                        shadowRadius: 4,
-                        elevation: 4,
-                    }}
-                >
-                    <Ionicons name="warning-outline" size={14} color="#FF9500" style={{ marginRight: 6 }} />
-                    <Text style={{
-                        fontSize: 12,
-                        color: '#856404',
-                        fontWeight: '600'
-                    }}>
-                        {t('sessionInfo.cliVersionOutdated')}
-                    </Text>
-                    <Ionicons name="close" size={14} color="#856404" style={{ marginLeft: 8 }} />
-                </Pressable>
-            )}
-
-            {/* Main content area - no padding since header is overlay */}
-            <View style={{ flexBasis: 0, flexGrow: 1, paddingBottom: safeArea.bottom + ((isRunningOnMac() || Platform.OS === 'web') ? 32 : 0) }}>
-                <InlineOptionsProvider
-                    messages={messages}
-                    sessionId={sessionId}
-                    inputValue={message}
-                >
-                    <AgentContentView
-                        content={content}
-                        input={input}
-                        placeholder={placeholder}
-                    />
-                </InlineOptionsProvider>
-            </View >
-
-            {/* Back button for landscape phone mode when header is hidden */}
-            {
-                isLandscape && deviceType === 'phone' && (
+        <View style={{
+            flex: 1,
+            flexDirection: previewVisible && Platform.OS === 'web' ? 'row' : 'column',
+        }}>
+            {/* Left side: chat area */}
+            <View style={{ flex: 1 }}>
+                {/* CLI Version Warning Overlay - Subtle centered pill */}
+                {shouldShowCliWarning && !(isLandscape && deviceType === 'phone') && (
                     <Pressable
-                        onPress={() => router.back()}
+                        onPress={handleDismissCliWarning}
                         style={{
                             position: 'absolute',
-                            top: safeArea.top + 8,
-                            left: 16,
-                            width: 44,
-                            height: 44,
-                            borderRadius: 22,
-                            backgroundColor: `rgba(${theme.dark ? '28, 23, 28' : '255, 255, 255'}, 0.9)`,
+                            top: 8, // Position at top of content area (padding handled by parent)
+                            alignSelf: 'center',
+                            backgroundColor: '#FFF3CD',
+                            borderRadius: 100, // Fully rounded pill
+                            paddingHorizontal: 14,
+                            paddingVertical: 7,
+                            flexDirection: 'row',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            ...Platform.select({
-                                ios: {
-                                    shadowColor: '#000',
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: 0.1,
-                                    shadowRadius: 4,
-                                },
-                                android: {
-                                    elevation: 2,
-                                }
-                            }),
+                            zIndex: 998, // Below voice bar but above content
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.15,
+                            shadowRadius: 4,
+                            elevation: 4,
                         }}
-                        hitSlop={15}
                     >
-                        <Ionicons
-                            name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
-                            size={Platform.select({ ios: 28, default: 24 })}
-                            color="#000"
-                        />
+                        <Ionicons name="warning-outline" size={14} color="#FF9500" style={{ marginRight: 6 }} />
+                        <Text style={{
+                            fontSize: 12,
+                            color: '#856404',
+                            fontWeight: '600'
+                        }}>
+                            {t('sessionInfo.cliVersionOutdated')}
+                        </Text>
+                        <Ionicons name="close" size={14} color="#856404" style={{ marginLeft: 8 }} />
                     </Pressable>
-                )
-            }
-        </>
+                )}
+
+                {/* Main content area - no padding since header is overlay */}
+                <View style={{ flexBasis: 0, flexGrow: 1, paddingBottom: safeArea.bottom + ((isRunningOnMac() || Platform.OS === 'web') ? 32 : 0) }}>
+                    <InlineOptionsProvider
+                        messages={messages}
+                        sessionId={sessionId}
+                        inputValue={message}
+                    >
+                        <AgentContentView
+                            content={content}
+                            input={input}
+                            placeholder={placeholder}
+                        />
+                    </InlineOptionsProvider>
+                </View >
+
+                {/* Back button for landscape phone mode when header is hidden */}
+                {
+                    isLandscape && deviceType === 'phone' && (
+                        <Pressable
+                            onPress={() => router.back()}
+                            style={{
+                                position: 'absolute',
+                                top: safeArea.top + 8,
+                                left: 16,
+                                width: 44,
+                                height: 44,
+                                borderRadius: 22,
+                                backgroundColor: `rgba(${theme.dark ? '28, 23, 28' : '255, 255, 255'}, 0.9)`,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                ...Platform.select({
+                                    ios: {
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: 0.1,
+                                        shadowRadius: 4,
+                                    },
+                                    android: {
+                                        elevation: 2,
+                                    }
+                                }),
+                            }}
+                            hitSlop={15}
+                        >
+                            <Ionicons
+                                name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
+                                size={Platform.select({ ios: 28, default: 24 })}
+                                color="#000"
+                            />
+                        </Pressable>
+                    )
+                }
+            </View>
+
+            {/* Right side: preview panel (web only) */}
+            {previewVisible && Platform.OS === 'web' && session.metadata?.machineId && (
+                <PreviewPanel
+                    sessionId={sessionId}
+                    machineId={session.metadata.machineId}
+                    onClose={() => setPreviewVisible(false)}
+                />
+            )}
+        </View>
     )
 }

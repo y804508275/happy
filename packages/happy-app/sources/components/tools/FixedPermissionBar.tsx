@@ -5,6 +5,7 @@ import { useSessionMessages } from '@/sync/storage';
 import { ToolCallMessage } from '@/sync/typesMessage';
 import { PermissionFooter } from './PermissionFooter';
 import { Metadata } from '@/sync/storageTypes';
+import { layout } from '@/components/layout';
 
 /**
  * Renders pending permission buttons in a fixed position above the input bar.
@@ -53,5 +54,8 @@ const styles = StyleSheet.create((theme) => ({
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: theme.colors.divider,
         backgroundColor: theme.colors.surface,
+        alignSelf: 'center',
+        width: '100%',
+        maxWidth: layout.maxWidth,
     },
 }));
