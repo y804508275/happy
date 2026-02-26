@@ -22,7 +22,14 @@ export function mapToClaudeMode(mode: PermissionMode): ClaudeSdkPermissionMode {
         'safe-yolo': 'default',
         'read-only': 'default',
     };
-    return codexToClaudeMap[mode] ?? (mode as ClaudeSdkPermissionMode);
+    let mapped = codexToClaudeMap[mode] ?? (mode as ClaudeSdkPermissionMode);
+    // Claude Code refuses bypassPermissions (--dangerously-skip-permissions) when running as root.
+    // Fall back to acceptEdits which auto-approves file edits but doesn't trigger the root check.
+    // Our own canCallTool handler still manages actual permission decisions.
+    if (mapped === 'bypassPermissions' && process.getuid?.() === 0) {
+        mapped = 'acceptEdits';
+    }
+    return mapped;
 }
 
 const VALID_PERMISSION_MODES: readonly PermissionMode[] = [

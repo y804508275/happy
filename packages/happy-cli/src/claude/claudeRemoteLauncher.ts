@@ -402,7 +402,12 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                     session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
                 }
             } catch (e) {
-                logger.debug('[remote]: launch error', e instanceof Error ? { message: e.message, stack: e.stack, name: e.name } : e);
+                const errorDetail = e instanceof Error
+                    ? { message: e.message, stack: e.stack, name: e.name }
+                    : typeof e === 'object' && e !== null
+                        ? { raw: JSON.stringify(e), type: typeof e, keys: Object.keys(e as object) }
+                        : { raw: String(e), type: typeof e };
+                logger.debug('[remote]: launch error', errorDetail);
                 if (!exitReason) {
                     // If the abort signal was triggered, treat this as a user-initiated cancel
                     // rather than an unexpected crash (the SDK may throw non-AbortError during cleanup)
@@ -410,8 +415,9 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                         session.client.closeClaudeSessionTurn('cancelled');
                         session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
                     } else {
+                        const errorMsg = e instanceof Error ? e.message : (typeof e === 'string' ? e : 'Unknown error');
                         session.client.closeClaudeSessionTurn('failed');
-                        session.client.sendSessionEvent({ type: 'message', message: 'Process exited unexpectedly' });
+                        session.client.sendSessionEvent({ type: 'message', message: `Error: ${errorMsg}. Try sending your message again.` });
                     }
                     continue;
                 }

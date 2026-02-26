@@ -114,7 +114,11 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
             }
             await this.processExitPromise
         } catch (error) {
-            this.inputStream.error(error as Error)
+            // Ensure we always propagate a proper Error object
+            const wrappedError = error instanceof Error
+                ? error
+                : new Error(`SDK stream error: ${typeof error === 'object' ? JSON.stringify(error) : String(error)}`);
+            this.inputStream.error(wrappedError)
         } finally {
             this.inputStream.done()
             this.cleanupControllers()
