@@ -453,6 +453,10 @@ export const pl: TranslationStructure = {
             badgeSafeYolo: 'Bezpieczny YOLO',
             badgeYolo: 'YOLO',
         },
+        autoConfirm: {
+            title: 'Auto-Potwierdź',
+            description: 'Automatycznie zatwierdzaj wszystkie wywołania narzędzi',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `Pozostało ${percent}%`,
         },

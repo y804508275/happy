@@ -444,6 +444,10 @@ export const zhHant: TranslationStructure = {
             badgeSafeYolo: '安全 YOLO',
             badgeYolo: 'YOLO',
         },
+        autoConfirm: {
+            title: '自動確認',
+            description: '自動批准所有工具調用',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `剩餘 ${percent}%`,
         },

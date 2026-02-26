@@ -54,6 +54,11 @@ export const SessionView = React.memo((props: { id: string }) => {
     const realtimeStatus = useRealtimeStatus();
     const isTablet = useIsTablet();
 
+    // Mark session as read when user views it
+    React.useEffect(() => {
+        storage.getState().markSessionRead(sessionId);
+    }, [sessionId]);
+
     // Compute header props based on session state
     const headerProps = useMemo(() => {
         if (!isDataReady) {

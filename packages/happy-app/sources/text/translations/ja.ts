@@ -475,6 +475,10 @@ export const ja: TranslationStructure = {
             badgeSafeYolo: '安全YOLO',
             badgeYolo: 'YOLO',
         },
+        autoConfirm: {
+            title: '自動確認',
+            description: 'すべてのツール呼び出しを自動的に承認',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `残り ${percent}%`,
         },

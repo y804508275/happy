@@ -472,6 +472,10 @@ export const it: TranslationStructure = {
             badgeSafeYolo: 'YOLO sicuro',
             badgeYolo: 'YOLO',
         },
+        autoConfirm: {
+            title: 'Auto-Conferma',
+            description: 'Approva automaticamente tutte le chiamate agli strumenti',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
         },
