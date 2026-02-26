@@ -22,6 +22,7 @@ import { useIsTablet } from '@/utils/responsive';
 import { ProjectGitStatus } from './ProjectGitStatus';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
+import { useSessionBadge } from '@/hooks/useSessionBadge';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
     container: {
@@ -298,6 +299,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
+    const badgeType = useSessionBadge(session);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
@@ -345,6 +347,28 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                 <View style={styles.sessionTitleRow}>
                     {/* Status dot or draft icon on the left */}
                     {(() => {
+                        // Badge takes priority: show badge-colored dot
+                        if (badgeType === 'action') {
+                            return (
+                                <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
+                                    <StatusDot
+                                        color={theme.colors.badge.action}
+                                        isPulsing={true}
+                                    />
+                                </View>
+                            );
+                        }
+                        if (badgeType === 'info') {
+                            return (
+                                <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
+                                    <StatusDot
+                                        color={theme.colors.badge.info}
+                                        isPulsing={false}
+                                    />
+                                </View>
+                            );
+                        }
+
                         // Show draft icon when online with draft
                         if (sessionStatus.state === 'waiting' && session.draft) {
                             return (
@@ -356,31 +380,31 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                                 />
                             );
                         }
-                        
-                        // Show status dot only for permission_required/thinking states
-                        if (sessionStatus.state === 'permission_required' || sessionStatus.state === 'thinking') {
+
+                        // Show status dot only for thinking state
+                        if (sessionStatus.state === 'thinking') {
                             return (
                                 <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                                    <StatusDot 
-                                        color={sessionStatus.statusDotColor} 
-                                        isPulsing={sessionStatus.isPulsing} 
+                                    <StatusDot
+                                        color={sessionStatus.statusDotColor}
+                                        isPulsing={sessionStatus.isPulsing}
                                     />
                                 </View>
                             );
                         }
-                        
+
                         // Show grey dot for online without draft
                         if (sessionStatus.state === 'waiting') {
                             return (
                                 <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                                    <StatusDot 
-                                        color={theme.colors.textSecondary} 
-                                        isPulsing={false} 
+                                    <StatusDot
+                                        color={theme.colors.textSecondary}
+                                        isPulsing={false}
                                     />
                                 </View>
                             );
                         }
-                        
+
                         return null;
                     })()}
                     

@@ -10,7 +10,7 @@ import { Avatar } from './Avatar';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
 import { useAllMachines, useSetting } from '@/sync/storage';
-import { StyleSheet } from 'react-native-unistyles';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { isMachineOnline } from '@/utils/machineUtils';
 import { machineSpawnNewSession, sessionKill } from '@/sync/ops';
 import { storage } from '@/sync/storage';
@@ -22,6 +22,8 @@ import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { useIsTablet } from '@/utils/responsive';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
+import { useSessionBadge } from '@/hooks/useSessionBadge';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
     container: {
@@ -129,6 +131,16 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         position: 'relative',
         width: 48,
         height: 48,
+    },
+    sessionBadge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: theme.colors.surface,
     },
     newSessionButton: {
         flexDirection: 'row',
@@ -335,14 +347,48 @@ export function ActiveSessionsGroup({ sessions, selectedSessionId }: ActiveSessi
 }
 
 // Compact session row component with status line
+// Badge dot component with optional pulse animation
+const ActiveSessionBadgeDot = React.memo(({ type, color }: { type: 'action' | 'info'; color: string }) => {
+    const styles = stylesheet;
+    const opacity = useSharedValue(1);
+
+    React.useEffect(() => {
+        if (type === 'action') {
+            opacity.value = withRepeat(
+                withTiming(0.3, { duration: 1000 }),
+                -1,
+                true
+            );
+        } else {
+            opacity.value = withTiming(1, { duration: 200 });
+        }
+    }, [type]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
+    return (
+        <Animated.View
+            style={[
+                styles.sessionBadge,
+                { backgroundColor: color },
+                type === 'action' && animatedStyle,
+            ]}
+        />
+    );
+});
+
 const CompactSessionRow = React.memo(({ session, selected, showBorder }: { session: Session; selected?: boolean; showBorder?: boolean }) => {
     const styles = stylesheet;
+    const { theme } = useUnistyles();
     const sessionStatus = useSessionStatus(session);
     const sessionName = getSessionName(session);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
+    const badgeType = useSessionBadge(session);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
@@ -391,6 +437,12 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         >
             <View style={styles.avatarContainer}>
                 <Avatar id={avatarId} size={48} monochrome={!sessionStatus.isConnected} flavor={session.metadata?.flavor} />
+                {badgeType && (
+                    <ActiveSessionBadgeDot
+                        type={badgeType}
+                        color={badgeType === 'action' ? theme.colors.badge.action : theme.colors.badge.info}
+                    />
+                )}
             </View>
             <View style={styles.sessionContent}>
                 {/* Title line */}

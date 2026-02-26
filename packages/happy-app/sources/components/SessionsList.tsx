@@ -334,6 +334,38 @@ export function SessionsList() {
     );
 }
 
+// Badge dot component with optional pulse animation
+const SessionBadgeDot = React.memo(({ type, color }: { type: 'action' | 'info'; color: string }) => {
+    const styles = stylesheet;
+    const opacity = useSharedValue(1);
+
+    React.useEffect(() => {
+        if (type === 'action') {
+            opacity.value = withRepeat(
+                withTiming(0.3, { duration: 1000 }),
+                -1,
+                true
+            );
+        } else {
+            opacity.value = withTiming(1, { duration: 200 });
+        }
+    }, [type]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
+    return (
+        <Animated.View
+            style={[
+                styles.sessionBadge,
+                { backgroundColor: color },
+                type === 'action' && animatedStyle,
+            ]}
+        />
+    );
+});
+
 // Sub-component that handles session message logic
 const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }: {
     session: Session;
@@ -343,6 +375,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     isSingle?: boolean;
 }) => {
     const styles = stylesheet;
+    const { theme } = useUnistyles();
     const sessionStatus = useSessionStatus(session);
     const sessionName = getSessionName(session);
     const sessionSubtitle = getSessionSubtitle(session);
@@ -350,6 +383,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
+    const badgeType = useSessionBadge(session);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
@@ -400,7 +434,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
         >
             <View style={styles.avatarContainer}>
                 <Avatar id={avatarId} size={48} monochrome={!sessionStatus.isConnected} flavor={session.metadata?.flavor} />
-                {session.draft && (
+                {session.draft && !badgeType && (
                     <View style={styles.draftIconContainer}>
                         <Ionicons
                             name="create-outline"
@@ -408,6 +442,12 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                             style={styles.draftIconOverlay}
                         />
                     </View>
+                )}
+                {badgeType && (
+                    <SessionBadgeDot
+                        type={badgeType}
+                        color={badgeType === 'action' ? theme.colors.badge.action : theme.colors.badge.info}
+                    />
                 )}
             </View>
             <View style={styles.sessionContent}>

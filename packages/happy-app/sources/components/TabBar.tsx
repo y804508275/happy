@@ -7,6 +7,7 @@ import { t } from '@/text';
 import { Typography } from '@/constants/Typography';
 import { layout } from '@/components/layout';
 import { useInboxHasContent } from '@/hooks/useInboxHasContent';
+import { useSessionsBadgeCount } from '@/hooks/useSessionBadge';
 
 export type TabType = 'inbox' | 'sessions' | 'settings';
 
@@ -84,6 +85,7 @@ export const TabBar = React.memo(({ activeTab, onTabPress, inboxBadgeCount = 0 }
     const { theme } = useUnistyles();
     const insets = useSafeAreaInsets();
     const inboxHasContent = useInboxHasContent();
+    const sessionsBadgeCount = useSessionsBadgeCount();
 
     const tabs: { key: TabType; icon: any; label: string }[] = React.useMemo(() => {
         // NOTE: Zen tab removed - the feature never got to a useful state
@@ -123,6 +125,13 @@ export const TabBar = React.memo(({ activeTab, onTabPress, inboxBadgeCount = 0 }
                                 )}
                                 {tab.key === 'inbox' && inboxHasContent && inboxBadgeCount === 0 && (
                                     <View style={styles.indicatorDot} />
+                                )}
+                                {tab.key === 'sessions' && sessionsBadgeCount > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>
+                                            {sessionsBadgeCount > 99 ? '99+' : sessionsBadgeCount}
+                                        </Text>
+                                    </View>
                                 )}
                             </View>
                             <Text style={[

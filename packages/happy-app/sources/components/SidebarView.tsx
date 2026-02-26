@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useInboxHasContent } from '@/hooks/useInboxHasContent';
+import { useSessionsBadgeCount } from '@/hooks/useSessionBadge';
 import { Ionicons } from '@expo/vector-icons';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
@@ -139,6 +140,7 @@ export const SidebarView = React.memo(() => {
     const realtimeStatus = useRealtimeStatus();
     const friendRequests = useFriendRequests();
     const inboxHasContent = useInboxHasContent();
+    const sessionsBadgeCount = useSessionsBadgeCount();
     const settings = useSettings();
 
     // Compute connection status once per render (theme-reactive, no stale memoization)
@@ -198,7 +200,16 @@ export const SidebarView = React.memo(() => {
     // Title content used in both centered and left-justified modes (DRY)
     const titleContent = (
         <>
-            <Text style={styles.titleText}>{t('sidebar.sessionsTitle')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.titleText}>{t('sidebar.sessionsTitle')}</Text>
+                {sessionsBadgeCount > 0 && (
+                    <View style={[styles.badge, { position: 'relative', top: 0, right: 0, marginLeft: 6 }]}>
+                        <Text style={styles.badgeText}>
+                            {sessionsBadgeCount > 99 ? '99+' : sessionsBadgeCount}
+                        </Text>
+                    </View>
+                )}
+            </View>
             {connectionStatus.text && (
                 <View style={styles.statusContainer}>
                     <StatusDot
