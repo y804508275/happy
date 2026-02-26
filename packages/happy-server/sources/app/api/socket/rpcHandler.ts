@@ -28,7 +28,7 @@ export function rpcHandler(
 
             // Register this socket as the listener for this method
             rpcListeners.set(method, socket);
-            log({ module: 'websocket-rpc' }, `RPC method registered: ${method} on socket ${socket.id} (user: ${userId}), total methods: [${Array.from(rpcListeners.keys()).join(',')}]`);
+            log({ module: 'websocket-rpc' }, `RPC method registered: ${method} on socket ${socket.id} (user: ${userId}), total methods: ${rpcListeners.size}`);
 
             socket.emit('rpc-registered', { method });
         } catch (error) {
@@ -66,7 +66,7 @@ export function rpcHandler(
     socket.on('rpc-call', async (data: any, callback: (response: any) => void) => {
         try {
             const { method, params } = data;
-            log({ module: 'websocket-rpc' }, `RPC call: method=${method}, userId=${userId}, localMethods=[${Array.from(rpcListeners.keys()).join(',')}]`);
+            log({ module: 'websocket-rpc' }, `RPC call: method=${method}, userId=${userId}, totalLocalMethods=${rpcListeners.size}, hasLocal=${rpcListeners.has(method)}`);
 
             if (!method || typeof method !== 'string') {
                 if (callback) {

@@ -25,6 +25,7 @@ export function startSocket(app: Fastify) {
         transports: ['websocket'],
         pingTimeout: 45000,
         pingInterval: 15000,
+        maxHttpBufferSize: 5e6, // 5MB limit per message
         path: '/v1/updates',
         allowUpgrades: true,
         upgradeTimeout: 10000,
