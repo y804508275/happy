@@ -188,6 +188,23 @@ export function saveSessionPermissionModes(modes: Record<string, string>) {
     mmkv.set('session-permission-modes', JSON.stringify(modes));
 }
 
+export function loadUnreadSessions(): Record<string, boolean> {
+    const unread = mmkv.getString('unread-sessions');
+    if (unread) {
+        try {
+            return JSON.parse(unread);
+        } catch (e) {
+            console.error('Failed to parse unread sessions', e);
+            return {};
+        }
+    }
+    return {};
+}
+
+export function saveUnreadSessions(unread: Record<string, boolean>) {
+    mmkv.set('unread-sessions', JSON.stringify(unread));
+}
+
 export function loadProfile(): Profile {
     const profile = mmkv.getString('profile');
     if (profile) {

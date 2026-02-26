@@ -442,6 +442,10 @@ export const en = {
             badgeSafeYolo: 'Safe YOLO',
             badgeYolo: 'YOLO',
         },
+        autoConfirm: {
+            title: 'Auto-Confirm',
+            description: 'Approve all tool calls automatically',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% left`,
         },

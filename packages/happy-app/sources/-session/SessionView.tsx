@@ -21,7 +21,7 @@ import { Modal } from '@/modal';
 import { voiceHooks } from '@/realtime/hooks/voiceHooks';
 import { startRealtimeSession, stopRealtimeSession } from '@/realtime/RealtimeSession';
 import { gitStatusSync } from '@/sync/gitStatusSync';
-import { sessionAbort } from '@/sync/ops';
+import { sessionAbort, sessionAutoConfirm } from '@/sync/ops';
 import { storage, useIsDataReady, useLocalSetting, useRealtimeStatus, useSessionMessages, useSessionUsage, useSetting } from '@/sync/storage';
 import { useSession } from '@/sync/storage';
 import { Session } from '@/sync/storageTypes';
@@ -220,6 +220,12 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, [machineId, cliVersion, acknowledgedCliVersions]);
 
+    // Auto-confirm state from agent state
+    const autoConfirm = session.agentState?.autoConfirm === true;
+    const handleAutoConfirmChange = React.useCallback((enabled: boolean) => {
+        sessionAutoConfirm(sessionId, enabled);
+    }, [sessionId]);
+
     // Function to update permission mode
     const updatePermissionMode = React.useCallback((mode: PermissionMode) => {
         storage.getState().updateSessionPermissionMode(sessionId, mode.key);
@@ -316,6 +322,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             availableModels={availableModels}
             onModelModeChange={updateModelMode}
             metadata={session.metadata}
+            autoConfirm={autoConfirm}
+            onAutoConfirmChange={handleAutoConfirmChange}
             connectionStatus={{
                 text: sessionStatus.statusText,
                 color: sessionStatus.statusColor,

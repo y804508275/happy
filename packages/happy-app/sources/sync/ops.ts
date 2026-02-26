@@ -300,6 +300,14 @@ export async function machineUpdateMetadata(
 }
 
 /**
+ * Toggle auto-confirm mode for a session
+ * When enabled, all permission requests are automatically approved
+ */
+export async function sessionAutoConfirm(sessionId: string, enabled: boolean): Promise<void> {
+    await apiSocket.sessionRPC(sessionId, 'autoConfirm', { enabled });
+}
+
+/**
  * Abort the current session operation
  */
 export async function sessionAbort(sessionId: string): Promise<void> {

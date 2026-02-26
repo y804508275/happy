@@ -40,6 +40,11 @@ export class CodexPermissionHandler extends BasePermissionHandler {
         toolName: string,
         input: unknown
     ): Promise<PermissionResult> {
+        if (this.autoConfirm) {
+            logger.debug(`${this.getLogPrefix()} Auto-confirming tool ${toolName} (${toolCallId})`);
+            return { decision: 'approved' };
+        }
+
         return new Promise<PermissionResult>((resolve, reject) => {
             // Store the pending request
             this.pendingRequests.set(toolCallId, {

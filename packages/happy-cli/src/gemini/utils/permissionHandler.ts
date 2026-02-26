@@ -102,6 +102,11 @@ export class GeminiPermissionHandler extends BasePermissionHandler {
         toolName: string,
         input: unknown
     ): Promise<PermissionResult> {
+        if (this.autoConfirm) {
+            logger.debug(`${this.getLogPrefix()} Auto-confirming tool ${toolName} (${toolCallId})`);
+            return { decision: 'approved' };
+        }
+
         // Check if we should auto-approve based on permission mode
         // Pass toolCallId to check by ID (e.g., change_title-* even if toolName is "other")
         if (this.shouldAutoApprove(toolName, toolCallId, input)) {

@@ -135,6 +135,12 @@ export const lightTheme = {
             default: '#8E8E93',
         },
 
+        // Session badge colors
+        badge: {
+            action: '#FF3B30',  // Red - needs user action (permission/question)
+            info: '#007AFF',    // Blue - work completed, user should review
+        },
+
         // Permission mode colors
         permission: {
             default: '#8E8E93',
@@ -343,6 +349,12 @@ export const darkTheme = {
             disconnected: '#8E8E93',
             error: '#FF453A',
             default: '#8E8E93',
+        },
+
+        // Session badge colors
+        badge: {
+            action: '#FF453A',  // Red - needs user action (permission/question)
+            info: '#0A84FF',    // Blue - work completed, user should review
         },
 
         // Permission mode colors

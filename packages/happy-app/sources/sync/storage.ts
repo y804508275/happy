@@ -10,7 +10,7 @@ import { LocalSettings, applyLocalSettings } from "./localSettings";
 import { Purchases, customerInfoToPurchases } from "./purchases";
 import { Profile } from "./profile";
 import { UserProfile, RelationshipUpdatedEvent } from "./friendTypes";
-import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes } from "./persistence";
+import { loadSettings, loadLocalSettings, saveLocalSettings, saveSettings, loadPurchases, savePurchases, loadProfile, saveProfile, loadSessionDrafts, saveSessionDrafts, loadSessionPermissionModes, saveSessionPermissionModes, loadUnreadSessions, saveUnreadSessions } from "./persistence";
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 import type { CustomerInfo } from './revenueCat/types';
 import React from "react";
@@ -96,8 +96,11 @@ interface StorageState {
     socketStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
     socketLastConnectedAt: number | null;
     socketLastDisconnectedAt: number | null;
+    unreadSessions: Record<string, boolean>;  // Sessions that completed work but user hasn't viewed yet
     isDataReady: boolean;
     nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
+    markSessionUnread: (sessionId: string) => void;
+    markSessionRead: (sessionId: string) => void;
     applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => void;
     applyMachines: (machines: Machine[], replace?: boolean) => void;
     applyLoaded: () => void;
@@ -254,6 +257,7 @@ export const storage = create<StorageState>()((set, get) => {
     let profile = loadProfile();
     let sessionDrafts = loadSessionDrafts();
     let sessionPermissionModes = loadSessionPermissionModes();
+    let unreadSessionsInit = loadUnreadSessions();
     return {
         settings,
         settingsVersion: version,
@@ -281,8 +285,21 @@ export const storage = create<StorageState>()((set, get) => {
         socketStatus: 'disconnected',
         socketLastConnectedAt: null,
         socketLastDisconnectedAt: null,
+        unreadSessions: unreadSessionsInit,
         isDataReady: false,
         nativeUpdateStatus: null,
+        markSessionUnread: (sessionId: string) => set((state) => {
+            const updated = { ...state.unreadSessions, [sessionId]: true };
+            saveUnreadSessions(updated);
+            return { unreadSessions: updated };
+        }),
+        markSessionRead: (sessionId: string) => set((state) => {
+            if (!state.unreadSessions[sessionId]) return state;
+            const updated = { ...state.unreadSessions };
+            delete updated[sessionId];
+            saveUnreadSessions(updated);
+            return { unreadSessions: updated };
+        }),
         isMutableToolCall: (sessionId: string, callId: string) => {
             const sessionMessages = get().sessionMessages[sessionId];
             if (!sessionMessages) {
@@ -334,6 +351,27 @@ export const storage = create<StorageState>()((set, get) => {
                     permissionMode: resolvedPermissionMode
                 };
             });
+
+            // Detect sessions that completed work (thinking: true → false) and mark as unread
+            let updatedUnread: Record<string, boolean> | null = null;
+            const isInitialLoad = Object.keys(state.sessions).length === 0;
+            if (!isInitialLoad) {
+                sessions.forEach(session => {
+                    const oldSession = state.sessions[session.id];
+                    if (oldSession && oldSession.thinking === true && session.thinking === false) {
+                        // Session just finished a turn - check if it has pending requests
+                        const hasRequests = session.agentState?.requests
+                            && Object.keys(session.agentState.requests).length > 0;
+                        if (!hasRequests) {
+                            if (!updatedUnread) updatedUnread = { ...state.unreadSessions };
+                            updatedUnread[session.id] = true;
+                        }
+                    }
+                });
+                if (updatedUnread) {
+                    saveUnreadSessions(updatedUnread);
+                }
+            }
 
             // Build active set from all sessions (including existing ones)
             const activeSet = new Set<string>();
@@ -470,7 +508,8 @@ export const storage = create<StorageState>()((set, get) => {
                 sessions: mergedSessions,
                 sessionsData: listData,  // Legacy - to be removed
                 sessionListViewData,
-                sessionMessages: updatedSessionMessages
+                sessionMessages: updatedSessionMessages,
+                ...(updatedUnread ? { unreadSessions: updatedUnread } : {}),
             };
         }),
         applyLoaded: () => set((state) => {
@@ -934,16 +973,23 @@ export const storage = create<StorageState>()((set, get) => {
             const modes = loadSessionPermissionModes();
             delete modes[sessionId];
             saveSessionPermissionModes(modes);
-            
+
+            // Clear unread state
+            const { [sessionId]: _deletedUnread, ...remainingUnread } = state.unreadSessions;
+            if (state.unreadSessions[sessionId]) {
+                saveUnreadSessions(remainingUnread);
+            }
+
             // Rebuild sessionListViewData without the deleted session
             const sessionListViewData = buildSessionListViewData(remainingSessions);
-            
+
             return {
                 ...state,
                 sessions: remainingSessions,
                 sessionMessages: remainingSessionMessages,
                 sessionGitStatus: remainingGitStatus,
-                sessionListViewData
+                sessionListViewData,
+                unreadSessions: remainingUnread,
             };
         }),
         // Friend management methods
@@ -1313,4 +1359,8 @@ export function useRequestedFriends() {
 
 export function useStreamingText(sessionId: string): string | undefined {
     return storage((state) => state.streamingTexts[sessionId]);
+}
+
+export function useSessionIsUnread(sessionId: string): boolean {
+    return storage((state) => !!state.unreadSessions[sessionId]);
 }

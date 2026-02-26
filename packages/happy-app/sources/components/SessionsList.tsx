@@ -29,6 +29,8 @@ import { useHappyAction } from '@/hooks/useHappyAction';
 import { sessionDelete } from '@/sync/ops';
 import { HappyError } from '@/utils/errors';
 import { Modal } from '@/modal';
+import { useSessionBadge } from '@/hooks/useSessionBadge';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -172,6 +174,16 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     draftIconOverlay: {
         color: theme.colors.textSecondary,
+    },
+    sessionBadge: {
+        position: 'absolute',
+        top: -2,
+        right: -2,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: theme.colors.surface,
     },
     artifactsSection: {
         paddingHorizontal: 16,

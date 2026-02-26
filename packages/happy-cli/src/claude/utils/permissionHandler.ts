@@ -42,6 +42,7 @@ export class PermissionHandler {
     private allowedBashLiterals = new Set<string>();
     private allowedBashPrefixes = new Set<string>();
     private permissionMode: PermissionMode = 'default';
+    private autoConfirm: boolean = false;
     private onPermissionRequestCallback?: (toolCallId: string) => void;
 
     constructor(session: Session) {
@@ -146,6 +147,10 @@ export class PermissionHandler {
         }
 
         if (this.permissionMode === 'acceptEdits' && descriptor.edit) {
+            return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
+        }
+
+        if (this.autoConfirm) {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
@@ -376,6 +381,47 @@ export class PermissionHandler {
      * Sets up the client handler for permission responses
      */
     private setupClientHandler(): void {
+        // Auto-confirm RPC handler
+        this.session.client.rpcHandlerManager.registerHandler<{ enabled: boolean }, void>('autoConfirm', async (message) => {
+            this.autoConfirm = message.enabled;
+            logger.debug(`Auto-confirm ${message.enabled ? 'enabled' : 'disabled'}`);
+
+            // Update agent state
+            this.session.client.updateAgentState((currentState) => ({
+                ...currentState,
+                autoConfirm: message.enabled
+            }));
+
+            // Auto-approve all pending requests when enabled
+            if (message.enabled) {
+                for (const [id, pending] of this.pendingRequests.entries()) {
+                    this.pendingRequests.delete(id);
+                    pending.resolve({ behavior: 'allow', updatedInput: (pending.input as Record<string, unknown>) || {} });
+
+                    // Move to completed in agent state
+                    this.session.client.updateAgentState((currentState) => {
+                        const request = currentState.requests?.[id];
+                        if (!request) return currentState;
+                        const { [id]: _, ...remainingRequests } = currentState.requests || {};
+                        return {
+                            ...currentState,
+                            requests: remainingRequests,
+                            completedRequests: {
+                                ...currentState.completedRequests,
+                                [id]: {
+                                    ...request,
+                                    completedAt: Date.now(),
+                                    status: 'approved',
+                                    reason: 'Auto-confirmed'
+                                }
+                            }
+                        };
+                    });
+                }
+            }
+        });
+
+        // Permission response handler
         this.session.client.rpcHandlerManager.registerHandler<PermissionResponse, void>('permission', async (message) => {
             logger.debug(`Permission response: ${JSON.stringify(message)}`);
 

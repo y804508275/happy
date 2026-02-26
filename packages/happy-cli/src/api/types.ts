@@ -281,6 +281,7 @@ export type Metadata = {
 
 export type AgentState = {
   controlledByUser?: boolean | null | undefined
+  autoConfirm?: boolean
   requests?: {
     [id: string]: {
       tool: string,

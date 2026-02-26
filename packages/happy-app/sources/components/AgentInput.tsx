@@ -76,6 +76,8 @@ interface AgentInputProps {
     minHeight?: number;
     profileId?: string | null;
     onProfileClick?: () => void;
+    autoConfirm?: boolean;
+    onAutoConfirmChange?: (enabled: boolean) => void;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -621,6 +623,65 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         );
                                     })}
                                 </View>
+
+                                {/* Auto-Confirm Toggle */}
+                                {props.onAutoConfirmChange && (
+                                    <>
+                                        <View style={{
+                                            height: 1,
+                                            backgroundColor: theme.colors.divider,
+                                            marginHorizontal: 16
+                                        }} />
+                                        <Pressable
+                                            onPress={() => {
+                                                hapticsLight();
+                                                props.onAutoConfirmChange?.(!props.autoConfirm);
+                                            }}
+                                            style={({ pressed }) => ({
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                paddingHorizontal: 16,
+                                                paddingVertical: 10,
+                                                backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
+                                            })}
+                                        >
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{
+                                                    fontSize: 14,
+                                                    color: props.autoConfirm ? theme.colors.radio.active : theme.colors.text,
+                                                    ...Typography.default()
+                                                }}>
+                                                    {t('agentInput.autoConfirm.title')}
+                                                </Text>
+                                                <Text style={{
+                                                    fontSize: 11,
+                                                    color: theme.colors.textSecondary,
+                                                    ...Typography.default()
+                                                }}>
+                                                    {t('agentInput.autoConfirm.description')}
+                                                </Text>
+                                            </View>
+                                            <View style={{
+                                                width: 42,
+                                                height: 24,
+                                                borderRadius: 12,
+                                                backgroundColor: props.autoConfirm ? theme.colors.radio.active : theme.colors.radio.inactive,
+                                                justifyContent: 'center',
+                                                paddingHorizontal: 2,
+                                                marginLeft: 12,
+                                            }}>
+                                                <View style={{
+                                                    width: 20,
+                                                    height: 20,
+                                                    borderRadius: 10,
+                                                    backgroundColor: '#fff',
+                                                    alignSelf: props.autoConfirm ? 'flex-end' : 'flex-start',
+                                                }} />
+                                            </View>
+                                        </Pressable>
+                                    </>
+                                )}
 
                                 {/* Divider */}
                                 <View style={{

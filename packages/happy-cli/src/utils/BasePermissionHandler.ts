@@ -45,6 +45,7 @@ export interface PermissionResult {
  */
 export abstract class BasePermissionHandler {
     protected pendingRequests = new Map<string, PendingRequest>();
+    protected autoConfirm: boolean = false;
     protected session: ApiSessionClient;
     private isResetting = false;
 
@@ -73,6 +74,51 @@ export abstract class BasePermissionHandler {
      * Setup RPC handler for permission responses.
      */
     protected setupRpcHandler(): void {
+        // Auto-confirm RPC handler
+        this.session.rpcHandlerManager.registerHandler<{ enabled: boolean }, void>(
+            'autoConfirm',
+            async (message) => {
+                this.autoConfirm = message.enabled;
+                logger.debug(`${this.getLogPrefix()} Auto-confirm ${message.enabled ? 'enabled' : 'disabled'}`);
+
+                // Update agent state
+                this.session.updateAgentState((currentState) => ({
+                    ...currentState,
+                    autoConfirm: message.enabled
+                }));
+
+                // Auto-approve all pending requests when enabled
+                if (message.enabled) {
+                    const pendingSnapshot = Array.from(this.pendingRequests.entries());
+                    this.pendingRequests.clear();
+
+                    for (const [id, pending] of pendingSnapshot) {
+                        pending.resolve({ decision: 'approved' });
+
+                        this.session.updateAgentState((currentState) => {
+                            const request = currentState.requests?.[id];
+                            if (!request) return currentState;
+                            const { [id]: _, ...remainingRequests } = currentState.requests || {};
+                            return {
+                                ...currentState,
+                                requests: remainingRequests,
+                                completedRequests: {
+                                    ...currentState.completedRequests,
+                                    [id]: {
+                                        ...request,
+                                        completedAt: Date.now(),
+                                        status: 'approved',
+                                        reason: 'Auto-confirmed'
+                                    }
+                                }
+                            };
+                        });
+                    }
+                }
+            }
+        );
+
+        // Permission response handler
         this.session.rpcHandlerManager.registerHandler<PermissionResponse, void>(
             'permission',
             async (response) => {
