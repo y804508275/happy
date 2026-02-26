@@ -47,6 +47,12 @@ async function main() {
     //
 
     log('Ready');
+
+    // Signal PM2 that we're ready to accept connections (for wait_ready mode)
+    if (process.send) {
+        process.send('ready');
+    }
+
     await awaitShutdown();
     log('Shutting down...');
 }

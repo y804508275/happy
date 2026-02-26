@@ -14,6 +14,8 @@ module.exports = {
                 REDIS_URL: "redis://127.0.0.1:6379",
             },
             kill_timeout: 5000,
+            wait_ready: true,
+            listen_timeout: 15000,
         },
         {
             name: "happy-server-2",
@@ -29,6 +31,8 @@ module.exports = {
                 REDIS_URL: "redis://127.0.0.1:6379",
             },
             kill_timeout: 5000,
+            wait_ready: true,
+            listen_timeout: 15000,
         }
     ]
 };

@@ -7,6 +7,7 @@ import { log } from "@/utils/log";
 import { encryptBytes, decryptBytes } from "@/modules/encrypt";
 import * as crypto from "crypto";
 import axios from "axios";
+import { redis } from "@/storage/redis";
 
 /**
  * Feishu OAuth authentication routes.
@@ -21,24 +22,11 @@ import axios from "axios";
  *    to get a linkToken, then starts the OAuth flow with ?link_token=xxx
  */
 
-// In-memory stores with 5-minute TTL
-const feishuOAuthStates = new Map<string, { linkToken?: string; appUrl?: string; expiresAt: number }>();
-const feishuAuthCodes = new Map<string, { token: string; secret: string; expiresAt: number }>();
-const feishuLinkTokens = new Map<string, { userId: string; encryptedSecret: string; expiresAt: number }>();
-
-// Cleanup expired entries every 60 seconds
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of feishuOAuthStates) {
-        if (value.expiresAt < now) feishuOAuthStates.delete(key);
-    }
-    for (const [key, value] of feishuAuthCodes) {
-        if (value.expiresAt < now) feishuAuthCodes.delete(key);
-    }
-    for (const [key, value] of feishuLinkTokens) {
-        if (value.expiresAt < now) feishuLinkTokens.delete(key);
-    }
-}, 60 * 1000);
+// Redis-backed stores with 5-minute TTL (shared across server instances)
+const FEISHU_STATE_PREFIX = 'feishu:state:';
+const FEISHU_CODE_PREFIX = 'feishu:code:';
+const FEISHU_LINK_PREFIX = 'feishu:link:';
+const FEISHU_TTL = 300; // 5 minutes
 
 function encryptSecret(secret: Uint8Array): string {
     const encrypted = encryptBytes(['feishu', 'secret'], secret as Uint8Array<ArrayBuffer>);
@@ -71,9 +59,7 @@ export function feishuAuthRoutes(app: Fastify) {
         }
 
         const state = crypto.randomBytes(32).toString('hex');
-        const stateData: { linkToken?: string; appUrl?: string; expiresAt: number } = {
-            expiresAt: Date.now() + 5 * 60 * 1000
-        };
+        const stateData: { linkToken?: string; appUrl?: string } = {};
 
         if (request.query.link_token) {
             stateData.linkToken = request.query.link_token;
@@ -82,7 +68,7 @@ export function feishuAuthRoutes(app: Fastify) {
             stateData.appUrl = request.query.app_url;
         }
 
-        feishuOAuthStates.set(state, stateData);
+        await redis.setex(FEISHU_STATE_PREFIX + state, FEISHU_TTL, JSON.stringify(stateData));
 
         const redirectUri = encodeURIComponent(`${request.protocol}://${request.host}/v1/auth/feishu/callback`);
         const url = `https://open.feishu.cn/open-apis/authen/v1/index?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&state=${state}`;
@@ -102,13 +88,13 @@ export function feishuAuthRoutes(app: Fastify) {
         try {
             const { code, state } = request.query;
 
-            // Validate state
-            const stateData = feishuOAuthStates.get(state);
-            if (!stateData || stateData.expiresAt < Date.now()) {
-                feishuOAuthStates.delete(state);
+            // Validate state (from Redis, shared across instances)
+            const stateJson = await redis.get(FEISHU_STATE_PREFIX + state);
+            if (!stateJson) {
                 return reply.code(400).send({ error: 'Invalid or expired state' });
             }
-            feishuOAuthStates.delete(state);
+            await redis.del(FEISHU_STATE_PREFIX + state);
+            const stateData = JSON.parse(stateJson) as { linkToken?: string; appUrl?: string };
 
             const appId = process.env.FEISHU_APP_ID!;
             const appSecret = process.env.FEISHU_APP_SECRET!;
@@ -150,12 +136,12 @@ export function feishuAuthRoutes(app: Fastify) {
 
             if (stateData.linkToken) {
                 // Link mode: associate Feishu with existing account
-                const linkData = feishuLinkTokens.get(stateData.linkToken);
-                if (!linkData || linkData.expiresAt < Date.now()) {
-                    feishuLinkTokens.delete(stateData.linkToken);
+                const linkJson = await redis.get(FEISHU_LINK_PREFIX + stateData.linkToken);
+                if (!linkJson) {
                     return reply.code(400).send({ error: 'Link token expired' });
                 }
-                feishuLinkTokens.delete(stateData.linkToken);
+                await redis.del(FEISHU_LINK_PREFIX + stateData.linkToken);
+                const linkData = JSON.parse(linkJson) as { userId: string; encryptedSecret: string };
 
                 // Clear feishuUnionId from any other account first
                 await db.account.updateMany({
@@ -211,13 +197,12 @@ export function feishuAuthRoutes(app: Fastify) {
                 }
             }
 
-            // Generate one-time exchange code and redirect
+            // Generate one-time exchange code and redirect (stored in Redis for cross-instance access)
             const exchangeCode = crypto.randomBytes(32).toString('hex');
-            feishuAuthCodes.set(exchangeCode, {
+            await redis.setex(FEISHU_CODE_PREFIX + exchangeCode, FEISHU_TTL, JSON.stringify({
                 token,
                 secret: secretBase64Url,
-                expiresAt: Date.now() + 5 * 60 * 1000
-            });
+            }));
 
             const appUrl = stateData.appUrl || `${request.protocol}://${request.host}`;
             return reply.redirect(`${appUrl}/?feishu_auth=${exchangeCode}`);
@@ -236,12 +221,12 @@ export function feishuAuthRoutes(app: Fastify) {
         }
     }, async (request, reply) => {
         const { code } = request.body;
-        const data = feishuAuthCodes.get(code);
-        if (!data || data.expiresAt < Date.now()) {
-            feishuAuthCodes.delete(code);
+        const dataJson = await redis.get(FEISHU_CODE_PREFIX + code);
+        if (!dataJson) {
             return reply.code(400).send({ error: 'Invalid or expired code' });
         }
-        feishuAuthCodes.delete(code);
+        await redis.del(FEISHU_CODE_PREFIX + code);
+        const data = JSON.parse(dataJson) as { token: string; secret: string };
 
         return reply.send({
             token: data.token,
@@ -262,11 +247,10 @@ export function feishuAuthRoutes(app: Fastify) {
         const encrypted = encryptSecret(secretBytes);
 
         const linkToken = crypto.randomBytes(32).toString('hex');
-        feishuLinkTokens.set(linkToken, {
+        await redis.setex(FEISHU_LINK_PREFIX + linkToken, FEISHU_TTL, JSON.stringify({
             userId: request.userId,
             encryptedSecret: encrypted,
-            expiresAt: Date.now() + 5 * 60 * 1000
-        });
+        }));
 
         return reply.send({ linkToken });
     });
