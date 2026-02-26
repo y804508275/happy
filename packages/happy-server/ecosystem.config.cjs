@@ -11,6 +11,7 @@ module.exports = {
                 HOME: "/root",
                 PORT: "3001",
                 METRICS_PORT: "9091",
+                REDIS_URL: "redis://127.0.0.1:6379",
             },
             kill_timeout: 5000,
         },
@@ -25,6 +26,7 @@ module.exports = {
                 HOME: "/root",
                 PORT: "3002",
                 METRICS_PORT: "9092",
+                REDIS_URL: "redis://127.0.0.1:6379",
             },
             kill_timeout: 5000,
         }

@@ -22,7 +22,7 @@ export function startSocket(app: Fastify) {
             credentials: true,
             allowedHeaders: ["*"]
         },
-        transports: ['websocket', 'polling'],
+        transports: ['websocket'],
         pingTimeout: 45000,
         pingInterval: 15000,
         path: '/v1/updates',
@@ -213,14 +213,14 @@ export function startSocket(app: Fastify) {
         artifactUpdateHandler(userId, socket);
         accessKeyHandler(userId, socket);
 
-        socket.on('disconnect', () => {
+        socket.on('disconnect', (reason) => {
             websocketEventsCounter.inc({ event_type: 'disconnect' });
 
             // Cleanup connections
             eventRouter.removeConnection(userId, connection);
             decrementWebSocketConnection(connection.connectionType);
 
-            log({ module: 'websocket' }, `User disconnected: ${userId}`);
+            log({ module: 'websocket' }, `User disconnected: ${userId}, reason: ${reason}, socketId: ${socket.id}`);
 
             // Broadcast daemon offline status
             if (connection.connectionType === 'machine-scoped') {

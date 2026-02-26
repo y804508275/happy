@@ -383,12 +383,11 @@ export function query(config: {
         child.on('close', (code) => {
             if (config.options?.abort?.aborted) {
                 query.setError(new AbortError('Claude Code process aborted by user'))
-            }
-            if (code !== 0) {
+            } else if (code !== 0) {
                 query.setError(new Error(`Claude Code process exited with code ${code}`))
-            } else {
-                resolve()
             }
+            // Always resolve so readMessages() can complete its finally block
+            resolve()
         })
     })
 
