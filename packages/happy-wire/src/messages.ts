@@ -78,10 +78,90 @@ export const UpdateMachineBodySchema = z.object({
 });
 export type UpdateMachineBody = z.infer<typeof UpdateMachineBodySchema>;
 
+// === Shared Items & Teams ===
+
+export const UpdateNewSharedItemBodySchema = z.object({
+  t: z.literal('new-shared-item'),
+  itemId: z.string(),
+  itemType: z.enum(['skill', 'context']),
+  visibility: z.enum(['private', 'team', 'public']),
+  name: z.string(),
+  slug: z.string(),
+  description: z.string().nullable(),
+  authorId: z.string(),
+  teamId: z.string().nullable(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type UpdateNewSharedItemBody = z.infer<typeof UpdateNewSharedItemBodySchema>;
+
+export const UpdateSharedItemBodySchema = z.object({
+  t: z.literal('update-shared-item'),
+  itemId: z.string(),
+  name: z.string().optional(),
+  description: z.string().nullable().optional(),
+  content: z.object({ value: z.string(), version: z.number() }).optional(),
+});
+export type UpdateSharedItemBody = z.infer<typeof UpdateSharedItemBodySchema>;
+
+export const DeleteSharedItemBodySchema = z.object({
+  t: z.literal('delete-shared-item'),
+  itemId: z.string(),
+});
+export type DeleteSharedItemBody = z.infer<typeof DeleteSharedItemBodySchema>;
+
+export const SessionSharedItemRefBodySchema = z.object({
+  t: z.literal('session-shared-item-ref'),
+  sessionId: z.string(),
+  itemId: z.string(),
+  action: z.enum(['added', 'removed']),
+});
+export type SessionSharedItemRefBody = z.infer<typeof SessionSharedItemRefBodySchema>;
+
+export const NewTeamBodySchema = z.object({
+  t: z.literal('new-team'),
+  teamId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  createdAt: z.number(),
+});
+export type NewTeamBody = z.infer<typeof NewTeamBodySchema>;
+
+export const UpdateTeamBodySchema = z.object({
+  t: z.literal('update-team'),
+  teamId: z.string(),
+  name: z.string().optional(),
+  description: z.string().nullable().optional(),
+});
+export type UpdateTeamBody = z.infer<typeof UpdateTeamBodySchema>;
+
+export const DeleteTeamBodySchema = z.object({
+  t: z.literal('delete-team'),
+  teamId: z.string(),
+});
+export type DeleteTeamBody = z.infer<typeof DeleteTeamBodySchema>;
+
+export const TeamMembershipBodySchema = z.object({
+  t: z.literal('team-membership'),
+  teamId: z.string(),
+  accountId: z.string(),
+  action: z.enum(['added', 'removed', 'role-changed']),
+  role: z.enum(['owner', 'admin', 'member']).optional(),
+});
+export type TeamMembershipBody = z.infer<typeof TeamMembershipBodySchema>;
+
 export const CoreUpdateBodySchema = z.discriminatedUnion('t', [
   UpdateNewMessageBodySchema,
   UpdateSessionBodySchema,
   UpdateMachineBodySchema,
+  UpdateNewSharedItemBodySchema,
+  UpdateSharedItemBodySchema,
+  DeleteSharedItemBodySchema,
+  SessionSharedItemRefBodySchema,
+  NewTeamBodySchema,
+  UpdateTeamBodySchema,
+  DeleteTeamBodySchema,
+  TeamMembershipBodySchema,
 ]);
 export type CoreUpdateBody = z.infer<typeof CoreUpdateBodySchema>;
 

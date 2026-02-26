@@ -20,6 +20,7 @@ import { isMutableTool } from "@/components/tools/knownTools";
 import { projectManager } from "./projectManager";
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
+import type { SharedItemSummary, TeamSummary } from "./sharedItemTypes";
 
 // Debounce timer for realtimeMode changes
 let realtimeModeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -90,6 +91,12 @@ interface StorageState {
     feedHasMore: boolean;
     feedLoaded: boolean;  // True after initial feed fetch
     friendsLoaded: boolean;  // True after initial friends fetch
+    // Shared Skills & Contexts
+    sharedItems: Record<string, SharedItemSummary>;
+    teams: Record<string, TeamSummary>;
+    sessionSharedItemRefs: Record<string, string[]>;  // sessionId -> itemId[]
+    sharedItemsLoaded: boolean;
+    teamsLoaded: boolean;
     streamingTexts: Record<string, string>;  // key=sessionId, value=accumulated streaming text
     realtimeStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
     realtimeMode: 'idle' | 'speaking';
@@ -152,6 +159,18 @@ interface StorageState {
     clearFeed: () => void;
     appendStreamingText: (sessionId: string, text: string) => void;
     clearStreamingText: (sessionId: string) => void;
+    // Shared Items & Teams methods
+    applySharedItems: (items: SharedItemSummary[]) => void;
+    addSharedItem: (item: SharedItemSummary) => void;
+    updateSharedItem: (itemId: string, updates: Partial<SharedItemSummary>) => void;
+    deleteSharedItem: (itemId: string) => void;
+    applyTeams: (teams: TeamSummary[]) => void;
+    addTeam: (team: TeamSummary) => void;
+    updateTeam: (teamId: string, updates: Partial<TeamSummary>) => void;
+    deleteTeam: (teamId: string) => void;
+    setSessionSharedItemRefs: (sessionId: string, itemIds: string[]) => void;
+    addSessionSharedItemRef: (sessionId: string, itemId: string) => void;
+    removeSessionSharedItemRef: (sessionId: string, itemId: string) => void;
 }
 
 // Helper function to build unified list view data from sessions and machines
@@ -275,6 +294,11 @@ export const storage = create<StorageState>()((set, get) => {
         feedHasMore: false,
         feedLoaded: false,  // Initialize as false
         friendsLoaded: false,  // Initialize as false
+        sharedItems: {},
+        teams: {},
+        sessionSharedItemRefs: {},
+        sharedItemsLoaded: false,
+        teamsLoaded: false,
         streamingTexts: {},
         sessionsData: null,  // Legacy - to be removed
         sessionListViewData: null,
@@ -1115,6 +1139,68 @@ export const storage = create<StorageState>()((set, get) => {
             feedLoaded: false,  // Reset loading flag
             friendsLoaded: false  // Reset loading flag
         })),
+        // Shared Items & Teams actions
+        applySharedItems: (items: SharedItemSummary[]) => set((state) => {
+            const merged = { ...state.sharedItems };
+            items.forEach(item => { merged[item.id] = item; });
+            return { ...state, sharedItems: merged, sharedItemsLoaded: true };
+        }),
+        addSharedItem: (item: SharedItemSummary) => set((state) => ({
+            ...state,
+            sharedItems: { ...state.sharedItems, [item.id]: item }
+        })),
+        updateSharedItem: (itemId: string, updates: Partial<SharedItemSummary>) => set((state) => {
+            const existing = state.sharedItems[itemId];
+            if (!existing) return state;
+            return {
+                ...state,
+                sharedItems: { ...state.sharedItems, [itemId]: { ...existing, ...updates } }
+            };
+        }),
+        deleteSharedItem: (itemId: string) => set((state) => {
+            const { [itemId]: _, ...rest } = state.sharedItems;
+            return { ...state, sharedItems: rest };
+        }),
+        applyTeams: (teams: TeamSummary[]) => set((state) => {
+            const merged = { ...state.teams };
+            teams.forEach(team => { merged[team.id] = team; });
+            return { ...state, teams: merged, teamsLoaded: true };
+        }),
+        addTeam: (team: TeamSummary) => set((state) => ({
+            ...state,
+            teams: { ...state.teams, [team.id]: team }
+        })),
+        updateTeam: (teamId: string, updates: Partial<TeamSummary>) => set((state) => {
+            const existing = state.teams[teamId];
+            if (!existing) return state;
+            return {
+                ...state,
+                teams: { ...state.teams, [teamId]: { ...existing, ...updates } }
+            };
+        }),
+        deleteTeam: (teamId: string) => set((state) => {
+            const { [teamId]: _, ...rest } = state.teams;
+            return { ...state, teams: rest };
+        }),
+        setSessionSharedItemRefs: (sessionId: string, itemIds: string[]) => set((state) => ({
+            ...state,
+            sessionSharedItemRefs: { ...state.sessionSharedItemRefs, [sessionId]: itemIds }
+        })),
+        addSessionSharedItemRef: (sessionId: string, itemId: string) => set((state) => {
+            const existing = state.sessionSharedItemRefs[sessionId] || [];
+            if (existing.includes(itemId)) return state;
+            return {
+                ...state,
+                sessionSharedItemRefs: { ...state.sessionSharedItemRefs, [sessionId]: [...existing, itemId] }
+            };
+        }),
+        removeSessionSharedItemRef: (sessionId: string, itemId: string) => set((state) => {
+            const existing = state.sessionSharedItemRefs[sessionId] || [];
+            return {
+                ...state,
+                sessionSharedItemRefs: { ...state.sessionSharedItemRefs, [sessionId]: existing.filter(id => id !== itemId) }
+            };
+        }),
         appendStreamingText: (sessionId: string, text: string) => set((state) => ({
             ...state,
             streamingTexts: {
@@ -1363,4 +1449,66 @@ export function useStreamingText(sessionId: string): string | undefined {
 
 export function useSessionIsUnread(sessionId: string): boolean {
     return storage((state) => !!state.unreadSessions[sessionId]);
+}
+
+// Shared Items hooks
+export function useSharedItems(): SharedItemSummary[] {
+    return storage(useShallow((state) => {
+        if (!state.sharedItemsLoaded) return [];
+        return Object.values(state.sharedItems).sort((a, b) => b.updatedAt - a.updatedAt);
+    }));
+}
+
+export function useSharedItemsByType(type: 'skill' | 'context'): SharedItemSummary[] {
+    return storage(useShallow((state) => {
+        if (!state.sharedItemsLoaded) return [];
+        return Object.values(state.sharedItems)
+            .filter(item => item.type === type)
+            .sort((a, b) => b.updatedAt - a.updatedAt);
+    }));
+}
+
+export function useSharedItemsByVisibility(visibility: 'private' | 'team' | 'public'): SharedItemSummary[] {
+    return storage(useShallow((state) => {
+        if (!state.sharedItemsLoaded) return [];
+        return Object.values(state.sharedItems)
+            .filter(item => item.visibility === visibility)
+            .sort((a, b) => b.updatedAt - a.updatedAt);
+    }));
+}
+
+export function useSharedItem(itemId: string): SharedItemSummary | null {
+    return storage(useShallow((state) => state.sharedItems[itemId] ?? null));
+}
+
+export function useSharedItemsLoaded(): boolean {
+    return storage((state) => state.sharedItemsLoaded);
+}
+
+// Team hooks
+export function useTeams(): TeamSummary[] {
+    return storage(useShallow((state) => {
+        if (!state.teamsLoaded) return [];
+        return Object.values(state.teams).sort((a, b) => b.createdAt - a.createdAt);
+    }));
+}
+
+export function useTeam(teamId: string): TeamSummary | null {
+    return storage(useShallow((state) => state.teams[teamId] ?? null));
+}
+
+export function useTeamsLoaded(): boolean {
+    return storage((state) => state.teamsLoaded);
+}
+
+// Session shared item refs hooks
+export function useSessionSharedItemRefs(sessionId: string): string[] {
+    return storage(useShallow((state) => state.sessionSharedItemRefs[sessionId] ?? []));
+}
+
+export function useSessionSharedItems(sessionId: string): SharedItemSummary[] {
+    return storage(useShallow((state) => {
+        const refs = state.sessionSharedItemRefs[sessionId] ?? [];
+        return refs.map(id => state.sharedItems[id]).filter(Boolean) as SharedItemSummary[];
+    }));
 }

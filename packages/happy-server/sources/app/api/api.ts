@@ -23,6 +23,9 @@ import { feedRoutes } from "./routes/feedRoutes";
 import { kvRoutes } from "./routes/kvRoutes";
 import { v3SessionRoutes } from "./routes/v3SessionRoutes";
 import { feishuAuthRoutes } from "./routes/feishuAuthRoutes";
+import { teamRoutes } from "./routes/teamRoutes";
+import { sharedItemRoutes } from "./routes/sharedItemRoutes";
+import { sessionSharedItemRoutes } from "./routes/sessionSharedItemRoutes";
 import { isLocalStorage, getLocalFilesDir } from "@/storage/files";
 import * as path from "path";
 import * as fs from "fs";
@@ -93,6 +96,9 @@ export async function startApi() {
     kvRoutes(typed);
     v3SessionRoutes(typed);
     feishuAuthRoutes(typed);
+    teamRoutes(typed);
+    sharedItemRoutes(typed);
+    sessionSharedItemRoutes(typed);
 
     // Start HTTP 
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

@@ -111,6 +111,70 @@ export const ApiKvBatchUpdateSchema = z.object({
     }))
 });
 
+// Shared Items update schemas
+export const ApiNewSharedItemSchema = z.object({
+    t: z.literal('new-shared-item'),
+    itemId: z.string(),
+    itemType: z.enum(['skill', 'context']),
+    visibility: z.enum(['private', 'team', 'public']),
+    name: z.string(),
+    slug: z.string(),
+    description: z.string().nullable(),
+    authorId: z.string(),
+    teamId: z.string().nullable(),
+    createdAt: z.number(),
+    updatedAt: z.number()
+});
+
+export const ApiUpdateSharedItemSchema = z.object({
+    t: z.literal('update-shared-item'),
+    itemId: z.string(),
+    name: z.string().optional(),
+    description: z.string().nullable().optional(),
+    content: z.object({ value: z.string(), version: z.number() }).optional()
+});
+
+export const ApiDeleteSharedItemSchema = z.object({
+    t: z.literal('delete-shared-item'),
+    itemId: z.string()
+});
+
+export const ApiSessionSharedItemRefSchema = z.object({
+    t: z.literal('session-shared-item-ref'),
+    sessionId: z.string(),
+    itemId: z.string(),
+    action: z.enum(['added', 'removed'])
+});
+
+// Team update schemas
+export const ApiNewTeamSchema = z.object({
+    t: z.literal('new-team'),
+    teamId: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    createdAt: z.number()
+});
+
+export const ApiUpdateTeamSchema = z.object({
+    t: z.literal('update-team'),
+    teamId: z.string(),
+    name: z.string().optional(),
+    description: z.string().nullable().optional()
+});
+
+export const ApiDeleteTeamSchema = z.object({
+    t: z.literal('delete-team'),
+    teamId: z.string()
+});
+
+export const ApiTeamMembershipSchema = z.object({
+    t: z.literal('team-membership'),
+    teamId: z.string(),
+    accountId: z.string(),
+    action: z.enum(['added', 'removed', 'role-changed']),
+    role: z.enum(['owner', 'admin', 'member']).optional()
+});
+
 // Use a plain union here to avoid runtime discriminator extraction issues
 // when some schemas come from shared package exports.
 export const ApiUpdateSchema = z.union([
@@ -125,7 +189,15 @@ export const ApiUpdateSchema = z.union([
     ApiDeleteArtifactSchema,
     ApiRelationshipUpdatedSchema,
     ApiNewFeedPostSchema,
-    ApiKvBatchUpdateSchema
+    ApiKvBatchUpdateSchema,
+    ApiNewSharedItemSchema,
+    ApiUpdateSharedItemSchema,
+    ApiDeleteSharedItemSchema,
+    ApiSessionSharedItemRefSchema,
+    ApiNewTeamSchema,
+    ApiUpdateTeamSchema,
+    ApiDeleteTeamSchema,
+    ApiTeamMembershipSchema
 ]);
 
 export type ApiUpdateNewMessage = z.infer<typeof ApiUpdateNewMessageSchema>;

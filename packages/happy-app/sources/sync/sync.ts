@@ -90,6 +90,8 @@ class Sync {
     private friendsSync: InvalidateSync;
     private friendRequestsSync: InvalidateSync;
     private feedSync: InvalidateSync;
+    private teamsSync: InvalidateSync;
+    private sharedItemsSync: InvalidateSync;
     private activityAccumulator: ActivityUpdateAccumulator;
     private pendingSettings: Partial<Settings> = loadPendingSettings();
     private appState: AppStateStatus = AppState.currentState;
@@ -113,6 +115,8 @@ class Sync {
         this.friendsSync = new InvalidateSync(this.fetchFriends);
         this.friendRequestsSync = new InvalidateSync(this.fetchFriendRequests);
         this.feedSync = new InvalidateSync(this.fetchFeed);
+        this.teamsSync = new InvalidateSync(this.fetchTeams);
+        this.sharedItemsSync = new InvalidateSync(this.fetchSharedItems);
 
         const registerPushToken = async () => {
             if (__DEV__) {
@@ -148,6 +152,8 @@ class Sync {
                 this.friendsSync.invalidate();
                 this.friendRequestsSync.invalidate();
                 this.feedSync.invalidate();
+                this.teamsSync.invalidate();
+                this.sharedItemsSync.invalidate();
             } else {
                 log.log(`📱 App state changed to: ${nextAppState}`);
                 this.maybeStartBackgroundSendWatchdog();
@@ -210,6 +216,8 @@ class Sync {
         this.friendRequestsSync.invalidate();
         this.artifactsSync.invalidate();
         this.feedSync.invalidate();
+        this.teamsSync.invalidate();
+        this.sharedItemsSync.invalidate();
         log.log('🔄 #init: All syncs invalidated, including artifacts');
 
         // Wait for both sessions and machines to load, then mark as ready
@@ -1271,6 +1279,34 @@ class Sync {
         }
     }
 
+    private fetchTeams = async () => {
+        if (!this.credentials) return;
+
+        try {
+            log.log('👥 Fetching teams...');
+            const { fetchTeams } = await import('./apiTeams');
+            const result = await fetchTeams(this.credentials);
+            storage.getState().applyTeams(result.teams);
+            log.log(`👥 fetchTeams completed - ${result.teams.length} teams`);
+        } catch (error) {
+            console.error('Failed to fetch teams:', error);
+        }
+    }
+
+    private fetchSharedItems = async () => {
+        if (!this.credentials) return;
+
+        try {
+            log.log('📋 Fetching shared items...');
+            const { fetchSharedItems } = await import('./apiSharedItems');
+            const result = await fetchSharedItems(this.credentials, { limit: 100 });
+            storage.getState().applySharedItems(result.items);
+            log.log(`📋 fetchSharedItems completed - ${result.items.length} items`);
+        } catch (error) {
+            console.error('Failed to fetch shared items:', error);
+        }
+    }
+
     private syncSettings = async () => {
         if (!this.credentials) return;
 
@@ -2114,6 +2150,70 @@ class Sync {
             
             // Apply to storage (will handle repeatKey replacement)
             storage.getState().applyFeedItems([feedItem]);
+        } else if (updateData.body.t === 'new-shared-item') {
+            log.log('📋 Received new-shared-item update');
+            const item = updateData.body;
+            storage.getState().addSharedItem({
+                id: item.itemId,
+                type: item.itemType,
+                visibility: item.visibility,
+                authorId: item.authorId,
+                teamId: item.teamId,
+                name: item.name,
+                slug: item.slug,
+                description: item.description,
+                usageCount: 0,
+                starCount: 0,
+                isStarred: false,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt
+            });
+        } else if (updateData.body.t === 'update-shared-item') {
+            log.log('📋 Received update-shared-item update');
+            const item = updateData.body;
+            const updates: Record<string, any> = {};
+            if (item.name !== undefined) updates.name = item.name;
+            if (item.description !== undefined) updates.description = item.description;
+            updates.updatedAt = updateData.createdAt;
+            storage.getState().updateSharedItem(item.itemId, updates);
+        } else if (updateData.body.t === 'delete-shared-item') {
+            log.log('📋 Received delete-shared-item update');
+            storage.getState().deleteSharedItem(updateData.body.itemId);
+        } else if (updateData.body.t === 'session-shared-item-ref') {
+            log.log('📋 Received session-shared-item-ref update');
+            const ref = updateData.body;
+            if (ref.action === 'added') {
+                storage.getState().addSessionSharedItemRef(ref.sessionId, ref.itemId);
+            } else {
+                storage.getState().removeSessionSharedItemRef(ref.sessionId, ref.itemId);
+            }
+        } else if (updateData.body.t === 'new-team') {
+            log.log('👥 Received new-team update');
+            const team = updateData.body;
+            storage.getState().addTeam({
+                id: team.teamId,
+                name: team.name,
+                description: team.description,
+                myRole: 'owner',
+                memberCount: 1,
+                createdAt: team.createdAt,
+                updatedAt: team.createdAt
+            });
+        } else if (updateData.body.t === 'update-team') {
+            log.log('👥 Received update-team update');
+            const team = updateData.body;
+            const updates: Record<string, any> = {};
+            if (team.name !== undefined) updates.name = team.name;
+            if (team.description !== undefined) updates.description = team.description;
+            updates.updatedAt = updateData.createdAt;
+            storage.getState().updateTeam(team.teamId, updates);
+        } else if (updateData.body.t === 'delete-team') {
+            log.log('👥 Received delete-team update');
+            storage.getState().deleteTeam(updateData.body.teamId);
+        } else if (updateData.body.t === 'team-membership') {
+            log.log('👥 Received team-membership update');
+            // Refresh teams list to get updated membership
+            this.teamsSync?.invalidate();
         }
     }
 

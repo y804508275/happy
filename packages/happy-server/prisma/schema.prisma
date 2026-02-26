@@ -55,6 +55,13 @@ model Account {
     AccessKey           AccessKey[]
     UserFeedItem        UserFeedItem[]
     UserKVStore         UserKVStore[]
+
+    // Shared Skills & Contexts
+    TeamsCreated          Team[]                 @relation("TeamsCreated")
+    TeamMemberships       TeamMember[]
+    SharedItemsAuthored   SharedItem[]           @relation("SharedItemsAuthored")
+    SharedItemStars       SharedItemStar[]       @relation("SharedItemStars")
+    SessionSharedItemRefs SessionSharedItemRef[] @relation("SessionSharedItemRefs")
 }
 
 model TerminalAuthRequest {
@@ -111,6 +118,7 @@ model Session {
     messages          SessionMessage[]
     usageReports      UsageReport[]
     accessKeys        AccessKey[]
+    sharedItemRefs    SessionSharedItemRef[]
 
     @@unique([accountId, tag])
     @@index([accountId, updatedAt(sort: Desc)])
@@ -363,4 +371,117 @@ model UserKVStore {
 
     @@unique([accountId, key])
     @@index([accountId])
+}
+
+//
+// Teams
+//
+
+enum TeamRole {
+    owner
+    admin
+    member
+}
+
+model Team {
+    id          String       @id @default(cuid())
+    name        String
+    description String?
+    /// [ImageRef]
+    avatar      Json?
+    createdById String
+    createdBy   Account      @relation("TeamsCreated", fields: [createdById], references: [id])
+    seq         Int          @default(0)
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+    members     TeamMember[]
+    sharedItems SharedItem[]
+
+    @@index([createdById])
+}
+
+model TeamMember {
+    id        String   @id @default(cuid())
+    teamId    String
+    team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+    accountId String
+    account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    role      TeamRole @default(member)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([teamId, accountId])
+    @@index([accountId])
+    @@index([teamId])
+}
+
+//
+// Shared Skills & Contexts
+//
+
+enum SharedItemType {
+    skill
+    context
+}
+
+enum SharedItemVisibility {
+    private
+    team
+    public
+}
+
+model SharedItem {
+    id             String               @id @default(cuid())
+    type           SharedItemType
+    visibility     SharedItemVisibility
+    authorId       String
+    author         Account              @relation("SharedItemsAuthored", fields: [authorId], references: [id])
+    teamId         String?
+    team           Team?                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+    name           String
+    slug           String
+    description    String?
+    content        String               // Markdown body
+    contentVersion Int                  @default(1)
+    /// [SharedItemMeta]
+    meta           Json?
+    usageCount     Int                  @default(0)
+    starCount      Int                  @default(0)
+    seq            Int                  @default(0)
+    createdAt      DateTime             @default(now())
+    updatedAt      DateTime             @updatedAt
+    stars          SharedItemStar[]
+    sessionRefs    SessionSharedItemRef[]
+
+    @@unique([authorId, slug])
+    @@index([type, visibility])
+    @@index([authorId])
+    @@index([teamId])
+}
+
+model SharedItemStar {
+    id           String     @id @default(cuid())
+    sharedItemId String
+    sharedItem   SharedItem @relation(fields: [sharedItemId], references: [id], onDelete: Cascade)
+    accountId    String
+    account      Account    @relation("SharedItemStars", fields: [accountId], references: [id], onDelete: Cascade)
+    createdAt    DateTime   @default(now())
+
+    @@unique([sharedItemId, accountId])
+    @@index([accountId])
+}
+
+model SessionSharedItemRef {
+    id           String     @id @default(cuid())
+    sessionId    String
+    session      Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    sharedItemId String
+    sharedItem   SharedItem @relation(fields: [sharedItemId], references: [id], onDelete: Cascade)
+    addedById    String
+    addedBy      Account    @relation("SessionSharedItemRefs", fields: [addedById], references: [id])
+    createdAt    DateTime   @default(now())
+
+    @@unique([sessionId, sharedItemId])
+    @@index([sessionId])
+    @@index([sharedItemId])
 }

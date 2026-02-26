@@ -153,6 +153,52 @@ export type UpdateEvent = {
         value: string | null; // null indicates deletion
         version: number; // -1 for deleted keys
     }>;
+} | {
+    type: 'new-shared-item';
+    itemId: string;
+    itemType: 'skill' | 'context';
+    visibility: 'private' | 'team' | 'public';
+    name: string;
+    slug: string;
+    description: string | null;
+    authorId: string;
+    teamId: string | null;
+    createdAt: number;
+    updatedAt: number;
+} | {
+    type: 'update-shared-item';
+    itemId: string;
+    name?: string;
+    description?: string | null;
+    content?: { value: string; version: number };
+} | {
+    type: 'delete-shared-item';
+    itemId: string;
+} | {
+    type: 'session-shared-item-ref';
+    sessionId: string;
+    itemId: string;
+    action: 'added' | 'removed';
+} | {
+    type: 'new-team';
+    teamId: string;
+    name: string;
+    description: string | null;
+    createdAt: number;
+} | {
+    type: 'update-team';
+    teamId: string;
+    name?: string;
+    description?: string | null;
+} | {
+    type: 'delete-team';
+    teamId: string;
+} | {
+    type: 'team-membership';
+    teamId: string;
+    accountId: string;
+    action: 'added' | 'removed' | 'role-changed';
+    role?: 'owner' | 'admin' | 'member';
 };
 
 // === EPHEMERAL EVENT TYPES (Transient) ===
@@ -678,6 +724,162 @@ export function buildKVBatchUpdateUpdate(
         body: {
             t: 'kv-batch-update',
             changes
+        },
+        createdAt: Date.now()
+    };
+}
+
+// === SHARED ITEMS & TEAMS EVENT BUILDERS ===
+
+export function buildNewSharedItemUpdate(item: {
+    id: string;
+    type: 'skill' | 'context';
+    visibility: 'private' | 'team' | 'public';
+    name: string;
+    slug: string;
+    description: string | null;
+    authorId: string;
+    teamId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'new-shared-item',
+            itemId: item.id,
+            itemType: item.type,
+            visibility: item.visibility,
+            name: item.name,
+            slug: item.slug,
+            description: item.description,
+            authorId: item.authorId,
+            teamId: item.teamId,
+            createdAt: item.createdAt.getTime(),
+            updatedAt: item.updatedAt.getTime()
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildUpdateSharedItemUpdate(
+    itemId: string,
+    updateSeq: number,
+    updateId: string,
+    updates: { name?: string; description?: string | null; content?: { value: string; version: number } }
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'update-shared-item',
+            itemId,
+            ...updates
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildDeleteSharedItemUpdate(itemId: string, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'delete-shared-item',
+            itemId
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildSessionSharedItemRefUpdate(
+    sessionId: string,
+    itemId: string,
+    action: 'added' | 'removed',
+    updateSeq: number,
+    updateId: string
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'session-shared-item-ref',
+            sessionId,
+            itemId,
+            action
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildNewTeamUpdate(team: {
+    id: string;
+    name: string;
+    description: string | null;
+    createdAt: Date;
+}, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'new-team',
+            teamId: team.id,
+            name: team.name,
+            description: team.description,
+            createdAt: team.createdAt.getTime()
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildUpdateTeamUpdate(
+    teamId: string,
+    updateSeq: number,
+    updateId: string,
+    updates: { name?: string; description?: string | null }
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'update-team',
+            teamId,
+            ...updates
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildDeleteTeamUpdate(teamId: string, updateSeq: number, updateId: string): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'delete-team',
+            teamId
+        },
+        createdAt: Date.now()
+    };
+}
+
+export function buildTeamMembershipUpdate(
+    teamId: string,
+    accountId: string,
+    action: 'added' | 'removed' | 'role-changed',
+    updateSeq: number,
+    updateId: string,
+    role?: 'owner' | 'admin' | 'member'
+): UpdatePayload {
+    return {
+        id: updateId,
+        seq: updateSeq,
+        body: {
+            t: 'team-membership',
+            teamId,
+            accountId,
+            action,
+            role
         },
         createdAt: Date.now()
     };
