@@ -13,6 +13,7 @@ import { machineUpdateHandler } from "./socket/machineUpdateHandler";
 import { artifactUpdateHandler } from "./socket/artifactUpdateHandler";
 import { accessKeyHandler } from "./socket/accessKeyHandler";
 import * as crypto from "crypto";
+import { EventEmitter } from "events";
 
 export function startSocket(app: Fastify) {
     const io = new Server(app.server, {
@@ -37,6 +38,10 @@ export function startSocket(app: Fastify) {
     eventRouter.init(io);
 
     let rpcListeners = new Map<string, Map<string, Socket>>();
+
+    // EventEmitter for RPC registration events — allows RPC calls to wait for daemon reconnection
+    const rpcRegistrationEmitter = new EventEmitter();
+    rpcRegistrationEmitter.setMaxListeners(500);
 
     // Cross-instance RPC forwarding via Redis pub/sub
     let forwardRpcCrossInstance: ((userId: string, method: string, params: any) => Promise<any>) | null = null;
@@ -206,7 +211,7 @@ export function startSocket(app: Fastify) {
             userRpcListeners = new Map<string, Socket>();
             rpcListeners.set(userId, userRpcListeners);
         }
-        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance);
+        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance, rpcRegistrationEmitter);
         usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);
         pingHandler(socket);
@@ -252,6 +257,9 @@ export function startSocket(app: Fastify) {
     });
 
     onShutdown('api', async () => {
+        // Notify all connected clients that the server is about to restart
+        io.emit('server-restarting', { reason: 'deployment' });
+        await new Promise(resolve => setTimeout(resolve, 500));
         await io.close();
     });
 }
