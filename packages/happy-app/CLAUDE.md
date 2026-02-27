@@ -460,3 +460,28 @@ const MyComponent = () => {
 - Always wrap pages in memo
 - For hotkeys use "useGlobalKeyboard", do not change it, it works only on Web
 - Use "AsyncLock" class for exclusive async locks
+
+## Web Build Gotchas (Metro/Terser)
+
+### process.env.EXPO_PUBLIC_* gets replaced at build time
+Metro replaces `process.env.EXPO_PUBLIC_*` with their literal values during bundling. If a dev server is running, the value will be the dev server's URL (e.g. `http://localhost:3000`). **Never rely on `process.env.EXPO_PUBLIC_*` for runtime-dynamic values.**
+
+### Metro + Terser static evaluation
+Both metro bundler and terser minifier aggressively evaluate expressions at build time:
+- `Platform.OS === 'web'` is resolved to `true`/`false` and dead code is eliminated
+- `window.location.origin` is evaluated during build (returns metro dev server URL)
+- `new Function('return ...')()` is also evaluated by terser
+- String concatenation tricks like `'win' + 'dow'` are folded by metro
+
+**Solution**: Use indirect `eval` to prevent static analysis:
+```typescript
+const indirect = eval;
+const origin = indirect('window.location.origin') as string;
+```
+This works because terser cannot statically evaluate an indirect eval reference.
+
+### Web deployment to happy.superlinear.studio
+- Build: `npx expo export --platform web --no-minify` (no-minify needed until terser indirect eval issue is resolved)
+- Deploy: `rsync -avz --delete dist/ root@43.130.14.15:/opt/happy-web/`
+- Nginx serves static files from `/opt/happy-web/` with SPA fallback
+- Backend runs on ports 3001/3002 behind nginx upstream `happy_backend`

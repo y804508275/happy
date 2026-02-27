@@ -6,10 +6,26 @@ const serverConfigStorage = new MMKV({ id: 'server-config' });
 const SERVER_KEY = 'custom-server-url';
 const DEFAULT_SERVER_URL = 'https://happy.superlinear.studio';
 
+// Cached runtime origin, evaluated lazily to avoid metro static analysis
+let _runtimeOrigin: string | undefined;
+
 export function getServerUrl(): string {
-    return serverConfigStorage.getString(SERVER_KEY) || 
-           process.env.EXPO_PUBLIC_HAPPY_SERVER_URL || 
-           DEFAULT_SERVER_URL;
+    const custom = serverConfigStorage.getString(SERVER_KEY);
+    if (custom) return custom;
+    // On web: use browser origin so the app works on any domain without build-time config.
+    // Indirect eval prevents metro/terser from statically evaluating at build time.
+    if (_runtimeOrigin === undefined) {
+        try {
+            const indirect = eval;
+            _runtimeOrigin = indirect('window.location.origin') as string;
+        } catch {
+            _runtimeOrigin = '';
+        }
+    }
+    if (_runtimeOrigin && _runtimeOrigin !== 'null' && !_runtimeOrigin.includes('localhost')) {
+        return _runtimeOrigin;
+    }
+    return DEFAULT_SERVER_URL;
 }
 
 export function setServerUrl(url: string | null): void {

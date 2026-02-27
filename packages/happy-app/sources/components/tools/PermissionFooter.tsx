@@ -5,6 +5,7 @@ import { sessionAllow, sessionDeny } from '@/sync/ops';
 import { useUnistyles } from 'react-native-unistyles';
 import { storage } from '@/sync/storage';
 import { t } from '@/text';
+import { useInlineOptions } from '@/hooks/useInlineOptions';
 
 /**
  * Minimum time (ms) after mount before clicks are accepted.
@@ -242,34 +243,35 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = React.memo(({ p
     const focusedIndexRef = useRef(focusedIndex);
     focusedIndexRef.current = focusedIndex;
 
-    // Keyboard navigation: up/down to select, enter to confirm (web only)
+    // Register keyboard handler with InlineOptionsProvider (replaces window listener)
+    const { setExternalHandler } = useInlineOptions();
     useEffect(() => {
         if (Platform.OS !== 'web' || !enableKeyboard || !isPending) return;
 
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
+        setExternalHandler((key: string, shiftKey: boolean): boolean => {
+            if (key === 'ArrowUp') {
                 setFocusedIndex(i => {
                     const next = (i - 1 + buttonCount) % buttonCount;
                     focusedIndexRef.current = next;
                     return next;
                 });
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
+                return true;
+            } else if (key === 'ArrowDown') {
                 setFocusedIndex(i => {
                     const next = (i + 1) % buttonCount;
                     focusedIndexRef.current = next;
                     return next;
                 });
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
+                return true;
+            } else if (key === 'Enter' && !shiftKey) {
                 buttonActionsRef.current[focusedIndexRef.current]?.();
+                return true;
             }
-        };
+            return false;
+        });
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [enableKeyboard, isPending, buttonCount]);
+        return () => setExternalHandler(null);
+    }, [enableKeyboard, isPending, buttonCount, setExternalHandler]);
 
     const styles = StyleSheet.create({
         container: {

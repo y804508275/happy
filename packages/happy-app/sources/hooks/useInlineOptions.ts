@@ -5,26 +5,38 @@ import { sync } from '@/sync/sync';
 import { Message } from '@/sync/typesMessage';
 
 /**
- * Manages inline options keyboard navigation state.
+ * Manages keyboard navigation for inline options and other option bars.
  *
- * Scans messages from newest to oldest:
- * - If the first relevant message is user-text → no active options (user already replied)
- * - If an agent-text contains <options> → those become activeItems
+ * Instead of using window.addEventListener (which doesn't reliably receive
+ * events from the textarea in React Native Web), this context exposes a
+ * handleOptionsKey() callback. AgentInput calls it from its own handleKeyPress
+ * as a fallback when no other handler consumed the key.
  *
- * On web, registers window-level keydown listeners for ArrowUp/Down/Enter
- * to navigate and select options. The textarea's keydown fires first and
- * consumes events when input has text or autocomplete is open, so this
- * hook only activates when the input is empty and no autocomplete is shown.
+ * Priority chain in AgentInput.handleKeyPress:
+ * 1. Autocomplete navigation (ArrowUp/Down/Enter/Tab)
+ * 2. Send message (Enter when input has text)
+ * 3. handleOptionsKey → inline options or registered external handler (Enter/ArrowUp/Down)
+ *
+ * External components (e.g. FixedAskUserQuestionBar) register their keyboard
+ * handlers via setExternalHandler, which takes priority over inline options.
  */
+
+type OptionsKeyHandler = (key: string, shiftKey: boolean) => boolean;
 
 type InlineOptionsContextType = {
     activeItems: string[] | null;
     focusedIndex: number;
+    /** Called by AgentInput for unhandled keyboard events */
+    handleOptionsKey: OptionsKeyHandler;
+    /** Called by external option bars (AskUserQuestion, Permission) to register a handler */
+    setExternalHandler: (handler: OptionsKeyHandler | null) => void;
 };
 
 const InlineOptionsContext = React.createContext<InlineOptionsContextType>({
     activeItems: null,
     focusedIndex: 0,
+    handleOptionsKey: () => false,
+    setExternalHandler: () => {},
 });
 
 export function useInlineOptions() {
@@ -37,7 +49,7 @@ export function InlineOptionsProvider(props: {
     inputValue: string;
     children: React.ReactNode;
 }) {
-    const { messages, sessionId, inputValue, children } = props;
+    const { messages, sessionId, children } = props;
 
     // Find active options: scan from newest message, stop at first user message
     const activeItems = React.useMemo(() => {
@@ -67,58 +79,65 @@ export function InlineOptionsProvider(props: {
         setSubmitted(false);
     }, [activeItemsKey]);
 
-    // Refs for stable access in the keyboard handler
-    const focusedIndexRef = React.useRef(focusedIndex);
-    focusedIndexRef.current = focusedIndex;
+    // External handler (e.g. FixedAskUserQuestionBar keyboard navigation)
+    const externalHandlerRef = React.useRef<OptionsKeyHandler | null>(null);
+    const setExternalHandler = React.useCallback((handler: OptionsKeyHandler | null) => {
+        externalHandlerRef.current = handler;
+    }, []);
 
-    const inputValueRef = React.useRef(inputValue);
-    inputValueRef.current = inputValue;
+    // Unified keyboard handler called by AgentInput
+    const handleOptionsKey = React.useCallback((key: string, shiftKey: boolean): boolean => {
+        // External handler takes priority (AskUserQuestion / Permission bars are more urgent)
+        if (externalHandlerRef.current) {
+            if (externalHandlerRef.current(key, shiftKey)) {
+                return true;
+            }
+        }
 
-    const submittedRef = React.useRef(submitted);
-    submittedRef.current = submitted;
-
-    const activeItemsRef = React.useRef(activeItems);
-    activeItemsRef.current = activeItems;
-
-    // Keyboard navigation (web only)
-    React.useEffect(() => {
-        if (Platform.OS !== 'web') return;
-        if (!activeItems) return;
-
+        // Inline options handling
+        if (!activeItems || submitted) return false;
         const len = activeItems.length;
 
+        if (key === 'ArrowUp') {
+            setFocusedIndex(i => (i - 1 + len) % len);
+            return true;
+        } else if (key === 'ArrowDown') {
+            setFocusedIndex(i => (i + 1) % len);
+            return true;
+        } else if (key === 'Enter' && !shiftKey) {
+            setSubmitted(true);
+            sync.sendMessage(sessionId, activeItems[focusedIndex]);
+            return true;
+        }
+
+        return false;
+    }, [activeItems, submitted, focusedIndex, sessionId]);
+
+    // Window-level listener for when textarea is not focused (e.g. user clicked outside)
+    // AgentInput.handleKeyPress handles events when textarea IS focused.
+    const handleOptionsKeyRef = React.useRef(handleOptionsKey);
+    handleOptionsKeyRef.current = handleOptionsKey;
+    React.useEffect(() => {
+        if (Platform.OS !== 'web') return;
+
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowUp') {
+            const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+            if (tag === 'textarea' || tag === 'input') return;
+            if (handleOptionsKeyRef.current(e.key, e.shiftKey)) {
                 e.preventDefault();
-                setFocusedIndex(i => {
-                    const next = (i - 1 + len) % len;
-                    focusedIndexRef.current = next;
-                    return next;
-                });
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setFocusedIndex(i => {
-                    const next = (i + 1) % len;
-                    focusedIndexRef.current = next;
-                    return next;
-                });
-            } else if (e.key === 'Enter' && !e.shiftKey) {
-                if (inputValueRef.current.trim() === '' && !submittedRef.current && activeItemsRef.current) {
-                    e.preventDefault();
-                    setSubmitted(true);
-                    sync.sendMessage(sessionId, activeItemsRef.current[focusedIndexRef.current]);
-                }
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [activeItemsKey, sessionId]);
+    }, []);
 
     const value = React.useMemo<InlineOptionsContextType>(() => ({
         activeItems,
         focusedIndex,
-    }), [activeItems, focusedIndex]);
+        handleOptionsKey,
+        setExternalHandler,
+    }), [activeItems, focusedIndex, handleOptionsKey, setExternalHandler]);
 
     return React.createElement(InlineOptionsContext.Provider, { value }, children);
 }

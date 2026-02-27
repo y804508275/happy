@@ -64,6 +64,7 @@ interface AgentInputProps {
         contextSize: number;
     };
     alwaysShowContextSize?: boolean;
+    onPreviewPress?: () => void;
     onFileViewerPress?: () => void;
     agentType?: 'claude' | 'codex' | 'gemini';
     onAgentClick?: () => void;
@@ -1152,6 +1153,33 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             )}
                                         </Pressable>
                                     </Shaker>
+                                )}
+
+                                {/* Preview button (web only) */}
+                                {Platform.OS === 'web' && props.onPreviewPress && (
+                                    <Pressable
+                                        onPress={() => {
+                                            hapticsLight();
+                                            props.onPreviewPress?.();
+                                        }}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="globe-outline"
+                                            size={16}
+                                            color={theme.colors.button.secondary.tint}
+                                        />
+                                    </Pressable>
                                 )}
 
                                 {/* Git Status Badge */}

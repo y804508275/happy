@@ -8,6 +8,8 @@ import { sessionAllow } from '@/sync/ops';
 import { sync } from '@/sync/sync';
 import { t } from '@/text';
 import { askQuestionSelectionsCache } from './views/AskUserQuestionView';
+import { useInlineOptions } from '@/hooks/useInlineOptions';
+import { layout } from '@/components/layout';
 
 interface QuestionOption {
     label: string;
@@ -116,34 +118,35 @@ const FixedQuestionContent = React.memo(({ tool, sessionId }: {
     const handleSelectRef = React.useRef(handleSelect);
     handleSelectRef.current = handleSelect;
 
-    // Keyboard navigation: up/down to select, enter to confirm (web only)
+    // Register keyboard handler with InlineOptionsProvider (replaces window listener)
+    const { setExternalHandler } = useInlineOptions();
     React.useEffect(() => {
         if (Platform.OS !== 'web') return;
 
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
+        setExternalHandler((key: string, shiftKey: boolean): boolean => {
+            if (key === 'ArrowUp') {
                 setFocusedIndex(i => {
                     const next = (i - 1 + optionCount) % optionCount;
                     focusedIndexRef.current = next;
                     return next;
                 });
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
+                return true;
+            } else if (key === 'ArrowDown') {
                 setFocusedIndex(i => {
                     const next = (i + 1) % optionCount;
                     focusedIndexRef.current = next;
                     return next;
                 });
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
+                return true;
+            } else if (key === 'Enter' && !shiftKey) {
                 handleSelectRef.current(focusedIndexRef.current);
+                return true;
             }
-        };
+            return false;
+        });
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [optionCount]);
+        return () => setExternalHandler(null);
+    }, [optionCount, setExternalHandler]);
 
     return (
         <View style={contentStyles.wrapper}>
@@ -187,6 +190,9 @@ const barStyles = StyleSheet.create((theme) => ({
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: theme.colors.divider,
         backgroundColor: theme.colors.surface,
+        alignSelf: 'center',
+        width: '100%',
+        maxWidth: layout.maxWidth,
     },
 }));
 
