@@ -897,6 +897,9 @@ export async function startDaemon(): Promise<void> {
           logger.debug('[DAEMON RUN] Failed to spawn new daemon, this is quite likely to happen during integration tests as we are cleaning out dist/ directory', error);
         }
 
+        // Persist sessions before exiting so the new daemon can re-adopt them
+        persistSessions();
+
         // So we can just hang forever
         logger.debug('[DAEMON RUN] Hanging for a bit - waiting for CLI to kill us because we are running outdated version of the code');
         await new Promise(resolve => setTimeout(resolve, 10_000));
