@@ -562,6 +562,13 @@ export class ApiSessionClient extends EventEmitter {
     }
 
     /**
+     * Get the current agent state (read-only snapshot)
+     */
+    getCurrentAgentState(): AgentState | null {
+        return this.agentState;
+    }
+
+    /**
      * Update session agent state
      * @param handler - Handler function that returns the updated agent state
      */

@@ -48,6 +48,13 @@ export class PermissionHandler {
     constructor(session: Session) {
         this.session = session;
         this.setupClientHandler();
+
+        // Restore autoConfirm from existing agent state (e.g. after session reconnect)
+        const currentState = this.session.client.getCurrentAgentState();
+        if (currentState?.autoConfirm) {
+            this.autoConfirm = true;
+            logger.debug('Restored autoConfirm=true from existing agent state');
+        }
     }
     
     /**

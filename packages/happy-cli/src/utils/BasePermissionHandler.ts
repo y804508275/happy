@@ -57,6 +57,13 @@ export abstract class BasePermissionHandler {
     constructor(session: ApiSessionClient) {
         this.session = session;
         this.setupRpcHandler();
+
+        // Restore autoConfirm from existing agent state (e.g. after session reconnect)
+        const currentState = this.session.getCurrentAgentState();
+        if (currentState?.autoConfirm) {
+            this.autoConfirm = true;
+            logger.debug(`${this.getLogPrefix()} Restored autoConfirm=true from existing agent state`);
+        }
     }
 
     /**
