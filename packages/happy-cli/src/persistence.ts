@@ -532,6 +532,47 @@ export function writeDaemonState(state: DaemonLocallyPersistedState): void {
 }
 
 /**
+ * Persisted session tracking types (imported from daemon/types for reference)
+ */
+import type { PersistedTrackedSession } from '@/daemon/types';
+
+/**
+ * Read persisted sessions from daemon.sessions.json
+ */
+export function readPersistedSessions(): PersistedTrackedSession[] {
+  try {
+    if (!existsSync(configuration.daemonSessionsFile)) {
+      return [];
+    }
+    const content = readFileSync(configuration.daemonSessionsFile, 'utf-8');
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed as PersistedTrackedSession[];
+  } catch (error) {
+    logger.debug(`[PERSISTENCE] Failed to read persisted sessions: ${error}`);
+    return [];
+  }
+}
+
+/**
+ * Write persisted sessions to daemon.sessions.json (synchronous for atomicity)
+ */
+export function writePersistedSessions(sessions: PersistedTrackedSession[]): void {
+  writeFileSync(configuration.daemonSessionsFile, JSON.stringify(sessions, null, 2), 'utf-8');
+}
+
+/**
+ * Clear persisted sessions file (for doctor clean)
+ */
+export function clearPersistedSessions(): void {
+  if (existsSync(configuration.daemonSessionsFile)) {
+    unlinkSync(configuration.daemonSessionsFile);
+  }
+}
+
+/**
  * Clean up daemon state file and lock file
  */
 export async function clearDaemonState(): Promise<void> {

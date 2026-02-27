@@ -4,7 +4,7 @@
  */
 
 import { logger } from '@/ui/logger';
-import { clearDaemonState, readDaemonState } from '@/persistence';
+import { clearDaemonState, clearPersistedSessions, readDaemonState } from '@/persistence';
 import { Metadata } from '@/api/types';
 import { projectPath } from '@/projectPath';
 import { readFileSync } from 'fs';
@@ -190,6 +190,15 @@ export async function cleanupDaemonState(): Promise<void> {
     logger.debug('[DAEMON RUN] Daemon state file removed');
   } catch (error) {
     logger.debug('[DAEMON RUN] Error cleaning up daemon metadata', error);
+  }
+}
+
+export function cleanupDaemonStateAndSessions(): void {
+  try {
+    clearPersistedSessions();
+    logger.debug('[DAEMON RUN] Daemon sessions file removed');
+  } catch (error) {
+    logger.debug('[DAEMON RUN] Error cleaning up daemon sessions', error);
   }
 }
 

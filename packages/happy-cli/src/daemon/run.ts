@@ -3,7 +3,7 @@ import os from 'os';
 import * as tmp from 'tmp';
 
 import { ApiClient } from '@/api/api';
-import { TrackedSession } from './types';
+import { TrackedSession, PersistedTrackedSession } from './types';
 import { MachineMetadata, DaemonState, Metadata } from '@/api/types';
 import { SpawnSessionOptions, SpawnSessionResult } from '@/modules/common/registerCommonHandlers';
 import { logger } from '@/ui/logger';
@@ -13,11 +13,11 @@ import { startCaffeinate, stopCaffeinate } from '@/utils/caffeinate';
 import packageJson from '../../package.json';
 import { getEnvironmentInfo } from '@/ui/doctor';
 import { spawnHappyCLI } from '@/utils/spawnHappyCLI';
-import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readSettings, getActiveProfile, getEnvironmentVariables, validateProfileForAgent, getProfileEnvironmentVariables } from '@/persistence';
+import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquireDaemonLock, releaseDaemonLock, readSettings, getActiveProfile, getEnvironmentVariables, validateProfileForAgent, getProfileEnvironmentVariables, readPersistedSessions, writePersistedSessions } from '@/persistence';
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
 import { startDaemonControlServer } from './controlServer';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { projectPath } from '@/projectPath';
 import { getTmuxUtilities, isTmuxAvailable, parseTmuxSessionIdentifier, formatTmuxSessionIdentifier } from '@/utils/tmux';
@@ -173,6 +173,26 @@ export async function startDaemon(): Promise<void> {
     // Helper functions
     const getCurrentChildren = () => Array.from(pidToTrackedSession.values());
 
+    // Persist current session map to disk for re-adoption after restart
+    const persistSessions = () => {
+      try {
+        const persisted: PersistedTrackedSession[] = Array.from(pidToTrackedSession.entries()).map(([pid, session]) => ({
+          pid,
+          startedBy: session.startedBy,
+          happySessionId: session.happySessionId,
+          directory: session.happySessionMetadataFromLocalWebhook?.path,
+          claudeSessionId: session.happySessionMetadataFromLocalWebhook?.claudeSessionId,
+          tmuxSessionId: session.tmuxSessionId,
+          agent: session.happySessionMetadataFromLocalWebhook?.flavor,
+          trackedAt: Date.now()
+        }));
+        writePersistedSessions(persisted);
+        logger.debug(`[DAEMON RUN] Persisted ${persisted.length} sessions to disk`);
+      } catch (error) {
+        logger.debug('[DAEMON RUN] Failed to persist sessions:', error);
+      }
+    };
+
     // Handle webhook from happy session reporting itself
     const onHappySessionWebhook = (sessionId: string, sessionMetadata: Metadata) => {
       logger.debugLargeJson(`[DAEMON RUN] Session reported`, sessionMetadata);
@@ -194,6 +214,7 @@ export async function startDaemon(): Promise<void> {
         existingSession.happySessionId = sessionId;
         existingSession.happySessionMetadataFromLocalWebhook = sessionMetadata;
         logger.debug(`[DAEMON RUN] Updated daemon-spawned session ${sessionId} with metadata`);
+        persistSessions();
 
         // Resolve any awaiter for this PID
         const awaiter = pidToAwaiter.get(pid);
@@ -212,6 +233,7 @@ export async function startDaemon(): Promise<void> {
         };
         pidToTrackedSession.set(pid, trackedSession);
         logger.debug(`[DAEMON RUN] Registered externally-started session ${sessionId}`);
+        persistSessions();
       }
     };
 
@@ -435,6 +457,7 @@ export async function startDaemon(): Promise<void> {
 
             // Add to tracking map so webhook can find it later
             pidToTrackedSession.set(tmuxResult.pid, trackedSession);
+            persistSessions();
 
             // Wait for webhook to populate session with happySessionId (exact same as regular flow)
             logger.debug(`[DAEMON RUN] Waiting for session webhook for PID ${tmuxResult.pid} (tmux)`);
@@ -544,6 +567,7 @@ export async function startDaemon(): Promise<void> {
           };
 
           pidToTrackedSession.set(happyProcess.pid, trackedSession);
+          persistSessions();
 
           happyProcess.on('exit', (code, signal) => {
             logger.debug(`[DAEMON RUN] Child PID ${happyProcess.pid} exited with code ${code}, signal ${signal}`);
@@ -629,6 +653,7 @@ export async function startDaemon(): Promise<void> {
           }
 
           pidToTrackedSession.delete(pid);
+          persistSessions();
           logger.debug(`[DAEMON RUN] Removed session ${sessionId} from tracking`);
           return true;
         }
@@ -643,6 +668,7 @@ export async function startDaemon(): Promise<void> {
       const trackedSession = pidToTrackedSession.get(pid);
       logger.debug(`[DAEMON RUN] Removing exited process PID ${pid} from tracking (code=${code}, signal=${signal})`);
       pidToTrackedSession.delete(pid);
+      persistSessions();
 
       // Exit code 42 = graceful restart requested
       if (code === 42 && trackedSession) {
@@ -681,6 +707,63 @@ export async function startDaemon(): Promise<void> {
       requestShutdown: () => requestShutdown('happy-cli'),
       onHappySessionWebhook
     });
+
+    // Re-adopt sessions from previous daemon instance
+    const previousSessions = readPersistedSessions();
+    if (previousSessions.length > 0) {
+      logger.debug(`[DAEMON RUN] Found ${previousSessions.length} persisted sessions from previous daemon`);
+      for (const persisted of previousSessions) {
+        try {
+          process.kill(persisted.pid, 0); // Check if alive
+          // Process is alive - re-adopt it
+          const trackedSession: TrackedSession = {
+            startedBy: persisted.startedBy,
+            pid: persisted.pid,
+            happySessionId: persisted.happySessionId,
+            tmuxSessionId: persisted.tmuxSessionId,
+            // Reconstruct partial metadata for restart support
+            // Only path and claudeSessionId are needed for respawn logic
+            happySessionMetadataFromLocalWebhook: persisted.directory ? {
+              path: persisted.directory,
+              host: os.hostname(),
+              homeDir: os.homedir(),
+              happyHomeDir: configuration.happyHomeDir,
+              happyLibDir: projectPath(),
+              happyToolsDir: '',
+              claudeSessionId: persisted.claudeSessionId,
+              hostPid: persisted.pid,
+              flavor: persisted.agent,
+            } as Metadata : undefined,
+            // No ChildProcess handle for re-adopted sessions
+          };
+          pidToTrackedSession.set(persisted.pid, trackedSession);
+          logger.debug(`[DAEMON RUN] Re-adopted live session PID ${persisted.pid} (sessionId: ${persisted.happySessionId || 'unknown'})`);
+        } catch {
+          // Process is dead - check for restart file
+          const restartFilePath = `/tmp/happy-restart-${persisted.pid}.json`;
+          if (existsSync(restartFilePath) && persisted.directory && persisted.claudeSessionId) {
+            logger.debug(`[DAEMON RUN] Dead persisted PID ${persisted.pid} has restart file, triggering respawn`);
+            (async () => {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              try {
+                const result = await spawnSession({
+                  directory: persisted.directory!,
+                  resumeClaudeSessionId: persisted.claudeSessionId!,
+                  restartFilePath,
+                });
+                logger.debug(`[DAEMON RUN] Persisted restart spawn result: ${JSON.stringify(result)}`);
+              } catch (err) {
+                logger.debug('[DAEMON RUN] Failed to respawn persisted session:', err);
+              }
+            })();
+          } else {
+            logger.debug(`[DAEMON RUN] Discarding dead persisted session PID ${persisted.pid} (no restart file)`);
+          }
+        }
+      }
+      // Persist the re-adopted sessions (dead ones removed)
+      persistSessions();
+    }
 
     // Write initial daemon state (no lock needed for state file)
     const fileState: DaemonLocallyPersistedState = {
@@ -743,15 +826,50 @@ export async function startDaemon(): Promise<void> {
       }
 
       // Prune stale sessions
-      for (const [pid, _] of pidToTrackedSession.entries()) {
+      let sessionsChanged = false;
+      const deadPids: number[] = [];
+      for (const [pid, session] of pidToTrackedSession.entries()) {
         try {
           // Check if process is still alive (signal 0 doesn't kill, just checks)
           process.kill(pid, 0);
         } catch (error) {
-          // Process is dead, remove from tracking
+          // Process is dead
           logger.debug(`[DAEMON RUN] Removing stale session with PID ${pid} (process no longer exists)`);
+
+          // For re-adopted sessions (no ChildProcess), check if restart file exists
+          if (!session.childProcess) {
+            const restartFilePath = `/tmp/happy-restart-${pid}.json`;
+            if (existsSync(restartFilePath)) {
+              logger.debug(`[DAEMON RUN] Found restart file for re-adopted dead PID ${pid}, triggering respawn`);
+              const metadata = session.happySessionMetadataFromLocalWebhook;
+              const directory = metadata?.path;
+              const claudeSessionId = metadata?.claudeSessionId;
+              if (directory && claudeSessionId) {
+                // Defer respawn to after loop (avoid modifying map during iteration)
+                deadPids.push(pid);
+                pidToTrackedSession.delete(pid);
+                sessionsChanged = true;
+                // Fire-and-forget respawn
+                (async () => {
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  try {
+                    const result = await spawnSession({ directory, resumeClaudeSessionId: claudeSessionId, restartFilePath });
+                    logger.debug(`[DAEMON RUN] Re-adopted restart spawn result: ${JSON.stringify(result)}`);
+                  } catch (err) {
+                    logger.debug('[DAEMON RUN] Failed to respawn re-adopted session:', err);
+                  }
+                })();
+                continue;
+              }
+            }
+          }
+
           pidToTrackedSession.delete(pid);
+          sessionsChanged = true;
         }
+      }
+      if (sessionsChanged) {
+        persistSessions();
       }
 
       // Check if daemon needs update
@@ -837,6 +955,8 @@ export async function startDaemon(): Promise<void> {
 
       apiMachine.shutdown();
       await stopControlServer();
+      // Persist sessions before removing daemon state so next daemon can re-adopt them
+      persistSessions();
       await cleanupDaemonState();
       await stopCaffeinate();
       await releaseDaemonLock(daemonLockHandle);

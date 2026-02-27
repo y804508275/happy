@@ -20,3 +20,19 @@ export interface TrackedSession {
   /** tmux session identifier (format: session:window) */
   tmuxSessionId?: string;
 }
+
+/**
+ * Serializable subset of TrackedSession for disk persistence.
+ * Does not include ChildProcess (non-serializable).
+ * Used to re-adopt sessions after daemon restart.
+ */
+export interface PersistedTrackedSession {
+  pid: number;
+  startedBy: 'daemon' | string;
+  happySessionId?: string;
+  directory?: string;
+  claudeSessionId?: string;
+  tmuxSessionId?: string;
+  agent?: string;
+  trackedAt: number;
+}

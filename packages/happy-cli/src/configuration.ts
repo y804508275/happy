@@ -21,6 +21,7 @@ class Configuration {
   public readonly settingsFile: string
   public readonly privateKeyFile: string
   public readonly daemonStateFile: string
+  public readonly daemonSessionsFile: string
   public readonly daemonLockFile: string
   public readonly currentCliVersion: string
 
@@ -49,6 +50,7 @@ class Configuration {
     this.settingsFile = join(this.happyHomeDir, 'settings.json')
     this.privateKeyFile = join(this.happyHomeDir, 'access.key')
     this.daemonStateFile = join(this.happyHomeDir, 'daemon.state.json')
+    this.daemonSessionsFile = join(this.happyHomeDir, 'daemon.sessions.json')
     this.daemonLockFile = join(this.happyHomeDir, 'daemon.state.json.lock')
 
     this.isExperimentalEnabled = ['true', '1', 'yes'].includes(process.env.HAPPY_EXPERIMENTAL?.toLowerCase() || '');
