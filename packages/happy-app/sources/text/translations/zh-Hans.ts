@@ -335,6 +335,10 @@ export const zhHans: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: '终止会话',
         killSessionConfirm: '您确定要终止此会话吗？',
+        restartSession: '重启会话',
+        restartSessionConfirm: '重启会话进程以应用代码更新？对话将继续。',
+        restartSessionSubtitle: '应用代码更新',
+        restartSessionStarted: '会话正在重启，将短暂离线后恢复。',
         archiveSession: '归档会话',
         archiveSessionConfirm: '您确定要归档此会话吗？',
         happySessionIdCopied: 'Happy 会话 ID 已复制到剪贴板',

@@ -1,10 +1,12 @@
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { readFileSync, unlinkSync } from 'node:fs';
 
 import { ApiClient } from '@/api/api';
+import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import { logger } from '@/ui/logger';
 import { loop } from '@/claude/loop';
-import { AgentState, Metadata } from '@/api/types';
+import { AgentState, Metadata, Session as SessionInfo } from '@/api/types';
 import packageJson from '../../package.json';
 import { Credentials, readSettings } from '@/persistence';
 import { EnhancedMode, PermissionMode } from './loop';
@@ -21,6 +23,7 @@ import { startHappyServer } from '@/claude/utils/startHappyServer';
 import { startHookServer } from '@/claude/utils/startHookServer';
 import { generateHookSettingsFile, cleanupHookSettingsFile } from '@/claude/utils/generateHookSettings';
 import { registerKillSessionHandler } from './registerKillSessionHandler';
+import { registerRestartSessionHandler } from './registerRestartSessionHandler';
 import { projectPath } from '../projectPath';
 import { resolve } from 'node:path';
 import { startOfflineReconnection, connectionState } from '@/utils/serverConnectionErrors';
@@ -116,7 +119,32 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         sandbox: sandboxConfig?.enabled ? sandboxConfig : null,
         dangerouslySkipPermissions,
     };
-    const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+    // Check for restart: if HAPPY_RESTART_FILE is set, reconnect to existing session
+    const restartFilePath = process.env.HAPPY_RESTART_FILE;
+    let response: SessionInfo | null;
+    if (restartFilePath) {
+        try {
+            const restartData = JSON.parse(readFileSync(restartFilePath, 'utf-8'));
+            logger.debug(`[RESTART] Reconnecting to existing session ${restartData.sessionId}`);
+            response = {
+                id: restartData.sessionId,
+                seq: 0,
+                encryptionKey: decodeBase64(restartData.encryptionKey),
+                encryptionVariant: restartData.encryptionVariant,
+                metadata,
+                metadataVersion: 0,
+                agentState: state,
+                agentStateVersion: 0,
+            };
+            // Clean up restart file
+            try { unlinkSync(restartFilePath); } catch {}
+        } catch (error) {
+            logger.debug('[RESTART] Failed to read restart file, creating new session:', error);
+            response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+        }
+    } else {
+        response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+    }
 
     // Handle server unreachable case - run Claude locally with hot reconnection
     // Note: connectionState.notifyOffline() was already called by api.ts with error details
@@ -442,6 +470,40 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     });
 
     registerKillSessionHandler(session.rpcHandlerManager, cleanup);
+
+    // Register restart handler - allows App to trigger a graceful restart
+    // that preserves conversation state by writing session info to a temp file
+    // and exiting with code 42 (daemon detects this and respawns with --resume)
+    registerRestartSessionHandler(
+        session.rpcHandlerManager,
+        {
+            sessionId: response.id,
+            encryptionKey: encodeBase64(response.encryptionKey),
+            encryptionVariant: response.encryptionVariant,
+        },
+        async () => {
+            logger.debug('[RESTART] Performing cleanup for restart...');
+            try {
+                if (session) {
+                    session.updateMetadata((currentMetadata) => ({
+                        ...currentMetadata,
+                        lifecycleState: 'restarting',
+                        lifecycleStateSince: Date.now(),
+                    }));
+                    currentSession?.cleanup();
+                    session.sendSessionDeath();
+                    await session.flush();
+                    await session.close();
+                }
+                stopCaffeinate();
+                happyServer.stop();
+                hookServer.stop();
+                cleanupHookSettingsFile(hookSettingsPath);
+            } catch (error) {
+                logger.debug('[RESTART] Error during restart cleanup:', error);
+            }
+        }
+    );
 
     // Create claude loop
     const exitCode = await loop({

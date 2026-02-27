@@ -333,6 +333,10 @@ export const ca: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Finalitza la sessió',
         killSessionConfirm: 'Segur que vols finalitzar aquesta sessió?',
+        restartSession: 'Reiniciar sessió',
+        restartSessionConfirm: 'Reiniciar el procés de la sessió per aplicar actualitzacions de codi? La conversa continuarà.',
+        restartSessionSubtitle: 'Aplicar actualitzacions de codi',
+        restartSessionStarted: 'La sessió s\'està reiniciant. Es desconnectarà breument i després tornarà.',
         archiveSession: 'Arxiva la sessió',
         archiveSessionConfirm: 'Segur que vols arxivar aquesta sessió?',
         happySessionIdCopied: 'ID de la sessió de Happy copiat al porta-retalls',

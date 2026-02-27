@@ -332,6 +332,10 @@ export const en = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Kill Session',
         killSessionConfirm: 'Are you sure you want to terminate this session?',
+        restartSession: 'Restart Session',
+        restartSessionConfirm: 'Restart the session process to pick up code updates? The conversation will continue.',
+        restartSessionSubtitle: 'Apply code updates',
+        restartSessionStarted: 'Session is restarting. It will briefly go offline then come back.',
         archiveSession: 'Archive Session',
         archiveSessionConfirm: 'Are you sure you want to archive this session?',
         happySessionIdCopied: 'Happy Session ID copied to clipboard',

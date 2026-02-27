@@ -499,6 +499,31 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
     }
 }
 
+interface SessionRestartResponse {
+    success: boolean;
+    message: string;
+}
+
+/**
+ * Restart the session process to pick up new code.
+ * The conversation continues from where it left off.
+ */
+export async function sessionRestart(sessionId: string): Promise<SessionRestartResponse> {
+    try {
+        const response = await apiSocket.sessionRPC<SessionRestartResponse, {}>(
+            sessionId,
+            'restartSession',
+            {}
+        );
+        return response;
+    } catch (error) {
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error'
+        };
+    }
+}
+
 /**
  * Permanently delete a session from the server
  * This will remove the session and all its associated data (messages, usage reports, access keys)
@@ -539,5 +564,6 @@ export type {
     SessionGetDirectoryTreeResponse,
     TreeNode,
     SessionRipgrepResponse,
-    SessionKillResponse
+    SessionKillResponse,
+    SessionRestartResponse
 };

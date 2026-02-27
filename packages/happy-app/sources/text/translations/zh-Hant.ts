@@ -334,6 +334,10 @@ export const zhHant: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: '終止工作階段',
         killSessionConfirm: '您確定要終止此工作階段嗎？',
+        restartSession: '重新啟動會話',
+        restartSessionConfirm: '重新啟動會話程序以套用程式碼更新？對話將繼續。',
+        restartSessionSubtitle: '套用程式碼更新',
+        restartSessionStarted: '會話正在重新啟動，將短暫離線後恢復。',
         archiveSession: '封存工作階段',
         archiveSessionConfirm: '您確定要封存此工作階段嗎？',
         happySessionIdCopied: 'Happy 工作階段 ID 已複製到剪貼簿',

@@ -344,6 +344,10 @@ export const pl: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Zakończ sesję',
         killSessionConfirm: 'Czy na pewno chcesz zakończyć tę sesję?',
+        restartSession: 'Uruchom ponownie sesję',
+        restartSessionConfirm: 'Ponownie uruchomić proces sesji, aby zastosować aktualizacje kodu? Rozmowa będzie kontynuowana.',
+        restartSessionSubtitle: 'Zastosuj aktualizacje kodu',
+        restartSessionStarted: 'Sesja jest restartowana. Na chwilę przejdzie w tryb offline, a następnie wróci.',
         archiveSession: 'Zarchiwizuj sesję',
         archiveSessionConfirm: 'Czy na pewno chcesz zarchiwizować tę sesję?',
         happySessionIdCopied: 'ID sesji Happy skopiowane do schowka',

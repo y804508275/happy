@@ -307,6 +307,10 @@ export const ru: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Завершить сессию',
         killSessionConfirm: 'Вы уверены, что хотите завершить эту сессию?',
+        restartSession: 'Перезапустить сессию',
+        restartSessionConfirm: 'Перезапустить процесс сессии для применения обновлений кода? Разговор продолжится.',
+        restartSessionSubtitle: 'Применить обновления кода',
+        restartSessionStarted: 'Сессия перезапускается. Она ненадолго перейдёт в офлайн, затем восстановится.',
         archiveSession: 'Архивировать сессию',
         archiveSessionConfirm: 'Вы уверены, что хотите архивировать эту сессию?',
         happySessionIdCopied: 'ID сессии Happy скопирован в буфер обмена',

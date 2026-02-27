@@ -362,6 +362,10 @@ export const it: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'Termina sessione',
         killSessionConfirm: 'Sei sicuro di voler terminare questa sessione?',
+        restartSession: 'Riavvia sessione',
+        restartSessionConfirm: 'Riavviare il processo della sessione per applicare gli aggiornamenti del codice? La conversazione continuerà.',
+        restartSessionSubtitle: 'Applica aggiornamenti codice',
+        restartSessionStarted: 'La sessione si sta riavviando. Sarà brevemente offline e poi tornerà.',
         archiveSession: 'Archivia sessione',
         archiveSessionConfirm: 'Sei sicuro di voler archiviare questa sessione?',
         happySessionIdCopied: 'ID sessione Happy copiato negli appunti',

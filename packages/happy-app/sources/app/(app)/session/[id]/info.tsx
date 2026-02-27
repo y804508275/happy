@@ -11,7 +11,7 @@ import { useSession, useIsDataReady } from '@/sync/storage';
 import { getSessionName, useSessionStatus, formatOSPlatform, formatPathRelativeToHome, getSessionAvatarId } from '@/utils/sessionUtils';
 import * as Clipboard from 'expo-clipboard';
 import { Modal } from '@/modal';
-import { sessionKill, sessionDelete } from '@/sync/ops';
+import { sessionKill, sessionDelete, sessionRestart } from '@/sync/ops';
 import { useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
@@ -176,6 +176,31 @@ function SessionInfoContent({ session }: { session: Session }) {
         );
     }, [performArchive]);
 
+    // Use HappyAction for restart
+    const [restartingSession, performRestart] = useHappyAction(async () => {
+        const result = await sessionRestart(session.id);
+        if (!result.success) {
+            throw new HappyError(result.message || 'Failed to restart session', false);
+        }
+        // Stay on session - it will briefly go offline then come back online
+        Modal.alert(t('sessionInfo.restartSession'), t('sessionInfo.restartSessionStarted'));
+    });
+
+    const handleRestartSession = useCallback(() => {
+        Modal.alert(
+            t('sessionInfo.restartSession'),
+            t('sessionInfo.restartSessionConfirm'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('sessionInfo.restartSession'),
+                    style: 'default',
+                    onPress: performRestart
+                }
+            ]
+        );
+    }, [performRestart]);
+
     // Use HappyAction for deletion - it handles errors automatically
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
@@ -315,6 +340,14 @@ function SessionInfoContent({ session }: { session: Session }) {
                             subtitle={t('sessionInfo.viewMachineSubtitle')}
                             icon={<Ionicons name="server-outline" size={29} color="#007AFF" />}
                             onPress={() => router.push(`/machine/${session.metadata?.machineId}`)}
+                        />
+                    )}
+                    {sessionStatus.isConnected && (
+                        <Item
+                            title={t('sessionInfo.restartSession')}
+                            subtitle={t('sessionInfo.restartSessionSubtitle')}
+                            icon={<Ionicons name="refresh-outline" size={29} color="#007AFF" />}
+                            onPress={handleRestartSession}
                         />
                     )}
                     {sessionStatus.isConnected && (

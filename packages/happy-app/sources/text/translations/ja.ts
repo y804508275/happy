@@ -365,6 +365,10 @@ export const ja: TranslationStructure = {
         // Used by Session Info screen (app/(app)/session/[id]/info.tsx)
         killSession: 'セッションを終了',
         killSessionConfirm: 'このセッションを終了してもよろしいですか？',
+        restartSession: 'セッションを再起動',
+        restartSessionConfirm: 'コード更新を反映するためにセッションプロセスを再起動しますか？会話は続行されます。',
+        restartSessionSubtitle: 'コード更新を適用',
+        restartSessionStarted: 'セッションを再起動しています。一時的にオフラインになった後、復帰します。',
         archiveSession: 'セッションをアーカイブ',
         archiveSessionConfirm: 'このセッションをアーカイブしてもよろしいですか？',
         happySessionIdCopied: 'Happy Session IDがクリップボードにコピーされました',

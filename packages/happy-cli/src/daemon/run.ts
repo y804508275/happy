@@ -495,8 +495,16 @@ export async function startDaemon(): Promise<void> {
             '--started-by', 'daemon'
           ];
 
-          // TODO: In future, sessionId could be used with --resume to continue existing sessions
-          // For now, we ignore it - each spawn creates a new session
+          // For graceful restart: pass --resume to continue Claude conversation
+          if (options.resumeClaudeSessionId) {
+            args.push('--resume', options.resumeClaudeSessionId);
+          }
+
+          // For graceful restart: pass restart file path so CLI can reconnect to same session
+          if (options.restartFilePath) {
+            extraEnv.HAPPY_RESTART_FILE = options.restartFilePath;
+          }
+
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true,  // Sessions stay alive when daemon stops
@@ -540,14 +548,14 @@ export async function startDaemon(): Promise<void> {
           happyProcess.on('exit', (code, signal) => {
             logger.debug(`[DAEMON RUN] Child PID ${happyProcess.pid} exited with code ${code}, signal ${signal}`);
             if (happyProcess.pid) {
-              onChildExited(happyProcess.pid);
+              onChildExited(happyProcess.pid, code, signal);
             }
           });
 
           happyProcess.on('error', (error) => {
             logger.debug(`[DAEMON RUN] Child process error:`, error);
             if (happyProcess.pid) {
-              onChildExited(happyProcess.pid);
+              onChildExited(happyProcess.pid, null, null);
             }
           });
 
@@ -631,9 +639,38 @@ export async function startDaemon(): Promise<void> {
     };
 
     // Handle child process exit
-    const onChildExited = (pid: number) => {
-      logger.debug(`[DAEMON RUN] Removing exited process PID ${pid} from tracking`);
+    const onChildExited = async (pid: number, code: number | null, signal: string | null) => {
+      const trackedSession = pidToTrackedSession.get(pid);
+      logger.debug(`[DAEMON RUN] Removing exited process PID ${pid} from tracking (code=${code}, signal=${signal})`);
       pidToTrackedSession.delete(pid);
+
+      // Exit code 42 = graceful restart requested
+      if (code === 42 && trackedSession) {
+        const metadata = trackedSession.happySessionMetadataFromLocalWebhook;
+        const directory = metadata?.path;
+        const claudeSessionId = metadata?.claudeSessionId;
+        const restartFilePath = `/tmp/happy-restart-${pid}.json`;
+
+        if (directory && claudeSessionId) {
+          logger.debug(`[DAEMON RUN] Graceful restart: dir=${directory}, claudeSession=${claudeSessionId}, restartFile=${restartFilePath}`);
+
+          // Brief delay to let socket disconnect propagate
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          try {
+            const result = await spawnSession({
+              directory,
+              resumeClaudeSessionId: claudeSessionId,
+              restartFilePath,
+            });
+            logger.debug('[DAEMON RUN] Restart spawn result:', JSON.stringify(result));
+          } catch (error) {
+            logger.debug('[DAEMON RUN] Failed to respawn after restart:', error);
+          }
+        } else {
+          logger.debug(`[DAEMON RUN] Cannot restart: missing directory (${directory}) or claudeSessionId (${claudeSessionId})`);
+        }
+      }
     };
 
     // Start control server
