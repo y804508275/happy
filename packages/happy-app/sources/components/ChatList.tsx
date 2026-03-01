@@ -234,6 +234,12 @@ const ChatListInternal = React.memo((props: {
                 subtree: true,
                 characterData: true,
             });
+
+            // Reset rafId so the MutationObserver callback can schedule
+            // its own rAF. Without this, rafId still holds the setup rAF ID
+            // (a truthy value), causing the `if (rafId) return` guard to
+            // skip every mutation — effectively disabling scroll compensation.
+            rafId = 0;
         };
 
         rafId = requestAnimationFrame(setup);
