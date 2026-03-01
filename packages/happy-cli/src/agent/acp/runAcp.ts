@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { ApiClient } from '@/api/api';
 import type { ApiSessionClient } from '@/api/apiSession';
 import type { AgentMessage } from '@/agent/core';
@@ -13,6 +14,8 @@ import { hashObject } from '@/utils/deterministicJson';
 import { Credentials, readSettings } from '@/persistence';
 import { initialMachineMetadata } from '@/daemon/run';
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
+import { configuration } from '@/configuration';
+import { encodeBase64 } from '@/api/encryption';
 import { setupOfflineReconnection } from '@/utils/setupOfflineReconnection';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
 import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
@@ -497,6 +500,26 @@ export async function runAcp(opts: {
   session = initialSession;
 
   if (response) {
+    // Write persistent session info file for crash recovery / respawn
+    const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+    const sessionInfoFilePath = join(sessionsDir, `${response.id}.json`);
+    try {
+      if (!existsSync(sessionsDir)) {
+        mkdirSync(sessionsDir, { recursive: true });
+      }
+      writeFileSync(sessionInfoFilePath, JSON.stringify({
+        sessionId: response.id,
+        encryptionKey: encodeBase64(response.encryptionKey),
+        encryptionVariant: response.encryptionVariant,
+        directory: process.cwd(),
+        pid: process.pid,
+        startedAt: Date.now(),
+      }), { mode: 0o600 });
+      logger.debug(`[acp] Wrote session info file: ${sessionInfoFilePath}`);
+    } catch (error) {
+      logger.debug('[acp] Failed to write session info file:', error);
+    }
+
     try {
       await notifyDaemonSessionStarted(response.id, metadata);
     } catch (error) {
@@ -965,6 +988,11 @@ export async function runAcp(opts: {
       await session.close();
     } catch (error) {
       logger.debug(`[${opts.agentName}] Session close failed:`, error);
+    }
+
+    // Remove session info file on clean exit
+    if (response) {
+      try { unlinkSync(join(configuration.happyHomeDir, 'sessions', `${response.id}.json`)); } catch {}
     }
   }
 }

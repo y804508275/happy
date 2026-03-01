@@ -17,7 +17,7 @@ import { writeDaemonState, DaemonLocallyPersistedState, readDaemonState, acquire
 
 import { cleanupDaemonState, isDaemonRunningCurrentlyInstalledHappyVersion, stopDaemon } from './controlClient';
 import { startDaemonControlServer } from './controlServer';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { projectPath } from '@/projectPath';
 import { getTmuxUtilities, isTmuxAvailable, parseTmuxSessionIdentifier, formatTmuxSessionIdentifier } from '@/utils/tmux';
@@ -663,6 +663,11 @@ export async function startDaemon(): Promise<void> {
       return false;
     };
 
+    // Track respawn attempts to prevent crash loops
+    const sessionRespawnAttempts = new Map<string, { count: number, lastAttempt: number }>();
+    const MAX_RESPAWN_ATTEMPTS = 3;
+    const RESPAWN_COOLDOWN_MS = 60000; // 1 minute cooldown between respawn bursts
+
     // Handle child process exit
     const onChildExited = async (pid: number, code: number | null, signal: string | null) => {
       const trackedSession = pidToTrackedSession.get(pid);
@@ -696,6 +701,79 @@ export async function startDaemon(): Promise<void> {
         } else {
           logger.debug(`[DAEMON RUN] Cannot restart: missing directory (${directory}) or claudeSessionId (${claudeSessionId})`);
         }
+        return;
+      }
+
+      // Exit code 0 = clean exit, don't respawn
+      if (code === 0) {
+        logger.debug(`[DAEMON RUN] Session exited cleanly (code=0), not respawning`);
+        return;
+      }
+
+      // Unexpected exit (crash) — try to auto-respawn using persistent session info file
+      if (trackedSession) {
+        const sessionId = trackedSession.happySessionId;
+        if (sessionId) {
+          await tryRespawnSession(sessionId, `crash (code=${code}, signal=${signal})`);
+        }
+      }
+    };
+
+    // Try to respawn a session using its persistent session info file
+    const tryRespawnSession = async (sessionId: string, reason: string) => {
+      const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+      const sessionInfoPath = join(sessionsDir, `${sessionId}.json`);
+
+      if (!existsSync(sessionInfoPath)) {
+        logger.debug(`[DAEMON RUN] No session info file for ${sessionId}, cannot respawn`);
+        return;
+      }
+
+      // Check respawn attempt limits
+      const attempts = sessionRespawnAttempts.get(sessionId);
+      const now = Date.now();
+      if (attempts) {
+        if (now - attempts.lastAttempt < RESPAWN_COOLDOWN_MS && attempts.count >= MAX_RESPAWN_ATTEMPTS) {
+          logger.debug(`[DAEMON RUN] Respawn limit reached for ${sessionId} (${attempts.count} attempts), skipping`);
+          // Clean up the session info file to prevent future attempts
+          try { unlinkSync(sessionInfoPath); } catch {}
+          return;
+        }
+        if (now - attempts.lastAttempt >= RESPAWN_COOLDOWN_MS) {
+          // Reset counter after cooldown
+          attempts.count = 0;
+        }
+      }
+
+      try {
+        const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
+        logger.debug(`[DAEMON RUN] Auto-respawning session ${sessionId} (reason: ${reason}), dir=${sessionInfo.directory}`);
+
+        // Update respawn attempts
+        sessionRespawnAttempts.set(sessionId, {
+          count: (attempts?.count || 0) + 1,
+          lastAttempt: now,
+        });
+
+        // Write a restart file that the CLI can use to reconnect to the same session
+        const restartFilePath = join(sessionsDir, `restart-${sessionId}.json`);
+        const { writeFileSync: writeSync } = await import('fs');
+        writeSync(restartFilePath, JSON.stringify({
+          sessionId: sessionInfo.sessionId,
+          encryptionKey: sessionInfo.encryptionKey,
+          encryptionVariant: sessionInfo.encryptionVariant,
+        }), { mode: 0o600 });
+
+        // Brief delay to let socket disconnect propagate
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const result = await spawnSession({
+          directory: sessionInfo.directory,
+          restartFilePath,
+        });
+        logger.debug('[DAEMON RUN] Auto-respawn result:', JSON.stringify(result));
+      } catch (error) {
+        logger.debug(`[DAEMON RUN] Failed to auto-respawn session ${sessionId}:`, error);
       }
     };
 
@@ -807,6 +885,44 @@ export async function startDaemon(): Promise<void> {
 
     // Connect to server
     apiMachine.connect();
+
+    // Recover orphaned sessions from persistent session info files
+    // This handles the case where the daemon restarted but session processes died
+    const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+    try {
+      if (existsSync(sessionsDir)) {
+        const sessionFiles = readdirSync(sessionsDir).filter(f => f.endsWith('.json') && !f.startsWith('restart-'));
+        for (const file of sessionFiles) {
+          try {
+            const sessionInfo = JSON.parse(readFileSync(join(sessionsDir, file), 'utf-8'));
+            const { sessionId, pid: savedPid } = sessionInfo;
+
+            // Check if the process is still alive
+            let processAlive = false;
+            if (savedPid) {
+              try {
+                process.kill(savedPid, 0);
+                processAlive = true;
+              } catch {
+                // Process is dead
+              }
+            }
+
+            if (!processAlive) {
+              logger.debug(`[DAEMON RUN] Found orphaned session ${sessionId} (PID ${savedPid} dead), will respawn`);
+              // Delay respawn slightly to let the daemon fully initialize
+              setTimeout(() => tryRespawnSession(sessionId, 'daemon startup recovery'), 3000);
+            } else {
+              logger.debug(`[DAEMON RUN] Session ${sessionId} (PID ${savedPid}) is still alive, skipping`);
+            }
+          } catch (error) {
+            logger.debug(`[DAEMON RUN] Failed to read session info file ${file}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      logger.debug('[DAEMON RUN] Failed to scan for orphaned sessions:', error);
+    }
 
     // Every 60 seconds:
     // 1. Prune stale sessions

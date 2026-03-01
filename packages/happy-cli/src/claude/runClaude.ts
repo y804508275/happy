@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, unlinkSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 
 import { ApiClient } from '@/api/api';
 import { encodeBase64, decodeBase64 } from '@/api/encryption';
@@ -25,7 +25,7 @@ import { generateHookSettingsFile, cleanupHookSettingsFile } from '@/claude/util
 import { registerKillSessionHandler } from './registerKillSessionHandler';
 import { registerRestartSessionHandler } from './registerRestartSessionHandler';
 import { projectPath } from '../projectPath';
-import { resolve } from 'node:path';
+import { resolve, join as pathJoin } from 'node:path';
 import { startOfflineReconnection, connectionState } from '@/utils/serverConnectionErrors';
 import { claudeLocal } from '@/claude/claudeLocal';
 import { createSessionScanner } from '@/claude/utils/sessionScanner';
@@ -192,6 +192,27 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     }
 
     logger.debug(`Session created: ${response.id}`);
+
+    // Write persistent session info file for crash recovery / respawn
+    // The daemon reads this file to respawn the session if it crashes
+    const sessionsDir = pathJoin(configuration.happyHomeDir, 'sessions');
+    const sessionInfoFilePath = pathJoin(sessionsDir, `${response.id}.json`);
+    try {
+        if (!existsSync(sessionsDir)) {
+            mkdirSync(sessionsDir, { recursive: true });
+        }
+        writeFileSync(sessionInfoFilePath, JSON.stringify({
+            sessionId: response.id,
+            encryptionKey: encodeBase64(response.encryptionKey),
+            encryptionVariant: response.encryptionVariant,
+            directory: process.cwd(),
+            pid: process.pid,
+            startedAt: Date.now(),
+        }), { mode: 0o600 });
+        logger.debug(`[START] Wrote session info file: ${sessionInfoFilePath}`);
+    } catch (error) {
+        logger.debug('[START] Failed to write session info file:', error);
+    }
 
     // Always report to daemon if it exists
     try {
@@ -445,6 +466,9 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             // Stop Hook server and cleanup settings file
             hookServer.stop();
             cleanupHookSettingsFile(hookSettingsPath);
+
+            // Remove session info file on clean exit (crash leaves it for respawn)
+            try { unlinkSync(sessionInfoFilePath); } catch {}
 
             logger.debug('[START] Cleanup complete, exiting');
             process.exit(0);
