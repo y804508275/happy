@@ -13,7 +13,7 @@ import { t } from '@/text';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useHeaderHeight } from '@/utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { machineSpawnNewSession } from '@/sync/ops';
+import { machineSpawnNewSession, sessionAutoConfirm } from '@/sync/ops';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
 import { SessionTypeSelector } from '@/components/SessionTypeSelector';
@@ -413,6 +413,7 @@ function NewSessionWizard() {
         return tempSessionData?.prompt || prompt || persistedDraft?.input || '';
     });
     const [isCreating, setIsCreating] = React.useState(false);
+    const [autoConfirm, setAutoConfirm] = React.useState(false);
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
     // Handle machineId route param from picker screens (main's navigation pattern)
@@ -1051,6 +1052,11 @@ function NewSessionWizard() {
                     storage.getState().updateSessionModelMode(result.sessionId, modelMode.key);
                 }
 
+                // Set auto-confirm if enabled
+                if (autoConfirm) {
+                    await sessionAutoConfirm(result.sessionId, true);
+                }
+
                 // Send initial message if provided
                 if (sessionPrompt.trim()) {
                     await sync.sendMessage(result.sessionId, sessionPrompt);
@@ -1077,7 +1083,7 @@ function NewSessionWizard() {
             Modal.alert(t('common.error'), errorMessage);
             setIsCreating(false);
         }
-    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, recentMachinePaths, profileMap, router]);
+    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, autoConfirm, recentMachinePaths, profileMap, router]);
 
     const screenWidth = useWindowDimensions().width;
 
@@ -1176,6 +1182,8 @@ function NewSessionWizard() {
                                 onMachineClick={handleMachineClick}
                                 currentPath={selectedPath}
                                 onPathClick={handlePathClick}
+                                autoConfirm={autoConfirm}
+                                onAutoConfirmChange={setAutoConfirm}
                             />
                         </View>
                     </View>
@@ -1929,6 +1937,8 @@ function NewSessionWizard() {
                             onPathClick={handleAgentInputPathClick}
                             profileId={selectedProfileId}
                             onProfileClick={handleAgentInputProfileClick}
+                            autoConfirm={autoConfirm}
+                            onAutoConfirmChange={setAutoConfirm}
                         />
                     </View>
                 </View>
