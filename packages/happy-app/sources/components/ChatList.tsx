@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useSession, useSessionMessages, useStreamingText } from "@/sync/storage";
+import { useSession, useSessionMessages, useStreamingText, storage } from "@/sync/storage";
 import { FlatList, NativeSyntheticEvent, NativeScrollEvent, Platform, Pressable, View } from 'react-native';
 import { useCallback, useRef, useState } from 'react';
 import { useHeaderHeight } from '@/utils/responsive';
@@ -128,7 +128,7 @@ const ChatListInternal = React.memo((props: {
         if (nearBottom) {
             // User is at the bottom watching new messages → keep scrollTop=0
             node.scrollTop = 0;
-        } else if (h > prev && hasNewMessagesRef.current) {
+        } else if (h > prev && (hasNewMessagesRef.current || !!storage.getState().streamingTexts[props.sessionId])) {
             // New messages were added → compensate to prevent jump
             node.scrollTop = currentScrollTop + (h - prev);
             hasNewMessagesRef.current = false;
@@ -136,7 +136,7 @@ const ChatListInternal = React.memo((props: {
         // When content size changes from virtualization (item recycling) or
         // content shrinking (streaming text cleared), do NOT compensate.
         // This prevents the cascading scroll jump bug.
-    }, []);
+    }, [props.sessionId]);
 
     const scrollToBottom = useCallback(() => {
         if (Platform.OS === 'web') {
