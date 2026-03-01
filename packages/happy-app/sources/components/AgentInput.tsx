@@ -503,7 +503,18 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         // Original key handling
         if (Platform.OS === 'web') {
-            if (agentInputEnterToSend && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+            if (agentInputEnterToSend && event.key === 'Enter' && !event.shiftKey) {
+                // Cmd+Enter (Mac) / Ctrl+Enter (Windows) → insert newline
+                if (event.metaKey || event.ctrlKey) {
+                    if (inputRef.current) {
+                        const pos = inputState.selection.start;
+                        const text = inputState.text;
+                        const newText = text.slice(0, pos) + '\n' + text.slice(pos);
+                        const newPos = pos + 1;
+                        inputRef.current.setTextAndSelection(newText, { start: newPos, end: newPos });
+                    }
+                    return true; // Key was handled
+                }
                 // Block Enter send while agent is working
                 if (props.showAbortButton) {
                     return true; // Consume the key, don't send
@@ -524,7 +535,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         }
         return false; // Key was not handled
-    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey]);
+    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState]);
 
 
 
