@@ -418,9 +418,9 @@ export const storage = create<StorageState>()((set, get) => {
                 }
             });
 
-            // Sort both arrays by creation date for stable ordering
-            activeSessions.sort((a, b) => b.createdAt - a.createdAt);
-            inactiveSessions.sort((a, b) => b.createdAt - a.createdAt);
+            // Sort both arrays by updated date (newest activity first)
+            activeSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+            inactiveSessions.sort((a, b) => b.updatedAt - a.updatedAt);
 
             // Build flat list data for FlashList
             const listData: SessionListItem[] = [];
