@@ -625,65 +625,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     })}
                                 </View>
 
-                                {/* Auto-Confirm Toggle */}
-                                {props.onAutoConfirmChange && (
-                                    <>
-                                        <View style={{
-                                            height: 1,
-                                            backgroundColor: theme.colors.divider,
-                                            marginHorizontal: 16
-                                        }} />
-                                        <Pressable
-                                            onPress={() => {
-                                                hapticsLight();
-                                                props.onAutoConfirmChange?.(!props.autoConfirm);
-                                            }}
-                                            style={({ pressed }) => ({
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                paddingHorizontal: 16,
-                                                paddingVertical: 10,
-                                                backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
-                                            })}
-                                        >
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={{
-                                                    fontSize: 14,
-                                                    color: props.autoConfirm ? theme.colors.radio.active : theme.colors.text,
-                                                    ...Typography.default()
-                                                }}>
-                                                    {t('agentInput.autoConfirm.title')}
-                                                </Text>
-                                                <Text style={{
-                                                    fontSize: 11,
-                                                    color: theme.colors.textSecondary,
-                                                    ...Typography.default()
-                                                }}>
-                                                    {t('agentInput.autoConfirm.description')}
-                                                </Text>
-                                            </View>
-                                            <View style={{
-                                                width: 42,
-                                                height: 24,
-                                                borderRadius: 12,
-                                                backgroundColor: props.autoConfirm ? theme.colors.radio.active : theme.colors.radio.inactive,
-                                                justifyContent: 'center',
-                                                paddingHorizontal: 2,
-                                                marginLeft: 12,
-                                            }}>
-                                                <View style={{
-                                                    width: 20,
-                                                    height: 20,
-                                                    borderRadius: 10,
-                                                    backgroundColor: '#fff',
-                                                    alignSelf: props.autoConfirm ? 'flex-end' : 'flex-start',
-                                                }} />
-                                            </View>
-                                        </Pressable>
-                                    </>
-                                )}
-
                                 {/* Divider */}
                                 <View style={{
                                     height: 1,
@@ -1046,6 +987,43 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             size={16}
                                             color={theme.colors.button.secondary.tint}
                                         />
+                                    </Pressable>
+                                )}
+
+                                {/* Auto-Confirm toggle button */}
+                                {props.onAutoConfirmChange && (
+                                    <Pressable
+                                        onPress={() => {
+                                            hapticsLight();
+                                            props.onAutoConfirmChange?.(!props.autoConfirm);
+                                        }}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 10,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                            gap: 6,
+                                            backgroundColor: props.autoConfirm ? theme.colors.radio.active + '20' : 'transparent',
+                                        })}
+                                    >
+                                        <Octicons
+                                            name={props.autoConfirm ? "check-circle-fill" : "check-circle"}
+                                            size={14}
+                                            color={props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint}
+                                        />
+                                        <Text style={{
+                                            fontSize: 13,
+                                            color: props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint,
+                                            fontWeight: '600',
+                                            ...Typography.default('semiBold'),
+                                        }}>
+                                            {t('agentInput.autoConfirm.title')}
+                                        </Text>
                                     </Pressable>
                                 )}
 
