@@ -348,7 +348,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             onMicPress={micButtonState.onMicPress}
             isMicActive={micButtonState.isMicActive}
             onAbort={() => sessionAbort(sessionId)}
-            showAbortButton={sessionStatus.state === 'thinking' || sessionStatus.state === 'waiting'}
+            showAbortButton={sessionStatus.state === 'thinking'}
             onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => !v) : undefined}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
             // Autocomplete configuration

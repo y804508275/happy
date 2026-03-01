@@ -504,6 +504,10 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
         // Original key handling
         if (Platform.OS === 'web') {
             if (agentInputEnterToSend && event.key === 'Enter' && !event.shiftKey) {
+                // Block Enter send while agent is working
+                if (props.showAbortButton) {
+                    return true; // Consume the key, don't send
+                }
                 if (props.value.trim()) {
                     props.onSend();
                     return true; // Key was handled
@@ -990,43 +994,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* Auto-Confirm toggle button */}
-                                {props.onAutoConfirmChange && (
-                                    <Pressable
-                                        onPress={() => {
-                                            hapticsLight();
-                                            props.onAutoConfirmChange?.(!props.autoConfirm);
-                                        }}
-                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
-                                        style={(p) => ({
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            borderRadius: Platform.select({ default: 16, android: 20 }),
-                                            paddingHorizontal: 10,
-                                            paddingVertical: 6,
-                                            justifyContent: 'center',
-                                            height: 32,
-                                            opacity: p.pressed ? 0.7 : 1,
-                                            gap: 6,
-                                            backgroundColor: props.autoConfirm ? theme.colors.radio.active + '20' : 'transparent',
-                                        })}
-                                    >
-                                        <Octicons
-                                            name={props.autoConfirm ? "check-circle-fill" : "check-circle"}
-                                            size={14}
-                                            color={props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint}
-                                        />
-                                        <Text style={{
-                                            fontSize: 13,
-                                            color: props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint,
-                                            fontWeight: '600',
-                                            ...Typography.default('semiBold'),
-                                        }}>
-                                            {t('agentInput.autoConfirm.title')}
-                                        </Text>
-                                    </Pressable>
-                                )}
-
                                 {/* Profile selector button - FIRST */}
                                 {props.profileId && props.onProfileClick && (
                                     <Pressable
@@ -1099,40 +1066,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* Abort button */}
-                                {props.onAbort && (
-                                    <Shaker ref={shakerRef}>
-                                        <Pressable
-                                            style={(p) => ({
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                borderRadius: Platform.select({ default: 16, android: 20 }),
-                                                paddingHorizontal: 8,
-                                                paddingVertical: 6,
-                                                justifyContent: 'center',
-                                                height: 32,
-                                                opacity: p.pressed ? 0.7 : 1,
-                                            })}
-                                            hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
-                                            onPress={handleAbortPress}
-                                            disabled={isAborting}
-                                        >
-                                            {isAborting ? (
-                                                <ActivityIndicator
-                                                    size="small"
-                                                    color={theme.colors.button.secondary.tint}
-                                                />
-                                            ) : (
-                                                <Octicons
-                                                    name={"stop"}
-                                                    size={16}
-                                                    color={theme.colors.button.secondary.tint}
-                                                />
-                                            )}
-                                        </Pressable>
-                                    </Shaker>
-                                )}
-
                                 {/* Preview button (web only) */}
                                 {Platform.OS === 'web' && props.onPreviewPress && (
                                     <Pressable
@@ -1160,17 +1093,53 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
+                                {/* Auto-Confirm toggle button */}
+                                {props.onAutoConfirmChange && (
+                                    <Pressable
+                                        onPress={() => {
+                                            hapticsLight();
+                                            props.onAutoConfirmChange?.(!props.autoConfirm);
+                                        }}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 10,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                            gap: 6,
+                                            backgroundColor: props.autoConfirm ? theme.colors.radio.active + '20' : 'transparent',
+                                        })}
+                                    >
+                                        <Octicons
+                                            name={props.autoConfirm ? "check-circle-fill" : "check-circle"}
+                                            size={14}
+                                            color={props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint}
+                                        />
+                                        <Text style={{
+                                            fontSize: 13,
+                                            color: props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint,
+                                            fontWeight: '600',
+                                            ...Typography.default('semiBold'),
+                                        }}>
+                                            {t('agentInput.autoConfirm.title')}
+                                        </Text>
+                                    </Pressable>
+                                )}
+
                                 {/* Git Status Badge */}
                                 <GitStatusButton sessionId={props.sessionId} onPress={props.onFileViewerPress} />
                                 </View>
 
-                                {/* Send/Voice button - aligned with first row */}
+                                {/* Send/Abort button - aligned with first row */}
+                                <Shaker ref={shakerRef}>
                                 <View
                                     style={[
                                         styles.sendButton,
-                                        (hasText || props.isSending || (props.onMicPress && !props.isMicActive))
-                                            ? styles.sendButtonActive
-                                            : styles.sendButtonInactive
+                                        styles.sendButtonActive
                                     ]}
                                 >
                                     <Pressable
@@ -1183,31 +1152,38 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         })}
                                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                         onPress={() => {
-                                            hapticsLight();
-                                            if (hasText) {
-                                                props.onSend();
+                                            if (props.showAbortButton && props.onAbort) {
+                                                handleAbortPress();
                                             } else {
-                                                props.onMicPress?.();
+                                                hapticsLight();
+                                                if (hasText) {
+                                                    props.onSend();
+                                                } else {
+                                                    props.onMicPress?.();
+                                                }
                                             }
                                         }}
-                                        disabled={props.isSendDisabled || props.isSending || (!hasText && !props.onMicPress)}
+                                        disabled={props.showAbortButton ? isAborting : (props.isSendDisabled || props.isSending)}
                                     >
-                                        {props.isSending ? (
+                                        {props.showAbortButton && props.onAbort ? (
+                                            isAborting ? (
+                                                <ActivityIndicator
+                                                    size="small"
+                                                    color={theme.colors.button.primary.tint}
+                                                />
+                                            ) : (
+                                                <Octicons
+                                                    name="square-fill"
+                                                    size={14}
+                                                    color={theme.colors.button.primary.tint}
+                                                />
+                                            )
+                                        ) : props.isSending ? (
                                             <ActivityIndicator
                                                 size="small"
                                                 color={theme.colors.button.primary.tint}
                                             />
-                                        ) : hasText ? (
-                                            <Octicons
-                                                name="arrow-up"
-                                                size={16}
-                                                color={theme.colors.button.primary.tint}
-                                                style={[
-                                                    styles.sendButtonIcon,
-                                                    { marginTop: Platform.OS === 'web' ? 2 : 0 }
-                                                ]}
-                                            />
-                                        ) : props.onMicPress && !props.isMicActive ? (
+                                        ) : Platform.OS !== 'web' && props.onMicPress && !props.isMicActive && !hasText ? (
                                             <Image
                                                 source={require('@/assets/images/icon-voice-white.png')}
                                                 style={{
@@ -1229,6 +1205,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         )}
                                     </Pressable>
                                 </View>
+                                </Shaker>
                             </View>
                         </View>
                     </View>
