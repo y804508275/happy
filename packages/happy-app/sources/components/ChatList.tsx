@@ -30,9 +30,13 @@ const MIN_GROUP_SIZE = 3;
 function groupMessages(messages: Message[]): ListItem[] {
     const result: ListItem[] = [];
     let currentRun: ToolCallMessage[] = [];
+    // Messages are newest-first. Skip grouping the first (most recent) run
+    // of completed tool calls to avoid jarring height changes while tools
+    // are still actively being executed.
+    let isFirstRun = true;
 
     const flushRun = () => {
-        if (currentRun.length >= MIN_GROUP_SIZE) {
+        if (!isFirstRun && currentRun.length >= MIN_GROUP_SIZE) {
             const oldest = currentRun[currentRun.length - 1];
             result.push({
                 kind: 'tool-call-group',
@@ -57,6 +61,7 @@ function groupMessages(messages: Message[]): ListItem[] {
             currentRun.push(message);
         } else {
             flushRun();
+            isFirstRun = false;
             result.push(message);
         }
     }
@@ -133,11 +138,15 @@ const ChatListInternal = React.memo((props: {
     const renderItem = useCallback(({ item }: { item: ListItem }) => {
         if (item.kind === 'tool-call-group') {
             return (
-                <ToolCallGroupView
-                    messages={item.messages}
-                    metadata={props.metadata}
-                    sessionId={props.sessionId}
-                />
+                <View style={groupWrapperStyles.container}>
+                    <View style={groupWrapperStyles.content}>
+                        <ToolCallGroupView
+                            messages={item.messages}
+                            metadata={props.metadata}
+                            sessionId={props.sessionId}
+                        />
+                    </View>
+                </View>
             );
         }
         return (
@@ -279,6 +288,19 @@ const scrollButtonStyles = StyleSheet.create((theme) => ({
     },
     buttonPressed: {
         backgroundColor: theme.colors.fab.backgroundPressed,
+    },
+}));
+
+const groupWrapperStyles = StyleSheet.create(() => ({
+    container: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    content: {
+        flexDirection: 'column',
+        flexGrow: 1,
+        flexBasis: 0,
+        maxWidth: layout.maxWidth,
     },
 }));
 
