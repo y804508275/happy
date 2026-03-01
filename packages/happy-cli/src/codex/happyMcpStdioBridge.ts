@@ -104,25 +104,6 @@ async function main() {
     }
   );
 
-  registerForwardTool('search_memories',
-    'Search saved memories by keyword.',
-    'Search Memories',
-    {
-      query: z.string().min(1).max(200).describe('Search query.'),
-      scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope.'),
-      limit: z.number().int().min(1).max(20).default(10).optional().describe('Max results.'),
-    }
-  );
-
-  registerForwardTool('list_memories',
-    'List all saved memories.',
-    'List Memories',
-    {
-      scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope.'),
-      limit: z.number().int().min(1).max(50).default(20).optional().describe('Max results.'),
-    }
-  );
-
   registerForwardTool('delete_memory',
     'Delete a memory by ID.',
     'Delete Memory',

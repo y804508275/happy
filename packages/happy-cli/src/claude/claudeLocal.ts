@@ -49,6 +49,8 @@ export async function claudeLocal(opts: {
     sandboxConfig?: SandboxConfig,
     /** Discovered local projects on this machine */
     projects?: ScannedProject[],
+    /** Pre-loaded project knowledge base context */
+    projectContext?: string | null,
 }) {
 
     // Ensure project directory exists
@@ -212,7 +214,7 @@ export async function claudeLocal(opts: {
             }
             // If hasResumeFlag && !startFrom: --resume is in claudeArgs, let Claude handle it
 
-            args.push('--append-system-prompt', buildSystemPrompt(opts.projects ?? []));
+            args.push('--append-system-prompt', buildSystemPrompt(opts.projects ?? [], opts.projectContext));
 
             if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
                 args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));

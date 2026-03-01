@@ -30,6 +30,7 @@ import { sessionDelete } from '@/sync/ops';
 import { HappyError } from '@/utils/errors';
 import { Modal } from '@/modal';
 import { useSessionBadge } from '@/hooks/useSessionBadge';
+import { WebContextMenu } from './WebContextMenu';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -203,14 +204,6 @@ const stylesheet = StyleSheet.create((theme) => ({
         color: '#FFFFFF',
         textAlign: 'center',
         ...Typography.default('semiBold'),
-    },
-    webDeleteButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginLeft: 4,
     },
 }));
 
@@ -392,7 +385,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
     const badgeType = useSessionBadge(session);
-    const [hovered, setHovered] = React.useState(false);
+    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
@@ -440,10 +433,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     navigateToSession(session.id);
                 }
             }}
-            {...(Platform.OS === 'web' ? {
-                onPointerEnter: () => setHovered(true),
-                onPointerLeave: () => setHovered(false),
-            } : {})}
         >
             <View style={styles.avatarContainer}>
                 <Avatar id={avatarId} size={48} monochrome={!sessionStatus.isConnected} flavor={session.metadata?.flavor} />
@@ -492,19 +481,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     </Text>
                 </View>
             </View>
-            {/* Web: show delete button on hover */}
-            {Platform.OS === 'web' && hovered && (
-                <Pressable
-                    onPress={(e) => {
-                        e.stopPropagation();
-                        handleDelete();
-                    }}
-                    disabled={deletingSession}
-                    style={styles.webDeleteButton}
-                >
-                    <Ionicons name="trash-outline" size={16} color={theme.colors.status.error} />
-                </Pressable>
-            )}
         </Pressable>
     );
 
@@ -517,8 +493,29 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
 
     if (!swipeEnabled) {
         return (
-            <View style={containerStyles}>
+            <View
+                style={containerStyles}
+                // @ts-ignore - onContextMenu works on web
+                onContextMenu={(e: any) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY });
+                }}
+            >
                 {itemContent}
+                <WebContextMenu
+                    visible={contextMenu !== null}
+                    position={contextMenu || { x: 0, y: 0 }}
+                    items={[
+                        {
+                            label: t('sessionInfo.deleteSession'),
+                            icon: 'trash-outline',
+                            color: theme.colors.status.error,
+                            onPress: handleDelete,
+                            disabled: deletingSession,
+                        },
+                    ]}
+                    onClose={() => setContextMenu(null)}
+                />
             </View>
         );
     }

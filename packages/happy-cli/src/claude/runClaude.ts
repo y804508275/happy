@@ -252,8 +252,13 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     logger.debug(`[START] Loaded ${projects.length} local projects`);
 
     // Start Happy MCP server
-    const happyServer = await startHappyServer(session, projects);
+    const happyServer = await startHappyServer(session, projects, workingDirectory);
     logger.debug(`[START] Happy MCP server started at ${happyServer.url}`);
+
+    // Load project knowledge base context for system prompt injection
+    const { loadProjectContext } = await import('@/claude/utils/projectContext');
+    const projectContext = await loadProjectContext(session.getAuthToken(), workingDirectory);
+    logger.debug(`[START] Project context: ${projectContext ? `${projectContext.length} chars loaded` : 'none'}`);
 
     // Variable to track current session instance (updated via onSessionReady callback)
     // Used by hook server to notify Session when Claude changes session ID
@@ -567,6 +572,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         hookSettingsPath,
         jsRuntime: options.jsRuntime,
         projects,
+        projectContext,
     });
 
     // Cleanup session resources (intervals, callbacks) - prevents memory leak

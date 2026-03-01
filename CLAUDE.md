@@ -213,9 +213,19 @@ yarn install
 systemctl restart happy-server
 ```
 
+### 版本系统
+
+| 版本 | 位置 | 格式 | 用途 |
+|------|------|------|------|
+| App Store 版本 | `packages/happy-app/app.config.js` | Semver `1.6.2` | iOS/Android 商店提交 |
+| 部署版本 | `packages/happy-app/sources/version.ts` | 日期 `2026.03.01` | 部署验证（Web 右下角 badge + Settings） |
+| Changelog 版本 | `packages/happy-app/CHANGELOG.md` | 整数 `1, 2, 3...` | 用户可见的功能里程碑 |
+
+**每次部署前**必须更新部署版本：运行 `yarn stamp-version`（OTA 部署时自动执行）。部署后在 Web 页面右下角确认版本号。
+
 ### 更新前端（happy-app Web）
 ```bash
-cd /Users/colinyu/Projects/happy-coder  # 本地
+cd /Users/colinyu/happy  # 本地
 # 注意：.env 文件在 packages/happy-app/.env 中定义了 EXPO_PUBLIC_HAPPY_SERVER_URL=https://happy.superlinear.studio
 # 必须先删除旧的 dist 目录，否则 expo export 不会覆盖已存在的文件
 rm -rf packages/happy-app/dist

@@ -28,11 +28,12 @@ import { useProfile } from '@/sync/storage';
 import { getDisplayName, getAvatarUrl, getBio } from '@/sync/profile';
 import { Avatar } from '@/components/Avatar';
 import { t } from '@/text';
+import { APP_DEPLOY_VERSION } from '@/version';
 
 export const SettingsView = React.memo(function SettingsView() {
     const { theme } = useUnistyles();
     const router = useRouter();
-    const appVersion = Constants.expoConfig?.version || '1.0.0';
+    const appVersion = `${Constants.expoConfig?.version || '1.0.0'} (${APP_DEPLOY_VERSION})`;
     const auth = useAuth();
     const [devModeEnabled, setDevModeEnabled] = useLocalSettingMutable('devModeEnabled');
     const isPro = __DEV__ || useEntitlement('pro');

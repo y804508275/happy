@@ -23,6 +23,7 @@ import { ProjectGitStatus } from './ProjectGitStatus';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
 import { useSessionBadge } from '@/hooks/useSessionBadge';
+import { WebContextMenu } from './WebContextMenu';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
     container: {
@@ -302,7 +303,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
     const badgeType = useSessionBadge(session);
-    const [hovered, setHovered] = React.useState(false);
+    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
@@ -444,30 +445,39 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                     </Text>
                 </View>
             </View>
-            {/* Web: show delete button on hover */}
-            {Platform.OS === 'web' && hovered && (
-                <Pressable
-                    onPress={(e) => {
-                        e.stopPropagation();
-                        handleDelete();
-                    }}
-                    disabled={deletingSession}
-                    style={{ width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}
-                >
-                    <Ionicons name="trash-outline" size={16} color={theme.colors.status.error} />
-                </Pressable>
-            )}
         </Pressable>
     );
 
     if (!swipeEnabled) {
         return (
             <View
-                // @ts-ignore - onMouseEnter/onMouseLeave work on web
-                onMouseEnter={() => setHovered(true)}
-                onMouseLeave={() => setHovered(false)}
+                // @ts-ignore - onContextMenu works on web
+                onContextMenu={(e: any) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY });
+                }}
             >
                 {itemContent}
+                <WebContextMenu
+                    visible={contextMenu !== null}
+                    position={contextMenu || { x: 0, y: 0 }}
+                    items={[
+                        {
+                            label: t('sessionInfo.archiveSession'),
+                            icon: 'archive-outline',
+                            onPress: handleArchive,
+                            disabled: archivingSession,
+                        },
+                        {
+                            label: t('sessionInfo.deleteSession'),
+                            icon: 'trash-outline',
+                            color: theme.colors.status.error,
+                            onPress: handleDelete,
+                            disabled: deletingSession,
+                        },
+                    ]}
+                    onClose={() => setContextMenu(null)}
+                />
             </View>
         );
     }

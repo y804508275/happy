@@ -306,7 +306,13 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const placeholder = messages.length === 0 ? (
         <>
             {isLoaded ? (
-                <EmptyMessages session={session} />
+                <EmptyMessages
+                    session={session}
+                    onProjectSelect={(path) => {
+                        const display = formatPathRelativeToHome(path, session.metadata?.homeDir);
+                        setMessage(`Help me with the ${display} project`);
+                    }}
+                />
             ) : (
                 <ActivityIndicator size="small" color={theme.colors.textSecondary} />
             )}

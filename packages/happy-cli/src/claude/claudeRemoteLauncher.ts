@@ -332,6 +332,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                     hookSettingsPath: session.hookSettingsPath,
                     jsRuntime: session.jsRuntime,
                     projects: session.projects,
+                    projectContext: session.projectContext,
                     canCallTool: permissionHandler.handleToolCall,
                     isAborted: (toolCallId: string) => {
                         return permissionHandler.isAborted(toolCallId);

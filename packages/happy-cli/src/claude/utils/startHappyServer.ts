@@ -147,22 +147,6 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
             .slice(0, 70) || 'untitled';
     }
 
-    // Filter items by memory meta fields
-    function filterMemoryItems(items: any[], scope: string): any[] {
-        return items.filter((item: any) => {
-            const meta = item.meta as any;
-            if (!meta || meta.memoryType !== 'memory') return false;
-            if (scope === 'global') return meta.scope === 'global';
-            if (scope === 'project' && workingDirectory) {
-                return meta.scope === 'project' && meta.projectPath === workingDirectory;
-            }
-            // 'all': global + current project
-            if (meta.scope === 'global') return true;
-            if (meta.scope === 'project' && workingDirectory && meta.projectPath === workingDirectory) return true;
-            return false;
-        });
-    }
-
     mcp.registerTool('save_memory', {
         description: 'Save a memory (important fact, preference, decision, or context) for future retrieval across sessions.',
         title: 'Save Memory',
@@ -240,98 +224,6 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
         }
     });
 
-    mcp.registerTool('search_memories', {
-        description: 'Search saved memories by keyword. Use this at the start of conversations or when you need to recall past context, preferences, or decisions.',
-        title: 'Search Memories',
-        inputSchema: {
-            query: z.string().min(1).max(200).describe('Search query - matches against memory title and description.'),
-            scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope. "all" returns both global and project memories.'),
-            limit: z.number().int().min(1).max(20).default(10).optional().describe('Maximum number of memories to return.'),
-        },
-    }, async (args) => {
-        try {
-            // Request more from server since we filter client-side
-            const serverLimit = Math.min((args.limit || 10) * 3, 50);
-            const response = await axios.get(`${apiBase}/v1/shared-items/search`, {
-                params: { q: args.query, type: 'context', limit: serverLimit },
-                headers: apiHeaders(),
-                timeout: 10000,
-            });
-
-            let items = filterMemoryItems(response.data.items, args.scope);
-            items = items.slice(0, args.limit || 10);
-
-            if (items.length === 0) {
-                return {
-                    content: [{ type: 'text', text: 'No memories found matching your query.' }],
-                    isError: false,
-                };
-            }
-
-            const formatted = items.map((item: any, i: number) => {
-                const meta = item.meta as any;
-                const scopeLabel = meta?.scope === 'global' ? '[global]' : '[project]';
-                const tags = meta?.tags?.length ? ` (${meta.tags.join(', ')})` : '';
-                return `${i + 1}. ${scopeLabel} **${item.name}**${tags} — id: ${item.id}`;
-            }).join('\n');
-
-            return {
-                content: [{ type: 'text', text: `Found ${items.length} memories:\n\n${formatted}` }],
-                isError: false,
-            };
-        } catch (error: any) {
-            return {
-                content: [{ type: 'text', text: `Failed to search memories: ${error.message || String(error)}` }],
-                isError: true,
-            };
-        }
-    });
-
-    mcp.registerTool('list_memories', {
-        description: 'List all saved memories, optionally filtered by scope.',
-        title: 'List Memories',
-        inputSchema: {
-            scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope. "project" shows only memories for the current directory.'),
-            limit: z.number().int().min(1).max(50).default(20).optional().describe('Maximum number of memories to return.'),
-        },
-    }, async (args) => {
-        try {
-            const serverLimit = Math.min((args.limit || 20) * 3, 100);
-            const response = await axios.get(`${apiBase}/v1/shared-items`, {
-                params: { type: 'context', visibility: 'private', limit: serverLimit },
-                headers: apiHeaders(),
-                timeout: 10000,
-            });
-
-            let items = filterMemoryItems(response.data.items, args.scope);
-            items = items.slice(0, args.limit || 20);
-
-            if (items.length === 0) {
-                return {
-                    content: [{ type: 'text', text: 'No memories found.' }],
-                    isError: false,
-                };
-            }
-
-            const formatted = items.map((item: any, i: number) => {
-                const meta = item.meta as any;
-                const scopeLabel = meta?.scope === 'global' ? '[global]' : '[project]';
-                const tags = meta?.tags?.length ? ` (${meta.tags.join(', ')})` : '';
-                return `${i + 1}. ${scopeLabel} **${item.name}**${tags} — id: ${item.id}`;
-            }).join('\n');
-
-            return {
-                content: [{ type: 'text', text: `${items.length} memories:\n\n${formatted}` }],
-                isError: false,
-            };
-        } catch (error: any) {
-            return {
-                content: [{ type: 'text', text: `Failed to list memories: ${error.message || String(error)}` }],
-                isError: true,
-            };
-        }
-    });
-
     mcp.registerTool('delete_memory', {
         description: 'Delete a saved memory by its ID.',
         title: 'Delete Memory',
@@ -395,7 +287,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
 
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title', 'list_projects', 'save_memory', 'search_memories', 'list_memories', 'delete_memory'],
+        toolNames: ['change_title', 'list_projects', 'save_memory', 'delete_memory'],
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
             mcp.close();

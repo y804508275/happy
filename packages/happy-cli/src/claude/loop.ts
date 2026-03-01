@@ -45,6 +45,8 @@ interface LoopOptions {
     jsRuntime?: JsRuntime
     /** Discovered local projects on this machine */
     projects?: ScannedProject[]
+    /** Pre-loaded project knowledge base context (injected into system prompt) */
+    projectContext?: string | null
 }
 
 export async function loop(opts: LoopOptions): Promise<number> {
@@ -67,6 +69,7 @@ export async function loop(opts: LoopOptions): Promise<number> {
         hookSettingsPath: opts.hookSettingsPath,
         jsRuntime: opts.jsRuntime,
         projects: opts.projects,
+        projectContext: opts.projectContext,
     });
 
     opts.onSessionReady?.(session)

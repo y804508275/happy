@@ -24,6 +24,8 @@ export class Session {
     readonly jsRuntime: JsRuntime;
     /** Discovered local projects on this machine */
     readonly projects: ScannedProject[];
+    /** Pre-loaded project knowledge base context */
+    readonly projectContext?: string | null;
 
     sessionId: string | null;
     mode: 'local' | 'remote' = 'local';
@@ -54,6 +56,8 @@ export class Session {
         jsRuntime?: JsRuntime,
         /** Discovered local projects on this machine */
         projects?: ScannedProject[],
+        /** Pre-loaded project knowledge base context */
+        projectContext?: string | null,
     }) {
         this.path = opts.path;
         this.api = opts.api;
@@ -70,6 +74,7 @@ export class Session {
         this.hookSettingsPath = opts.hookSettingsPath;
         this.jsRuntime = opts.jsRuntime ?? 'node';
         this.projects = opts.projects ?? [];
+        this.projectContext = opts.projectContext;
 
         // Start keep alive
         this.client.keepAlive(this.thinking, this.mode);

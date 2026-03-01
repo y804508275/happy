@@ -31,6 +31,8 @@ export async function claudeRemote(opts: {
     jsRuntime?: JsRuntime,
     /** Discovered local projects on this machine */
     projects?: ScannedProject[],
+    /** Pre-loaded project knowledge base context */
+    projectContext?: string | null,
 
     // Dynamic parameters
     nextMessage: () => Promise<{ message: string, mode: EnhancedMode } | null>,
@@ -116,7 +118,7 @@ export async function claudeRemote(opts: {
 
     // Prepare SDK options
     let mode = initial.mode;
-    const builtPrompt = buildSystemPrompt(opts.projects ?? []);
+    const builtPrompt = buildSystemPrompt(opts.projects ?? [], opts.projectContext);
     const sdkOptions: QueryOptions = {
         cwd: opts.path,
         resume: startFrom ?? undefined,
