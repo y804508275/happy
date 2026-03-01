@@ -74,6 +74,10 @@ type V3PostSessionMessagesResponse = {
 export class ApiSessionClient extends EventEmitter {
     private readonly token: string;
     readonly sessionId: string;
+
+    getAuthToken(): string {
+        return this.token;
+    }
     private metadata: Metadata | null;
     private metadataVersion: number;
     private agentState: AgentState | null;

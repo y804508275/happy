@@ -1,0 +1,20 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Happy Client",
+  "identifier": "com.slopus.happy.client",
+  "build": {
+    "frontendDist": "https://happy.superlinear.studio/",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Happy Client",
+        "width": 1024,
+        "height": 768,
+        "resizable": true
+      }
+    ]
+  }
+}

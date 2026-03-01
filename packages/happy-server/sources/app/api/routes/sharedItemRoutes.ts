@@ -44,6 +44,7 @@ const SharedItemSummarySchema = z.object({
     name: z.string(),
     slug: z.string(),
     description: z.string().nullable(),
+    meta: z.any().nullable(),
     usageCount: z.number(),
     starCount: z.number(),
     isStarred: z.boolean(),
@@ -247,7 +248,7 @@ export function sharedItemRoutes(app: Fastify) {
                 where,
                 select: {
                     id: true, type: true, visibility: true, authorId: true,
-                    teamId: true, name: true, slug: true, description: true,
+                    teamId: true, name: true, slug: true, description: true, meta: true,
                     usageCount: true, starCount: true, createdAt: true, updatedAt: true,
                     stars: { where: { accountId: userId }, select: { id: true } }
                 },
@@ -268,6 +269,7 @@ export function sharedItemRoutes(app: Fastify) {
                     name: item.name,
                     slug: item.slug,
                     description: item.description,
+                    meta: item.meta,
                     usageCount: item.usageCount,
                     starCount: item.starCount,
                     isStarred: item.stars.length > 0,
@@ -333,7 +335,7 @@ export function sharedItemRoutes(app: Fastify) {
                 where,
                 select: {
                     id: true, type: true, visibility: true, authorId: true,
-                    teamId: true, name: true, slug: true, description: true,
+                    teamId: true, name: true, slug: true, description: true, meta: true,
                     usageCount: true, starCount: true, createdAt: true, updatedAt: true,
                     stars: { where: { accountId: userId }, select: { id: true } }
                 },
@@ -351,6 +353,7 @@ export function sharedItemRoutes(app: Fastify) {
                     name: item.name,
                     slug: item.slug,
                     description: item.description,
+                    meta: item.meta,
                     usageCount: item.usageCount,
                     starCount: item.starCount,
                     isStarred: item.stars.length > 0,
@@ -399,7 +402,7 @@ export function sharedItemRoutes(app: Fastify) {
                 where,
                 select: {
                     id: true, type: true, visibility: true, authorId: true,
-                    teamId: true, name: true, slug: true, description: true,
+                    teamId: true, name: true, slug: true, description: true, meta: true,
                     usageCount: true, starCount: true, createdAt: true, updatedAt: true,
                     stars: { where: { accountId: userId }, select: { id: true } }
                 },
@@ -420,6 +423,7 @@ export function sharedItemRoutes(app: Fastify) {
                     name: item.name,
                     slug: item.slug,
                     description: item.description,
+                    meta: item.meta,
                     usageCount: item.usageCount,
                     starCount: item.starCount,
                     isStarred: item.stars.length > 0,

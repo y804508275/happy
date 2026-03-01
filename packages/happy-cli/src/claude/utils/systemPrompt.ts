@@ -1,5 +1,6 @@
 import { trimIdent } from "@/utils/trimIdent";
 import { shouldIncludeCoAuthoredBy } from "./claudeSettings";
+import { type ScannedProject, formatProjectsForPrompt } from "./projectScanner";
 
 /**
  * Base system prompt shared across all configurations
@@ -23,16 +24,28 @@ const CO_AUTHORED_CREDITS = (() => trimIdent(`
     Co-Authored-By: Happy <yesreply@happy.engineering>
 `))();
 
+const includeCoAuthored = shouldIncludeCoAuthoredBy();
+
 /**
- * System prompt with conditional Co-Authored-By lines based on Claude's settings.json configuration.
- * Settings are read once on startup for performance.
+ * Build system prompt with optional project list injection.
+ * Used by claudeLocal and claudeRemote to include discovered projects in context.
  */
-export const systemPrompt = (() => {
-  const includeCoAuthored = shouldIncludeCoAuthoredBy();
-  
+export function buildSystemPrompt(projects: ScannedProject[]): string {
+  let prompt = BASE_SYSTEM_PROMPT;
+
   if (includeCoAuthored) {
-    return BASE_SYSTEM_PROMPT + '\n\n' + CO_AUTHORED_CREDITS;
-  } else {
-    return BASE_SYSTEM_PROMPT;
+    prompt += '\n\n' + CO_AUTHORED_CREDITS;
   }
-})();
+
+  const projectSection = formatProjectsForPrompt(projects);
+  if (projectSection) {
+    prompt += '\n\n' + projectSection;
+  }
+
+  return prompt;
+}
+
+/**
+ * Static system prompt (backward-compatible, without project list).
+ */
+export const systemPrompt = buildSystemPrompt([]);

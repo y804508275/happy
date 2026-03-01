@@ -527,14 +527,26 @@ export async function sessionRestart(sessionId: string): Promise<SessionRestartR
 /**
  * Permanently delete a session from the server
  * This will remove the session and all its associated data (messages, usage reports, access keys)
- * The session should be inactive/archived before deletion
+ * Also attempts to kill the running CLI process first (best-effort) so it stops occupying memory
  */
 export async function sessionDelete(sessionId: string): Promise<{ success: boolean; message?: string }> {
+    // Best-effort: try to kill the running process first.
+    // Use a short timeout since the session may already be offline.
+    try {
+        await Promise.race([
+            sessionKill(sessionId),
+            new Promise<void>((_, reject) => setTimeout(() => reject(new Error('kill timeout')), 3000))
+        ]);
+    } catch {
+        // Ignore - session might already be offline or unresponsive
+    }
+
+    // Then delete the DB record
     try {
         const response = await apiSocket.request(`/v1/sessions/${sessionId}`, {
             method: 'DELETE'
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             return { success: true };

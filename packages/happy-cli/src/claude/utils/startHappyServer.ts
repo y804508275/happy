@@ -1,6 +1,7 @@
 /**
  * Happy MCP server
  * Provides Happy CLI specific tools including chat session title management
+ * and local project discovery
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -11,8 +12,11 @@ import { z } from "zod";
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
+import { type ScannedProject, scanProjects, readProjectCache } from "./projectScanner";
+import axios from "axios";
+import { configuration } from "@/configuration";
 
-export async function startHappyServer(client: ApiSessionClient) {
+export async function startHappyServer(client: ApiSessionClient, projects: ScannedProject[] = [], workingDirectory?: string) {
     logger.debug(`[happyMCP] server:start sessionId=${client.sessionId}`);
 
     // Handler that sends title updates via the client
@@ -74,6 +78,290 @@ export async function startHappyServer(client: ApiSessionClient) {
         }
     });
 
+    // Keep a mutable reference to the project list for refresh
+    let currentProjects = projects;
+
+    mcp.registerTool('list_projects', {
+        description: 'List all local git projects discovered on this machine. Use refresh=true to re-scan the filesystem.',
+        title: 'List Local Projects',
+        inputSchema: {
+            refresh: z.boolean().optional().default(false).describe('Set to true to re-scan the filesystem instead of using cached results'),
+        },
+    }, async (args) => {
+        try {
+            if (args.refresh) {
+                logger.debug('[happyMCP] Refreshing project list...');
+                currentProjects = await scanProjects();
+            } else {
+                // Try cache first, fallback to current list
+                const cached = readProjectCache();
+                if (cached) {
+                    currentProjects = cached;
+                }
+            }
+
+            if (currentProjects.length === 0) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: 'No git projects found on this machine.',
+                    }],
+                    isError: false,
+                };
+            }
+
+            const lines = currentProjects.map(p => `- ${p.name}: ${p.path}`).join('\n');
+            return {
+                content: [{
+                    type: 'text',
+                    text: `Found ${currentProjects.length} local projects:\n\n${lines}`,
+                }],
+                isError: false,
+            };
+        } catch (error) {
+            return {
+                content: [{
+                    type: 'text',
+                    text: `Failed to list projects: ${String(error)}`,
+                }],
+                isError: true,
+            };
+        }
+    });
+
+    //
+    // Memory tools
+    //
+
+    const apiBase = configuration.serverUrl;
+    const apiHeaders = () => ({
+        'Authorization': `Bearer ${client.getAuthToken()}`,
+        'Content-Type': 'application/json'
+    });
+
+    function slugify(title: string): string {
+        return 'memory-' + title
+            .toLowerCase()
+            .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 70) || 'untitled';
+    }
+
+    // Filter items by memory meta fields
+    function filterMemoryItems(items: any[], scope: string): any[] {
+        return items.filter((item: any) => {
+            const meta = item.meta as any;
+            if (!meta || meta.memoryType !== 'memory') return false;
+            if (scope === 'global') return meta.scope === 'global';
+            if (scope === 'project' && workingDirectory) {
+                return meta.scope === 'project' && meta.projectPath === workingDirectory;
+            }
+            // 'all': global + current project
+            if (meta.scope === 'global') return true;
+            if (meta.scope === 'project' && workingDirectory && meta.projectPath === workingDirectory) return true;
+            return false;
+        });
+    }
+
+    mcp.registerTool('save_memory', {
+        description: 'Save a memory (important fact, preference, decision, or context) for future retrieval across sessions.',
+        title: 'Save Memory',
+        inputSchema: {
+            content: z.string().describe('The memory content to save. Be specific and self-contained.'),
+            title: z.string().max(200).describe('A short, descriptive title for the memory.'),
+            scope: z.enum(['global', 'project']).default('project').describe('global = applies everywhere. project = applies only to the current project/directory.'),
+            tags: z.array(z.string()).optional().describe('Optional tags for categorization, e.g. ["preference", "architecture"]'),
+        },
+    }, async (args) => {
+        try {
+            const slug = slugify(args.title);
+            const meta: Record<string, unknown> = {
+                memoryType: 'memory',
+                scope: args.scope,
+                tags: args.tags || [],
+                createdBy: 'claude-auto',
+            };
+            if (args.scope === 'project' && workingDirectory) {
+                meta.projectPath = workingDirectory;
+            }
+
+            const response = await axios.post(`${apiBase}/v1/shared-items`, {
+                type: 'context',
+                visibility: 'private',
+                name: args.title,
+                slug,
+                description: args.tags?.join(', ') || null,
+                content: args.content,
+                meta,
+            }, { headers: apiHeaders(), timeout: 10000 });
+
+            return {
+                content: [{ type: 'text', text: `Memory saved: "${args.title}" (${args.scope} scope, id: ${response.data.id})` }],
+                isError: false,
+            };
+        } catch (error: any) {
+            // Handle slug conflict by appending timestamp suffix
+            if (error.response?.status === 409) {
+                const retrySlug = slugify(args.title).slice(0, 60) + '-' + Date.now().toString(36);
+                const meta: Record<string, unknown> = {
+                    memoryType: 'memory',
+                    scope: args.scope,
+                    tags: args.tags || [],
+                    createdBy: 'claude-auto',
+                };
+                if (args.scope === 'project' && workingDirectory) {
+                    meta.projectPath = workingDirectory;
+                }
+                try {
+                    const response = await axios.post(`${apiBase}/v1/shared-items`, {
+                        type: 'context',
+                        visibility: 'private',
+                        name: args.title,
+                        slug: retrySlug,
+                        description: args.tags?.join(', ') || null,
+                        content: args.content,
+                        meta,
+                    }, { headers: apiHeaders(), timeout: 10000 });
+                    return {
+                        content: [{ type: 'text', text: `Memory saved: "${args.title}" (${args.scope} scope, id: ${response.data.id})` }],
+                        isError: false,
+                    };
+                } catch (retryError: any) {
+                    return {
+                        content: [{ type: 'text', text: `Failed to save memory: ${retryError.message || String(retryError)}` }],
+                        isError: true,
+                    };
+                }
+            }
+            return {
+                content: [{ type: 'text', text: `Failed to save memory: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
+    mcp.registerTool('search_memories', {
+        description: 'Search saved memories by keyword. Use this at the start of conversations or when you need to recall past context, preferences, or decisions.',
+        title: 'Search Memories',
+        inputSchema: {
+            query: z.string().min(1).max(200).describe('Search query - matches against memory title and description.'),
+            scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope. "all" returns both global and project memories.'),
+            limit: z.number().int().min(1).max(20).default(10).optional().describe('Maximum number of memories to return.'),
+        },
+    }, async (args) => {
+        try {
+            // Request more from server since we filter client-side
+            const serverLimit = Math.min((args.limit || 10) * 3, 50);
+            const response = await axios.get(`${apiBase}/v1/shared-items/search`, {
+                params: { q: args.query, type: 'context', limit: serverLimit },
+                headers: apiHeaders(),
+                timeout: 10000,
+            });
+
+            let items = filterMemoryItems(response.data.items, args.scope);
+            items = items.slice(0, args.limit || 10);
+
+            if (items.length === 0) {
+                return {
+                    content: [{ type: 'text', text: 'No memories found matching your query.' }],
+                    isError: false,
+                };
+            }
+
+            const formatted = items.map((item: any, i: number) => {
+                const meta = item.meta as any;
+                const scopeLabel = meta?.scope === 'global' ? '[global]' : '[project]';
+                const tags = meta?.tags?.length ? ` (${meta.tags.join(', ')})` : '';
+                return `${i + 1}. ${scopeLabel} **${item.name}**${tags} — id: ${item.id}`;
+            }).join('\n');
+
+            return {
+                content: [{ type: 'text', text: `Found ${items.length} memories:\n\n${formatted}` }],
+                isError: false,
+            };
+        } catch (error: any) {
+            return {
+                content: [{ type: 'text', text: `Failed to search memories: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
+    mcp.registerTool('list_memories', {
+        description: 'List all saved memories, optionally filtered by scope.',
+        title: 'List Memories',
+        inputSchema: {
+            scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope. "project" shows only memories for the current directory.'),
+            limit: z.number().int().min(1).max(50).default(20).optional().describe('Maximum number of memories to return.'),
+        },
+    }, async (args) => {
+        try {
+            const serverLimit = Math.min((args.limit || 20) * 3, 100);
+            const response = await axios.get(`${apiBase}/v1/shared-items`, {
+                params: { type: 'context', visibility: 'private', limit: serverLimit },
+                headers: apiHeaders(),
+                timeout: 10000,
+            });
+
+            let items = filterMemoryItems(response.data.items, args.scope);
+            items = items.slice(0, args.limit || 20);
+
+            if (items.length === 0) {
+                return {
+                    content: [{ type: 'text', text: 'No memories found.' }],
+                    isError: false,
+                };
+            }
+
+            const formatted = items.map((item: any, i: number) => {
+                const meta = item.meta as any;
+                const scopeLabel = meta?.scope === 'global' ? '[global]' : '[project]';
+                const tags = meta?.tags?.length ? ` (${meta.tags.join(', ')})` : '';
+                return `${i + 1}. ${scopeLabel} **${item.name}**${tags} — id: ${item.id}`;
+            }).join('\n');
+
+            return {
+                content: [{ type: 'text', text: `${items.length} memories:\n\n${formatted}` }],
+                isError: false,
+            };
+        } catch (error: any) {
+            return {
+                content: [{ type: 'text', text: `Failed to list memories: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
+    mcp.registerTool('delete_memory', {
+        description: 'Delete a saved memory by its ID.',
+        title: 'Delete Memory',
+        inputSchema: {
+            id: z.string().describe('The ID of the memory to delete.'),
+        },
+    }, async (args) => {
+        try {
+            await axios.delete(`${apiBase}/v1/shared-items/${args.id}`, {
+                headers: apiHeaders(),
+                timeout: 10000,
+            });
+            return {
+                content: [{ type: 'text', text: `Memory deleted (id: ${args.id}).` }],
+                isError: false,
+            };
+        } catch (error: any) {
+            if (error.response?.status === 404) {
+                return {
+                    content: [{ type: 'text', text: `Memory not found (id: ${args.id}).` }],
+                    isError: true,
+                };
+            }
+            return {
+                content: [{ type: 'text', text: `Failed to delete memory: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
     const transport = new StreamableHTTPServerTransport({
         // NOTE: Returning session id here will result in claude
         // sdk spawn to fail with `Invalid Request: Server already initialized`
@@ -107,7 +395,7 @@ export async function startHappyServer(client: ApiSessionClient) {
 
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title'],
+        toolNames: ['change_title', 'list_projects', 'save_memory', 'search_memories', 'list_memories', 'delete_memory'],
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
             mcp.close();

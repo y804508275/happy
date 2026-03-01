@@ -8,8 +8,9 @@ import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { claudeFindLastSession } from "./utils/claudeFindLastSession";
 import { getProjectPath } from "./utils/path";
 import { projectPath } from "@/projectPath";
-import { systemPrompt } from "./utils/systemPrompt";
+import { buildSystemPrompt } from "./utils/systemPrompt";
 import type { SandboxConfig } from "@/persistence";
+import type { ScannedProject } from "./utils/projectScanner";
 import { initializeSandbox, wrapCommand } from "@/sandbox/manager";
 
 /**
@@ -46,6 +47,8 @@ export async function claudeLocal(opts: {
     /** Path to temporary settings file with SessionStart hook (optional - for session tracking) */
     hookSettingsPath?: string,
     sandboxConfig?: SandboxConfig,
+    /** Discovered local projects on this machine */
+    projects?: ScannedProject[],
 }) {
 
     // Ensure project directory exists
@@ -209,7 +212,7 @@ export async function claudeLocal(opts: {
             }
             // If hasResumeFlag && !startFrom: --resume is in claudeArgs, let Claude handle it
 
-            args.push('--append-system-prompt', systemPrompt);
+            args.push('--append-system-prompt', buildSystemPrompt(opts.projects ?? []));
 
             if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
                 args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));

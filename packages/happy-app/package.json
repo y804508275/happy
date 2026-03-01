@@ -38,7 +38,12 @@
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build:dev": "tauri build --config src-tauri/tauri.dev.conf.json",
     "tauri:build:preview": "tauri build --config src-tauri/tauri.preview.conf.json",
-    "tauri:build:production": "tauri build"
+    "tauri:build:production": "tauri build",
+    "tauri:dev:client": "tauri dev --config src-tauri/tauri.client.conf.json",
+    "tauri:build:client": "tauri build --config src-tauri/tauri.client.conf.json",
+    "// ==== Standalone (local server + PGlite) ====": "",
+    "tauri:dev:standalone": "tauri dev --config src-tauri/tauri.standalone.conf.json",
+    "tauri:build:standalone": "tauri build --config src-tauri/tauri.standalone.conf.json"
   },
   "jest": {
     "preset": "jest-expo"

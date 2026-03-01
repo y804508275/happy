@@ -63,31 +63,70 @@ async function main() {
     version: '1.0.0',
   });
 
-  // Register the single tool and forward to HTTP MCP
-  server.registerTool(
-    'change_title',
-    {
-      description: 'Change the title of the current chat session',
-      title: 'Change Chat Title',
-      inputSchema: {
-        title: z.string().describe('The new title for the chat session'),
-      },
-    },
-    async (args) => {
+  // Generic forwarder: register a tool that proxies to the HTTP MCP server
+  function registerForwardTool(
+    name: string,
+    description: string,
+    title: string,
+    inputSchema: Record<string, z.ZodTypeAny>,
+  ) {
+    server.registerTool(name, { description, title, inputSchema }, async (args) => {
       try {
         const client = await ensureHttpClient();
-        const response = await client.callTool({ name: 'change_title', arguments: args });
-        // Pass-through response from HTTP server
+        const response = await client.callTool({ name, arguments: args });
         return response as any;
       } catch (error) {
         return {
           content: [
-            { type: 'text', text: `Failed to change chat title: ${error instanceof Error ? error.message : String(error)}` },
+            { type: 'text', text: `Failed to call ${name}: ${error instanceof Error ? error.message : String(error)}` },
           ],
           isError: true,
         };
       }
+    });
+  }
+
+  // Register tools and forward to HTTP MCP
+  registerForwardTool('change_title',
+    'Change the title of the current chat session',
+    'Change Chat Title',
+    { title: z.string().describe('The new title for the chat session') }
+  );
+
+  registerForwardTool('save_memory',
+    'Save a memory for future retrieval across sessions.',
+    'Save Memory',
+    {
+      content: z.string().describe('The memory content to save.'),
+      title: z.string().max(200).describe('A short, descriptive title.'),
+      scope: z.enum(['global', 'project']).default('project').describe('global or project scope.'),
+      tags: z.array(z.string()).optional().describe('Optional tags.'),
     }
+  );
+
+  registerForwardTool('search_memories',
+    'Search saved memories by keyword.',
+    'Search Memories',
+    {
+      query: z.string().min(1).max(200).describe('Search query.'),
+      scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope.'),
+      limit: z.number().int().min(1).max(20).default(10).optional().describe('Max results.'),
+    }
+  );
+
+  registerForwardTool('list_memories',
+    'List all saved memories.',
+    'List Memories',
+    {
+      scope: z.enum(['all', 'global', 'project']).default('all').describe('Filter by scope.'),
+      limit: z.number().int().min(1).max(50).default(20).optional().describe('Max results.'),
+    }
+  );
+
+  registerForwardTool('delete_memory',
+    'Delete a memory by ID.',
+    'Delete Memory',
+    { id: z.string().describe('The ID of the memory to delete.') }
   );
 
   // Start STDIO transport

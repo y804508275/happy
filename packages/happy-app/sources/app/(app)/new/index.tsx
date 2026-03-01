@@ -452,6 +452,12 @@ function NewSessionWizard() {
     const pathSectionRef = React.useRef<View>(null);
     const permissionSectionRef = React.useRef<View>(null);
 
+    // Selected machine object (must be before hooks that reference it)
+    const selectedMachine = React.useMemo(() => {
+        if (!selectedMachineId) return null;
+        return machines.find(m => m.id === selectedMachineId);
+    }, [selectedMachineId, machines]);
+
     // CLI Detection - automatic, non-blocking detection of installed CLIs on selected machine
     const cliAvailability = useCLIDetection(selectedMachineId);
 
@@ -587,11 +593,6 @@ function NewSessionWizard() {
         // Check built-in profiles
         return getBuiltInProfile(selectedProfileId);
     }, [selectedProfileId, profileMap]);
-
-    const selectedMachine = React.useMemo(() => {
-        if (!selectedMachineId) return null;
-        return machines.find(m => m.id === selectedMachineId);
-    }, [selectedMachineId, machines]);
 
     // Get recent paths for the selected machine
     // Recent machines computed from sessions (for inline machine selection)

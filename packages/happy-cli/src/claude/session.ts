@@ -4,6 +4,7 @@ import { EnhancedMode } from "./loop";
 import { logger } from "@/ui/logger";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
+import type { ScannedProject } from "./utils/projectScanner";
 
 export class Session {
     readonly path: string;
@@ -21,6 +22,8 @@ export class Session {
     readonly hookSettingsPath: string;
     /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
     readonly jsRuntime: JsRuntime;
+    /** Discovered local projects on this machine */
+    readonly projects: ScannedProject[];
 
     sessionId: string | null;
     mode: 'local' | 'remote' = 'local';
@@ -49,6 +52,8 @@ export class Session {
         hookSettingsPath: string,
         /** JavaScript runtime to use for spawning Claude Code (default: 'node') */
         jsRuntime?: JsRuntime,
+        /** Discovered local projects on this machine */
+        projects?: ScannedProject[],
     }) {
         this.path = opts.path;
         this.api = opts.api;
@@ -64,6 +69,7 @@ export class Session {
         this._onModeChange = opts.onModeChange;
         this.hookSettingsPath = opts.hookSettingsPath;
         this.jsRuntime = opts.jsRuntime ?? 'node';
+        this.projects = opts.projects ?? [];
 
         // Start keep alive
         this.client.keepAlive(this.thinking, this.mode);

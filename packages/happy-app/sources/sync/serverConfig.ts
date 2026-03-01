@@ -6,12 +6,17 @@ const serverConfigStorage = new MMKV({ id: 'server-config' });
 const SERVER_KEY = 'custom-server-url';
 const DEFAULT_SERVER_URL = 'https://happy.superlinear.studio';
 
+// Build-time override via EXPO_PUBLIC_HAPPY_SERVER_URL env var (baked by Metro)
+const BUILD_TIME_SERVER_URL = process.env.EXPO_PUBLIC_HAPPY_SERVER_URL || '';
+
 // Cached runtime origin, evaluated lazily to avoid metro static analysis
 let _runtimeOrigin: string | undefined;
 
 export function getServerUrl(): string {
     const custom = serverConfigStorage.getString(SERVER_KEY);
     if (custom) return custom;
+    // Build-time env var takes priority over runtime origin and default
+    if (BUILD_TIME_SERVER_URL) return BUILD_TIME_SERVER_URL;
     // On web: use browser origin so the app works on any domain without build-time config.
     // Indirect eval prevents metro/terser from statically evaluating at build time.
     if (_runtimeOrigin === undefined) {
@@ -25,6 +30,12 @@ export function getServerUrl(): string {
     if (_runtimeOrigin && _runtimeOrigin !== 'null' && !_runtimeOrigin.includes('localhost')) {
         return _runtimeOrigin;
     }
+    // Tauri standalone: connect to local server
+    try {
+        if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+            return 'http://localhost:3005';
+        }
+    } catch {}
     return DEFAULT_SERVER_URL;
 }
 

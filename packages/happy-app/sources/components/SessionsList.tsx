@@ -204,6 +204,14 @@ const stylesheet = StyleSheet.create((theme) => ({
         textAlign: 'center',
         ...Typography.default('semiBold'),
     },
+    webDeleteButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 4,
+    },
 }));
 
 export function SessionsList() {
@@ -384,6 +392,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
     const badgeType = useSessionBadge(session);
+    const [hovered, setHovered] = React.useState(false);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
@@ -431,6 +440,10 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     navigateToSession(session.id);
                 }
             }}
+            {...(Platform.OS === 'web' ? {
+                onPointerEnter: () => setHovered(true),
+                onPointerLeave: () => setHovered(false),
+            } : {})}
         >
             <View style={styles.avatarContainer}>
                 <Avatar id={avatarId} size={48} monochrome={!sessionStatus.isConnected} flavor={session.metadata?.flavor} />
@@ -479,6 +492,19 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     </Text>
                 </View>
             </View>
+            {/* Web: show delete button on hover */}
+            {Platform.OS === 'web' && hovered && (
+                <Pressable
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        handleDelete();
+                    }}
+                    disabled={deletingSession}
+                    style={styles.webDeleteButton}
+                >
+                    <Ionicons name="trash-outline" size={16} color={theme.colors.status.error} />
+                </Pressable>
+            )}
         </Pressable>
     );
 

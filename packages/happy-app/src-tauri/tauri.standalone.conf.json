@@ -1,0 +1,28 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Happy Standalone",
+  "identifier": "com.slopus.happy.standalone",
+  "build": {
+    "devUrl": "http://localhost:8082",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "rm -rf dist && yarn expo export --platform web --output-dir dist --no-minify"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Happy Standalone",
+        "width": 1024,
+        "height": 768,
+        "resizable": true
+      }
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://happy.superlinear.studio/v1/tauri-update/{{target}}/{{current_version}}"
+      ],
+      "pubkey": ""
+    }
+  }
+}
