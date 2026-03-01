@@ -89,6 +89,7 @@ export interface Session {
         priority: 'high' | 'medium' | 'low';
         id: string;
     }>;
+    sortTimestamp: number; // Updated only when AI needs user action (new requests, completed work)
     draft?: string | null; // Local draft message, not synced to server
     permissionMode?: string | null; // Local permission mode key, not synced to server
     modelMode?: string | null; // Local model key, not synced to server

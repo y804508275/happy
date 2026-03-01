@@ -90,7 +90,7 @@ export default function MachineDetailScreen() {
 
     const previousSessions = useMemo(() => {
         return [...machineSessions]
-            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+            .sort((a, b) => (b.sortTimestamp || 0) - (a.sortTimestamp || 0))
             .slice(0, 5);
     }, [machineSessions]);
 

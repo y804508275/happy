@@ -12,7 +12,7 @@ import { StatusDot } from './StatusDot';
 import { useAllMachines, useSetting } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { isMachineOnline } from '@/utils/machineUtils';
-import { machineSpawnNewSession, sessionKill } from '@/sync/ops';
+import { machineSpawnNewSession, sessionKill, sessionDelete } from '@/sync/ops';
 import { storage } from '@/sync/storage';
 import { Modal } from '@/modal';
 import { CompactGitStatus } from './CompactGitStatus';
@@ -274,7 +274,7 @@ export function ActiveSessionsGroup({ sessions, selectedSessionId }: ActiveSessi
         // Sort sessions within each machine group by updated time (newest activity first)
         groups.forEach(projectGroup => {
             projectGroup.machines.forEach(machineGroup => {
-                machineGroup.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+                machineGroup.sessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
             });
         });
 
@@ -284,8 +284,8 @@ export function ActiveSessionsGroup({ sessions, selectedSessionId }: ActiveSessi
     // Sort project groups by latest activity (newest first)
     const sortedProjectGroups = React.useMemo(() => {
         return Array.from(projectGroups.entries()).sort(([, groupA], [, groupB]) => {
-            const latestA = Math.max(...Array.from(groupA.machines.values()).flatMap(m => m.sessions.map(s => s.updatedAt)));
-            const latestB = Math.max(...Array.from(groupB.machines.values()).flatMap(m => m.sessions.map(s => s.updatedAt)));
+            const latestA = Math.max(...Array.from(groupA.machines.values()).flatMap(m => m.sessions.map(s => s.sortTimestamp)));
+            const latestB = Math.max(...Array.from(groupB.machines.values()).flatMap(m => m.sessions.map(s => s.sortTimestamp)));
             return latestB - latestA;
         });
     }, [projectGroups]);
@@ -391,11 +391,19 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
     const badgeType = useSessionBadge(session);
+    const [hovered, setHovered] = React.useState(false);
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
         if (!result.success) {
             throw new HappyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
+        }
+    });
+
+    const [deletingSession, performDelete] = useHappyAction(async () => {
+        const result = await sessionDelete(session.id);
+        if (!result.success) {
+            throw new HappyError(result.message || t('sessionInfo.failedToDeleteSession'), false);
         }
     });
 
@@ -414,6 +422,21 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
             ]
         );
     }, [performArchive]);
+
+    const handleDelete = React.useCallback(() => {
+        Modal.alert(
+            t('sessionInfo.deleteSession'),
+            t('sessionInfo.deleteSessionWarning'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('sessionInfo.deleteSession'),
+                    style: 'destructive',
+                    onPress: performDelete
+                }
+            ]
+        );
+    }, [performDelete]);
 
     const avatarId = React.useMemo(() => {
         return getSessionAvatarId(session);
@@ -516,11 +539,32 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                     </View>
                 </View>
             </View>
+            {/* Web: show delete button on hover */}
+            {Platform.OS === 'web' && hovered && (
+                <Pressable
+                    onPress={(e) => {
+                        e.stopPropagation();
+                        handleDelete();
+                    }}
+                    disabled={deletingSession}
+                    style={{ width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}
+                >
+                    <Ionicons name="trash-outline" size={16} color={theme.colors.status.error} />
+                </Pressable>
+            )}
         </Pressable>
     );
 
     if (!swipeEnabled) {
-        return itemContent;
+        return (
+            <View
+                // @ts-ignore - onMouseEnter/onMouseLeave work on web
+                onMouseEnter={() => setHovered(true)}
+                onMouseLeave={() => setHovered(false)}
+            >
+                {itemContent}
+            </View>
+        );
     }
 
     const renderRightActions = () => (

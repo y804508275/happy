@@ -108,7 +108,7 @@ interface StorageState {
     nativeUpdateStatus: { available: boolean; updateUrl?: string } | null;
     markSessionUnread: (sessionId: string) => void;
     markSessionRead: (sessionId: string) => void;
-    applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => void;
+    applySessions: (sessions: (Omit<Session, 'presence' | 'sortTimestamp'> & { presence?: "online" | number, sortTimestamp?: number })[]) => void;
     applyMachines: (machines: Machine[], replace?: boolean) => void;
     applyLoaded: () => void;
     applyReady: () => void;
@@ -189,9 +189,9 @@ function buildSessionListViewData(
         }
     });
 
-    // Sort sessions by updated date (newest first)
-    activeSessions.sort((a, b) => b.updatedAt - a.updatedAt);
-    inactiveSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+    // Sort sessions by sortTimestamp (only updates on user-actionable events)
+    activeSessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+    inactiveSessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
 
     // Build unified list view data
     const listData: SessionListViewItem[] = [];
@@ -210,7 +210,7 @@ function buildSessionListViewData(
     let currentDateString: string | null = null;
 
     for (const session of inactiveSessions) {
-        const sessionDate = new Date(session.updatedAt);
+        const sessionDate = new Date(session.sortTimestamp);
         const dateString = sessionDate.toDateString();
 
         if (currentDateString !== dateString) {
@@ -343,7 +343,7 @@ export const storage = create<StorageState>()((set, get) => {
             const state = get();
             return Object.values(state.sessions).filter(s => s.active);
         },
-        applySessions: (sessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[]) => set((state) => {
+        applySessions: (sessions: (Omit<Session, 'presence' | 'sortTimestamp'> & { presence?: "online" | number, sortTimestamp?: number })[]) => set((state) => {
             // Load drafts and permission modes if sessions are empty (initial load)
             const savedDrafts = Object.keys(state.sessions).length === 0 ? sessionDrafts : {};
             const savedPermissionModes = Object.keys(state.sessions).length === 0 ? sessionPermissionModes : {};
@@ -368,24 +368,46 @@ export const storage = create<StorageState>()((set, get) => {
                     (session.permissionMode && session.permissionMode !== 'default' ? session.permissionMode : undefined) ||
                     defaultPermissionMode;
 
+                // Preserve existing sortTimestamp or initialize to createdAt
+                const existingSortTimestamp = state.sessions[session.id]?.sortTimestamp;
+
                 mergedSessions[session.id] = {
                     ...session,
                     presence,
+                    sortTimestamp: existingSortTimestamp || session.sortTimestamp || session.createdAt,
                     draft: existingDraft || savedDraft || session.draft || null,
                     permissionMode: resolvedPermissionMode
                 };
             });
 
             // Detect sessions that completed work (thinking: true → false) and mark as unread
+            // Also update sortTimestamp when AI needs user action
             let updatedUnread: Record<string, boolean> | null = null;
             const isInitialLoad = Object.keys(state.sessions).length === 0;
             if (!isInitialLoad) {
                 sessions.forEach(session => {
                     const oldSession = state.sessions[session.id];
-                    if (oldSession && oldSession.thinking === true && session.thinking === false) {
-                        // Session just finished a turn - check if it has pending requests
+                    if (!oldSession) return;
+
+                    // Detect new permission requests → update sortTimestamp
+                    const oldRequests = oldSession.agentState?.requests || {};
+                    const newRequests = session.agentState?.requests || {};
+                    const hasNewRequests = Object.keys(newRequests).some(id => !oldRequests[id]);
+                    if (hasNewRequests) {
+                        mergedSessions[session.id] = {
+                            ...mergedSessions[session.id],
+                            sortTimestamp: Date.now()
+                        };
+                    }
+
+                    // Detect thinking → done transition → update sortTimestamp & mark unread
+                    if (oldSession.thinking === true && session.thinking === false) {
                         const hasRequests = session.agentState?.requests
                             && Object.keys(session.agentState.requests).length > 0;
+                        mergedSessions[session.id] = {
+                            ...mergedSessions[session.id],
+                            sortTimestamp: Date.now()
+                        };
                         if (!hasRequests) {
                             if (!updatedUnread) updatedUnread = { ...state.unreadSessions };
                             updatedUnread[session.id] = true;
@@ -418,9 +440,9 @@ export const storage = create<StorageState>()((set, get) => {
                 }
             });
 
-            // Sort both arrays by updated date (newest activity first)
-            activeSessions.sort((a, b) => b.updatedAt - a.updatedAt);
-            inactiveSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+            // Sort both arrays by sortTimestamp (only updates on user-actionable events)
+            activeSessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+            inactiveSessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
 
             // Build flat list data for FlashList
             const listData: SessionListItem[] = [];
@@ -1288,7 +1310,7 @@ export function useSessionListViewData(): SessionListViewItem[] | null {
 export function useAllSessions(): Session[] {
     return storage(useShallow((state) => {
         if (!state.isDataReady) return [];
-        return Object.values(state.sessions).sort((a, b) => b.updatedAt - a.updatedAt);
+        return Object.values(state.sessions).sort((a, b) => b.sortTimestamp - a.sortTimestamp);
     }));
 }
 

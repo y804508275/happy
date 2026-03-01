@@ -742,7 +742,7 @@ class Sync {
         await this.encryption.initializeSessions(sessionKeys);
 
         // Decrypt sessions
-        let decryptedSessions: (Omit<Session, 'presence'> & { presence?: "online" | number })[] = [];
+        let decryptedSessions: (Omit<Session, 'presence' | 'sortTimestamp'> & { presence?: "online" | number, sortTimestamp?: number })[] = [];
         for (const session of sessions) {
             // Get session encryption (should always exist after initialization)
             const sessionEncryption = this.encryption.getSessionEncryption(session.id);
@@ -2303,8 +2303,9 @@ class Sync {
         }
     }
 
-    private applySessions = (sessions: (Omit<Session, "presence"> & {
+    private applySessions = (sessions: (Omit<Session, "presence" | "sortTimestamp"> & {
         presence?: "online" | number;
+        sortTimestamp?: number;
     })[]) => {
         const active = storage.getState().getActiveSessions();
         storage.getState().applySessions(sessions);

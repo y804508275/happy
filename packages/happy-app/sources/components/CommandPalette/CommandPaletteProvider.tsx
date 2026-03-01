@@ -77,7 +77,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
 
         // Add session-specific commands
         const recentSessions = Object.values(sessions)
-            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .sort((a, b) => b.sortTimestamp - a.sortTimestamp)
             .slice(0, 5);
 
         recentSessions.forEach(session => {
