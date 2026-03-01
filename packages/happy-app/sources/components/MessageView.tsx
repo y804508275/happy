@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, Text } from "react-native";
 import { StyleSheet } from 'react-native-unistyles';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
 import { Message, UserTextMessage, AgentTextMessage, ToolCallMessage } from "@/sync/typesMessage";
@@ -12,14 +13,40 @@ import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { useSetting } from "@/sync/storage";
 
+function useMessageEntrance(shouldAnimate: boolean, direction: 'left' | 'right' | 'none') {
+  const opacity = useSharedValue(shouldAnimate ? 0 : 1);
+  const translateX = useSharedValue(
+    shouldAnimate ? (direction === 'right' ? 12 : direction === 'left' ? -12 : 0) : 0
+  );
+
+  React.useEffect(() => {
+    if (shouldAnimate) {
+      const config = { duration: 250, easing: Easing.out(Easing.cubic) };
+      opacity.value = withTiming(1, config);
+      translateX.value = withTiming(0, config);
+    }
+  }, []);
+
+  return useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: translateX.value }],
+  }));
+}
+
 export const MessageView = React.memo((props: {
   message: Message;
   metadata: Metadata | null;
   sessionId: string;
   getMessageById?: (id: string) => Message | null;
 }) => {
+  const isRecent = Date.now() - props.message.createdAt < 3000;
+  const direction = props.message.kind === 'user-text' ? 'right'
+    : props.message.kind === 'agent-text' ? 'left'
+    : 'none';
+  const animStyle = useMessageEntrance(isRecent, direction);
+
   return (
-    <View style={styles.messageContainer} renderToHardwareTextureAndroid={true}>
+    <Animated.View style={[styles.messageContainer, animStyle]} renderToHardwareTextureAndroid={true}>
       <View style={styles.messageContent}>
         <RenderBlock
           message={props.message}
@@ -28,7 +55,7 @@ export const MessageView = React.memo((props: {
           getMessageById={props.getMessageById}
         />
       </View>
-    </View>
+    </Animated.View>
   );
 });
 
