@@ -503,7 +503,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         // Original key handling
         if (Platform.OS === 'web') {
-            if (agentInputEnterToSend && event.key === 'Enter' && !event.shiftKey) {
+            if (agentInputEnterToSend && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
                 // Block Enter send while agent is working
                 if (props.showAbortButton) {
                     return true; // Consume the key, don't send
