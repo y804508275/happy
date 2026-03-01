@@ -30,13 +30,9 @@ const MIN_GROUP_SIZE = 3;
 function groupMessages(messages: Message[]): ListItem[] {
     const result: ListItem[] = [];
     let currentRun: ToolCallMessage[] = [];
-    // Messages are newest-first. Skip grouping the first (most recent) run
-    // of completed tool calls to avoid jarring height changes while tools
-    // are still actively being executed.
-    let isFirstRun = true;
 
     const flushRun = () => {
-        if (!isFirstRun && currentRun.length >= MIN_GROUP_SIZE) {
+        if (currentRun.length >= MIN_GROUP_SIZE) {
             const oldest = currentRun[currentRun.length - 1];
             result.push({
                 kind: 'tool-call-group',
@@ -61,7 +57,6 @@ function groupMessages(messages: Message[]): ListItem[] {
             currentRun.push(message);
         } else {
             flushRun();
-            isFirstRun = false;
             result.push(message);
         }
     }
@@ -134,6 +129,25 @@ const ChatListInternal = React.memo((props: {
 }) => {
     const listItems = React.useMemo(() => groupMessages(props.messages), [props.messages]);
 
+    // Track which group IDs existed in the previous render.
+    // Newly formed groups start expanded to avoid jarring height collapse.
+    // Groups that already existed (e.g. on session open) stay collapsed.
+    const knownGroupIdsRef = useRef<Set<string>>(new Set());
+    const newGroupIds = React.useMemo(() => {
+        const currentIds = new Set<string>();
+        const freshIds = new Set<string>();
+        for (const item of listItems) {
+            if (item.kind === 'tool-call-group') {
+                currentIds.add(item.id);
+                if (!knownGroupIdsRef.current.has(item.id)) {
+                    freshIds.add(item.id);
+                }
+            }
+        }
+        knownGroupIdsRef.current = currentIds;
+        return freshIds;
+    }, [listItems]);
+
     const keyExtractor = useCallback((item: ListItem) => item.id, []);
     const renderItem = useCallback(({ item }: { item: ListItem }) => {
         if (item.kind === 'tool-call-group') {
@@ -144,6 +158,7 @@ const ChatListInternal = React.memo((props: {
                             messages={item.messages}
                             metadata={props.metadata}
                             sessionId={props.sessionId}
+                            defaultExpanded={newGroupIds.has(item.id)}
                         />
                     </View>
                 </View>
@@ -152,7 +167,7 @@ const ChatListInternal = React.memo((props: {
         return (
             <MessageView message={item} metadata={props.metadata} sessionId={props.sessionId} />
         );
-    }, [props.metadata, props.sessionId]);
+    }, [props.metadata, props.sessionId, newGroupIds]);
 
     // Track whether the user is near the visual bottom (latest messages).
     // In an inverted FlatList, offsetY ≈ 0 corresponds to the visual bottom.
@@ -193,41 +208,68 @@ const ChatListInternal = React.memo((props: {
 
     useEffect(() => {
         if (Platform.OS !== 'web') return;
-        const node = (flatListRef.current as any)?.getScrollableNode?.();
-        if (!node) return;
 
-        // Disable browser scroll anchoring — it conflicts with our manual
-        // compensation in the scaleY(-1) inverted list
-        node.style.overflowAnchor = 'none';
+        let observer: MutationObserver | null = null;
+        let rafId = 0;
+        let prevHeight = 0;
 
-        const contentNode = node.firstElementChild;
-        if (!contentNode) return;
-
-        let prevHeight = node.scrollHeight;
-
-        const observer = new ResizeObserver(() => {
-            const newHeight = node.scrollHeight;
-            if (newHeight === prevHeight) return;
-            const delta = newHeight - prevHeight;
-            prevHeight = newHeight;
-
-            const currentScrollTop = node.scrollTop;
-            const nearBottom = currentScrollTop < 100;
-
-            if (nearBottom) {
-                // User is at the bottom watching new messages → stay at bottom
-                node.scrollTop = 0;
-            } else if (delta > 0 && (hasNewMessagesRef.current || !!storage.getState().streamingTexts[sessionIdRef.current])) {
-                // Content grew from new messages or streaming → compensate to prevent jump
-                node.scrollTop = currentScrollTop + delta;
-                hasNewMessagesRef.current = false;
+        // Retry getting the scroll node — FlatList DOM may not be ready on first frame
+        const setup = () => {
+            const node = (flatListRef.current as any)?.getScrollableNode?.();
+            if (!node) {
+                rafId = requestAnimationFrame(setup);
+                return;
             }
-            // When content size changes from virtualization (item recycling) or
-            // content shrinking (streaming text cleared), do NOT compensate.
-        });
 
-        observer.observe(contentNode);
-        return () => observer.disconnect();
+            // Disable browser scroll anchoring — it conflicts with our manual
+            // compensation in the scaleY(-1) inverted list
+            node.style.overflowAnchor = 'none';
+
+            prevHeight = node.scrollHeight;
+
+            // Use MutationObserver to detect ALL DOM changes (streaming text,
+            // new messages, virtualization). ResizeObserver on firstElementChild
+            // can miss changes if the observed element isn't the actual content wrapper.
+            observer = new MutationObserver(() => {
+                // Batch multiple mutations within the same frame
+                if (rafId) return;
+                rafId = requestAnimationFrame(() => {
+                    rafId = 0;
+                    const newHeight = node.scrollHeight;
+                    if (newHeight === prevHeight) return;
+
+                    const delta = newHeight - prevHeight;
+                    prevHeight = newHeight;
+
+                    const currentScrollTop = node.scrollTop;
+                    const nearBottom = currentScrollTop < 100;
+
+                    if (nearBottom) {
+                        // User is at the bottom watching new messages → stay at bottom
+                        node.scrollTop = 0;
+                    } else if (delta > 0 && (hasNewMessagesRef.current || !!storage.getState().streamingTexts[sessionIdRef.current])) {
+                        // Content grew from new messages or streaming → compensate to prevent jump
+                        node.scrollTop = currentScrollTop + delta;
+                        hasNewMessagesRef.current = false;
+                    }
+                    // When content size changes from virtualization (item recycling) or
+                    // content shrinking (streaming text cleared), do NOT compensate.
+                });
+            });
+
+            observer.observe(node, {
+                childList: true,
+                subtree: true,
+                characterData: true,
+            });
+        };
+
+        rafId = requestAnimationFrame(setup);
+
+        return () => {
+            if (observer) observer.disconnect();
+            if (rafId) cancelAnimationFrame(rafId);
+        };
     }, []);
 
     const scrollToBottom = useCallback(() => {
