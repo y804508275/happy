@@ -20,9 +20,36 @@ interface WebContextMenuProps {
     onClose: () => void;
 }
 
+/**
+ * Hook to attach a native contextmenu event listener to a View ref.
+ * More reliable than onContextMenu prop on React Native Web components.
+ */
+export function useWebContextMenu() {
+    const ref = React.useRef<any>(null);
+    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
+
+    React.useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const el = ref.current;
+        if (!el || typeof el.addEventListener !== 'function') return;
+
+        const handler = (e: any) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY });
+        };
+
+        el.addEventListener('contextmenu', handler);
+        return () => el.removeEventListener('contextmenu', handler);
+    }, []);
+
+    const close = React.useCallback(() => setContextMenu(null), []);
+
+    return { ref, contextMenu, close };
+}
+
 const stylesheet = StyleSheet.create((theme) => ({
     menu: {
-        position: 'absolute' as any,
         backgroundColor: theme.colors.surface,
         borderRadius: 8,
         paddingVertical: 4,
@@ -61,14 +88,35 @@ export function WebContextMenu({ visible, position, items, onClose }: WebContext
     if (!visible || Platform.OS !== 'web') return null;
 
     const styles = stylesheet;
+    const backdropRef = React.useRef<any>(null);
 
     // Close on Escape key
     React.useEffect(() => {
+        const win = globalThis as any;
         const handler = (e: any) => {
             if (e.key === 'Escape') onClose();
         };
-        (globalThis as any).addEventListener('keydown', handler);
-        return () => (globalThis as any).removeEventListener('keydown', handler);
+        win.addEventListener('keydown', handler);
+        return () => win.removeEventListener('keydown', handler);
+    }, [onClose]);
+
+    // Attach click and contextmenu handlers to backdrop via native DOM
+    React.useEffect(() => {
+        const el = backdropRef.current;
+        if (!el || typeof el.addEventListener !== 'function') return;
+
+        const handleClick = () => onClose();
+        const handleContextMenu = (e: any) => {
+            e.preventDefault();
+            onClose();
+        };
+
+        el.addEventListener('click', handleClick);
+        el.addEventListener('contextmenu', handleContextMenu);
+        return () => {
+            el.removeEventListener('click', handleClick);
+            el.removeEventListener('contextmenu', handleContextMenu);
+        };
     }, [onClose]);
 
     // Adjust position to stay within viewport
@@ -84,7 +132,7 @@ export function WebContextMenu({ visible, position, items, onClose }: WebContext
         return { x: Math.max(8, x), y: Math.max(8, y) };
     }, [position, items.length]);
 
-    return (
+    const menuContent = (
         <View
             style={{
                 // @ts-ignore - position: 'fixed' works on web
@@ -96,8 +144,9 @@ export function WebContextMenu({ visible, position, items, onClose }: WebContext
                 zIndex: 99999,
             }}
         >
-            {/* Backdrop to catch clicks */}
-            <Pressable
+            {/* Backdrop */}
+            <View
+                ref={backdropRef}
                 style={{
                     // @ts-ignore
                     position: 'fixed',
@@ -106,18 +155,18 @@ export function WebContextMenu({ visible, position, items, onClose }: WebContext
                     right: 0,
                     bottom: 0,
                 }}
-                onPress={onClose}
-                // @ts-ignore
-                onContextMenu={(e: any) => { e.preventDefault(); onClose(); }}
             />
             {/* Menu */}
             <View
                 style={[
                     styles.menu,
-                    { top: adjustedPosition.y, left: adjustedPosition.x },
+                    {
+                        // @ts-ignore
+                        position: 'fixed',
+                        top: adjustedPosition.y,
+                        left: adjustedPosition.x,
+                    },
                 ]}
-                // @ts-ignore
-                onContextMenu={(e: any) => e.preventDefault()}
             >
                 {items.map((item, index) => (
                     <ContextMenuRow key={index} item={item} onClose={onClose} />
@@ -125,6 +174,14 @@ export function WebContextMenu({ visible, position, items, onClose }: WebContext
             </View>
         </View>
     );
+
+    // Use portal to render at document.body level (avoids z-index/overflow clipping)
+    try {
+        const { createPortal } = require('react-dom');
+        return createPortal(menuContent, (globalThis as any).document.body);
+    } catch {
+        return menuContent;
+    }
 }
 
 const ContextMenuRow = React.memo(({ item, onClose }: { item: ContextMenuItem; onClose: () => void }) => {

@@ -30,7 +30,7 @@ import { sessionDelete } from '@/sync/ops';
 import { HappyError } from '@/utils/errors';
 import { Modal } from '@/modal';
 import { useSessionBadge } from '@/hooks/useSessionBadge';
-import { WebContextMenu } from './WebContextMenu';
+import { WebContextMenu, useWebContextMenu } from './WebContextMenu';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 const stylesheet = StyleSheet.create((theme) => ({
@@ -385,7 +385,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
     const badgeType = useSessionBadge(session);
-    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
+    const { ref: contextMenuRef, contextMenu, close: closeContextMenu } = useWebContextMenu();
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
@@ -493,14 +493,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
 
     if (!swipeEnabled) {
         return (
-            <View
-                style={containerStyles}
-                // @ts-ignore - onContextMenu works on web
-                onContextMenu={(e: any) => {
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY });
-                }}
-            >
+            <View ref={contextMenuRef} style={containerStyles}>
                 {itemContent}
                 <WebContextMenu
                     visible={contextMenu !== null}
@@ -514,7 +507,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                             disabled: deletingSession,
                         },
                     ]}
-                    onClose={() => setContextMenu(null)}
+                    onClose={closeContextMenu}
                 />
             </View>
         );

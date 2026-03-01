@@ -23,7 +23,7 @@ import { useIsTablet } from '@/utils/responsive';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
 import { useSessionBadge } from '@/hooks/useSessionBadge';
-import { WebContextMenu } from './WebContextMenu';
+import { WebContextMenu, useWebContextMenu } from './WebContextMenu';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
@@ -392,7 +392,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
     const badgeType = useSessionBadge(session);
-    const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
+    const { ref: contextMenuRef, contextMenu, close: closeContextMenu } = useWebContextMenu();
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
@@ -545,13 +545,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
 
     if (!swipeEnabled) {
         return (
-            <View
-                // @ts-ignore - onContextMenu works on web
-                onContextMenu={(e: any) => {
-                    e.preventDefault();
-                    setContextMenu({ x: e.clientX, y: e.clientY });
-                }}
-            >
+            <View ref={contextMenuRef}>
                 {itemContent}
                 <WebContextMenu
                     visible={contextMenu !== null}
@@ -571,7 +565,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                             disabled: deletingSession,
                         },
                     ]}
-                    onClose={() => setContextMenu(null)}
+                    onClose={closeContextMenu}
                 />
             </View>
         );
