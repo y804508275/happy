@@ -25,14 +25,14 @@ type ToolCallGroup = {
 
 type ListItem = Message | ToolCallGroup;
 
-const MIN_GROUP_SIZE = 3;
-
 function groupMessages(messages: Message[]): ListItem[] {
     const result: ListItem[] = [];
     let currentRun: ToolCallMessage[] = [];
 
     const flushRun = () => {
-        if (currentRun.length >= MIN_GROUP_SIZE) {
+        if (currentRun.length >= 1) {
+            // All consecutive tool calls become a group (even single ones).
+            // This keeps the FlatList key stable as new tools join the run.
             const oldest = currentRun[currentRun.length - 1];
             result.push({
                 kind: 'tool-call-group',
@@ -40,20 +40,12 @@ function groupMessages(messages: Message[]): ListItem[] {
                 messages: [...currentRun],
                 createdAt: oldest.createdAt,
             });
-        } else {
-            for (const msg of currentRun) {
-                result.push(msg);
-            }
         }
         currentRun = [];
     };
 
     for (const message of messages) {
-        if (
-            message.kind === 'tool-call' &&
-            message.tool &&
-            message.tool.state === 'completed'
-        ) {
+        if (message.kind === 'tool-call' && message.tool) {
             currentRun.push(message);
         } else {
             flushRun();
@@ -129,25 +121,6 @@ const ChatListInternal = React.memo((props: {
 }) => {
     const listItems = React.useMemo(() => groupMessages(props.messages), [props.messages]);
 
-    // Track which group IDs existed in the previous render.
-    // Newly formed groups start expanded to avoid jarring height collapse.
-    // Groups that already existed (e.g. on session open) stay collapsed.
-    const knownGroupIdsRef = useRef<Set<string>>(new Set());
-    const newGroupIds = React.useMemo(() => {
-        const currentIds = new Set<string>();
-        const freshIds = new Set<string>();
-        for (const item of listItems) {
-            if (item.kind === 'tool-call-group') {
-                currentIds.add(item.id);
-                if (!knownGroupIdsRef.current.has(item.id)) {
-                    freshIds.add(item.id);
-                }
-            }
-        }
-        knownGroupIdsRef.current = currentIds;
-        return freshIds;
-    }, [listItems]);
-
     const keyExtractor = useCallback((item: ListItem) => item.id, []);
     const renderItem = useCallback(({ item }: { item: ListItem }) => {
         if (item.kind === 'tool-call-group') {
@@ -158,7 +131,6 @@ const ChatListInternal = React.memo((props: {
                             messages={item.messages}
                             metadata={props.metadata}
                             sessionId={props.sessionId}
-                            defaultExpanded={newGroupIds.has(item.id)}
                         />
                     </View>
                 </View>
@@ -167,7 +139,7 @@ const ChatListInternal = React.memo((props: {
         return (
             <MessageView message={item} metadata={props.metadata} sessionId={props.sessionId} />
         );
-    }, [props.metadata, props.sessionId, newGroupIds]);
+    }, [props.metadata, props.sessionId]);
 
     // Track whether the user is near the visual bottom (latest messages).
     // In an inverted FlatList, offsetY ≈ 0 corresponds to the visual bottom.
