@@ -33,11 +33,14 @@ import { isRunningOnMac } from '@/utils/platform';
 import { useDeviceType, useHeaderHeight, useIsLandscape, useIsTablet } from '@/utils/responsive';
 import { formatPathRelativeToHome, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
 import { isVersionSupported, MINIMUM_CLI_VERSION } from '@/utils/versionUtils';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Octicons } from '@expo/vector-icons';
+import { Typography } from '@/constants/Typography';
+import { layout } from '@/components/layout';
+import { hapticsLight } from '@/components/haptics';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { useMemo } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUnistyles } from 'react-native-unistyles';
 import type { ModelMode, PermissionMode } from '@/components/PermissionModeSelector';
@@ -323,6 +326,44 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         <>
         <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} />
         <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} />
+        {/* Auto-Confirm toggle bar */}
+        <View style={{
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: theme.colors.divider,
+            backgroundColor: theme.colors.surface,
+            alignSelf: 'center',
+            width: '100%',
+            maxWidth: layout.maxWidth,
+        }}>
+            <Pressable
+                onPress={() => {
+                    hapticsLight();
+                    handleAutoConfirmChange(!autoConfirm);
+                }}
+                style={(p) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    gap: 8,
+                    opacity: p.pressed ? 0.7 : 1,
+                })}
+            >
+                <Octicons
+                    name={autoConfirm ? "check-circle-fill" : "check-circle"}
+                    size={16}
+                    color={autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint}
+                />
+                <Text style={{
+                    fontSize: 14,
+                    color: autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint,
+                    fontWeight: '600',
+                    ...Typography.default('semiBold'),
+                }}>
+                    {t('agentInput.autoConfirm.title')}
+                </Text>
+            </Pressable>
+        </View>
         <AgentInput
             placeholder={t('session.inputPlaceholder')}
             value={message}
@@ -335,8 +376,6 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             availableModels={availableModels}
             onModelModeChange={updateModelMode}
             metadata={session.metadata}
-            autoConfirm={autoConfirm}
-            onAutoConfirmChange={handleAutoConfirmChange}
             connectionStatus={{
                 text: sessionStatus.statusText,
                 color: sessionStatus.statusColor,
