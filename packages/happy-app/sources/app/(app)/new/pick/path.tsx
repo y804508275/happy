@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import { ItemGroup } from '@/components/ItemGroup';
@@ -11,6 +11,8 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
 import { MultiTextInput, MultiTextInputHandle } from '@/components/MultiTextInput';
+import { useProjectScanning } from '@/hooks/useProjectScanning';
+import { machineBash } from '@/sync/ops';
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -75,6 +77,9 @@ export default function PathPickerScreen() {
     const machine = useMemo(() => {
         return machines.find(m => m.id === params.machineId);
     }, [machines, params.machineId]);
+
+    // Scan for git projects on the device
+    const projectScan = useProjectScanning(params.machineId || null, machineBash);
 
     // Get recent paths for this machine - prioritize from settings, then fall back to sessions
     const recentPaths = useMemo(() => {
@@ -293,6 +298,58 @@ export default function PathPickerScreen() {
                                 })()}
                             </ItemGroup>
                         )}
+
+                        {/* Discovered Projects from filesystem scan */}
+                        <ItemGroup title={
+                            projectScan.isScanning
+                                ? 'Discovered Projects (scanning...)'
+                                : `Discovered Projects (${projectScan.projects.length})`
+                        }>
+                            {projectScan.isScanning && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 }}>
+                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 14, ...Typography.default() }}>
+                                        Scanning device for git projects...
+                                    </Text>
+                                </View>
+                            )}
+                            {!projectScan.isScanning && projectScan.projects.length === 0 && (
+                                <View style={{ padding: 16 }}>
+                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 14, ...Typography.default() }}>
+                                        {projectScan.error
+                                            ? `Scan error: ${projectScan.error}`
+                                            : 'No git projects found on device'}
+                                    </Text>
+                                </View>
+                            )}
+                            {projectScan.projects.map((project, index) => {
+                                const isSelected = customPath.trim() === project.path;
+                                const isLast = index === projectScan.projects.length - 1;
+
+                                return (
+                                    <Item
+                                        key={project.path}
+                                        title={project.name}
+                                        subtitle={project.path}
+                                        leftElement={
+                                            <Ionicons
+                                                name="code-slash-outline"
+                                                size={18}
+                                                color={theme.colors.textSecondary}
+                                            />
+                                        }
+                                        onPress={() => {
+                                            setCustomPath(project.path);
+                                            setTimeout(() => inputRef.current?.focus(), 50);
+                                        }}
+                                        selected={isSelected}
+                                        showChevron={false}
+                                        pressableStyle={isSelected ? { backgroundColor: theme.colors.surfaceSelected } : undefined}
+                                        showDivider={!isLast}
+                                    />
+                                );
+                            })}
+                        </ItemGroup>
                     </View>
                 </ScrollView>
             </View>

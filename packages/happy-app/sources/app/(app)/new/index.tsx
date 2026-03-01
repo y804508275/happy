@@ -13,7 +13,7 @@ import { t } from '@/text';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useHeaderHeight } from '@/utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { machineSpawnNewSession, sessionAutoConfirm } from '@/sync/ops';
+import { machineSpawnNewSession, sessionAutoConfirm, machineBash } from '@/sync/ops';
 import { Modal } from '@/modal';
 import { sync } from '@/sync/sync';
 import { SessionTypeSelector } from '@/components/SessionTypeSelector';
@@ -462,7 +462,8 @@ function NewSessionWizard() {
     const cliAvailability = useCLIDetection(selectedMachineId);
 
     // Project scanning - discover git projects on selected machine's filesystem
-    const projectScan = useProjectScanning(selectedMachineId, selectedMachine?.metadata?.homeDir ?? null);
+    // Pass machineBash as callback to avoid circular dependency (hook must not import ops.ts directly)
+    const projectScan = useProjectScanning(selectedMachineId, machineBash);
 
     // Auto-correct invalid agent selection after CLI detection completes
     // This handles the case where lastUsedAgent was 'codex' but codex is not installed
@@ -663,19 +664,10 @@ function NewSessionWizard() {
         return paths;
     }, [sessions, selectedMachineId, recentMachinePaths]);
 
-    // Merge recent paths with scanned projects for the "All Items" section
-    const allDirectoryItems = React.useMemo(() => {
-        const pathSet = new Set(recentPaths);
-        const scannedOnly: string[] = [];
-
-        for (const project of projectScan.projects) {
-            if (!pathSet.has(project.path)) {
-                scannedOnly.push(project.path);
-            }
-        }
-
-        return [...recentPaths, ...scannedOnly];
-    }, [recentPaths, projectScan.projects]);
+    // All scanned projects from the device filesystem
+    const discoveredProjects = React.useMemo(() => {
+        return projectScan.projects.map(p => p.path);
+    }, [projectScan.projects]);
 
     // Validation
     const canCreate = React.useMemo(() => {
@@ -1803,7 +1795,13 @@ function NewSessionWizard() {
                                     recentSectionTitle: "Recent Directories",
                                     favoritesSectionTitle: "Favorite Directories",
                                     allSectionTitle: "Discovered Projects",
-                                    noItemsMessage: projectScan.isScanning ? "Scanning for projects..." : "No recent directories",
+                                    noItemsMessage: projectScan.isScanning
+                                        ? "Scanning for projects..."
+                                        : projectScan.error
+                                        ? `Scan error: ${projectScan.error}`
+                                        : discoveredProjects.length === 0 && projectScan.projects.length === 0
+                                        ? "No projects found on device"
+                                        : "No recent directories",
                                     getAllItemIcon: () => (
                                         <Ionicons
                                             name="code-slash-outline"
@@ -1817,7 +1815,7 @@ function NewSessionWizard() {
                                     allowCustomInput: true,
                                     compactItems: true,
                                 }}
-                                items={allDirectoryItems}
+                                items={discoveredProjects}
                                 recentItems={recentPaths}
                                 favoriteItems={(() => {
                                     if (!selectedMachine?.metadata?.homeDir) return [];
@@ -1856,6 +1854,21 @@ function NewSessionWizard() {
                                 }}
                                     context={{ homeDir: selectedMachine?.metadata?.homeDir }}
                                 />
+
+                                {/* Project scan status */}
+                                {selectedMachineId && (
+                                    <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
+                                            {projectScan.isScanning
+                                                ? '🔍 Scanning for projects...'
+                                                : projectScan.error
+                                                ? `⚠️ Scan error: ${projectScan.error}`
+                                                : discoveredProjects.length > 0
+                                                ? `Found ${discoveredProjects.length} projects on device`
+                                                : '⏳ No projects discovered yet'}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
 
                             {/* Section 4: Permission Mode */}

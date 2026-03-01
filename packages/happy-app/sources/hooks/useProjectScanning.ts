@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { machineBash } from '@/sync/ops';
+import { useState, useEffect, useRef } from 'react';
 
 export interface ScannedProject {
     path: string;   // Absolute path, e.g. /home/user/projects/my-app
@@ -12,23 +11,37 @@ interface ProjectScanResult {
     error?: string;
 }
 
+type BashFn = (machineId: string, command: string, cwd: string) => Promise<{
+    success: boolean;
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+}>;
+
 /**
  * Scans for git projects on a remote machine's filesystem.
  *
  * NON-BLOCKING: Scanning runs asynchronously. UI shows loading state
  * while scan is in progress, then updates when results arrive.
  *
- * Uses machineBash to run `find` on the remote machine, looking for
- * directories containing .git (up to 3 levels deep from home).
+ * Uses a bash function to run `find` on the remote machine, looking for
+ * directories containing .git (up to 4 levels deep from home).
+ *
+ * NOTE: Does NOT import from @/sync/ops to avoid circular dependency
+ * (ops → sync → storage → sync). Caller must pass machineBash as bashFn.
  *
  * @param machineId - The machine to scan (null = no scan)
- * @param homeDir - The machine's home directory (for display purposes)
+ * @param bashFn - The bash execution function (machineBash from ops.ts)
  */
-export function useProjectScanning(machineId: string | null, homeDir: string | null): ProjectScanResult {
+export function useProjectScanning(machineId: string | null, bashFn: BashFn): ProjectScanResult {
     const [result, setResult] = useState<ProjectScanResult>({
         projects: [],
         isScanning: false,
     });
+
+    // Stable ref for bashFn to avoid re-triggering effect
+    const bashFnRef = useRef(bashFn);
+    bashFnRef.current = bashFn;
 
     useEffect(() => {
         if (!machineId) {
@@ -43,9 +56,9 @@ export function useProjectScanning(machineId: string | null, homeDir: string | n
             console.log('[useProjectScanning] Starting scan for machineId:', machineId);
 
             try {
-                // Find all .git directories up to 3 levels deep, strip /.git suffix
+                // Find all .git directories up to 4 levels deep, strip /.git suffix
                 // Use home directory as scan root; head -200 to cap results
-                const bashResult = await machineBash(
+                const bashResult = await bashFnRef.current(
                     machineId,
                     'find ~ -maxdepth 4 -name .git -type d 2>/dev/null | head -200 | sed \'s|/\\.git$||\'  | sort',
                     '/'
