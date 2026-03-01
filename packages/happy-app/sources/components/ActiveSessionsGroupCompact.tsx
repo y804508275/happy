@@ -218,20 +218,22 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
             machineGroup.sessions.push(session);
         });
 
-        // Sort sessions within each machine group by creation time (newest first)
+        // Sort sessions within each machine group by updated time (newest activity first)
         groups.forEach(projectGroup => {
             projectGroup.machines.forEach(machineGroup => {
-                machineGroup.sessions.sort((a, b) => b.createdAt - a.createdAt);
+                machineGroup.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
             });
         });
 
         return groups;
     }, [sessions, machinesMap]);
 
-    // Sort project groups by display path
+    // Sort project groups by latest activity (newest first)
     const sortedProjectGroups = React.useMemo(() => {
         return Array.from(projectGroups.entries()).sort(([, groupA], [, groupB]) => {
-            return groupA.displayPath.localeCompare(groupB.displayPath);
+            const latestA = Math.max(...Array.from(groupA.machines.values()).flatMap(m => m.sessions.map(s => s.updatedAt)));
+            const latestB = Math.max(...Array.from(groupB.machines.values()).flatMap(m => m.sessions.map(s => s.updatedAt)));
+            return latestB - latestA;
         });
     }, [projectGroups]);
 
