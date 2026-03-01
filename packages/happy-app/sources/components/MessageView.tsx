@@ -13,23 +13,17 @@ import { sync } from '@/sync/sync';
 import { Option } from './markdown/MarkdownView';
 import { useSetting } from "@/sync/storage";
 
-function useMessageEntrance(shouldAnimate: boolean, direction: 'left' | 'right' | 'none') {
+function useMessageEntrance(shouldAnimate: boolean) {
   const opacity = useSharedValue(shouldAnimate ? 0 : 1);
-  const translateX = useSharedValue(
-    shouldAnimate ? (direction === 'right' ? 12 : direction === 'left' ? -12 : 0) : 0
-  );
 
   React.useEffect(() => {
     if (shouldAnimate) {
-      const config = { duration: 250, easing: Easing.out(Easing.cubic) };
-      opacity.value = withTiming(1, config);
-      translateX.value = withTiming(0, config);
+      opacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) });
     }
   }, []);
 
   return useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ translateX: translateX.value }],
   }));
 }
 
@@ -40,10 +34,7 @@ export const MessageView = React.memo((props: {
   getMessageById?: (id: string) => Message | null;
 }) => {
   const isRecent = Date.now() - props.message.createdAt < 3000;
-  const direction = props.message.kind === 'user-text' ? 'right'
-    : props.message.kind === 'agent-text' ? 'left'
-    : 'none';
-  const animStyle = useMessageEntrance(isRecent, direction);
+  const animStyle = useMessageEntrance(isRecent);
 
   return (
     <Animated.View style={[styles.messageContainer, animStyle]} renderToHardwareTextureAndroid={true}>
