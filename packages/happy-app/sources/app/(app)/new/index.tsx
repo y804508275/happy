@@ -33,6 +33,7 @@ import { AgentInput } from '@/components/AgentInput';
 import { StyleSheet } from 'react-native-unistyles';
 import { randomUUID } from 'expo-crypto';
 import { useCLIDetection } from '@/hooks/useCLIDetection';
+import { useProjectScanning } from '@/hooks/useProjectScanning';
 import { useEnvironmentVariables, resolveEnvVarSubstitution, extractEnvVarReferences } from '@/hooks/useEnvironmentVariables';
 import { formatPathRelativeToHome } from '@/utils/sessionUtils';
 import { resolveAbsolutePath } from '@/utils/pathUtils';
@@ -454,6 +455,9 @@ function NewSessionWizard() {
     // CLI Detection - automatic, non-blocking detection of installed CLIs on selected machine
     const cliAvailability = useCLIDetection(selectedMachineId);
 
+    // Project scanning - discover git projects on selected machine's filesystem
+    const projectScan = useProjectScanning(selectedMachineId, selectedMachine?.metadata?.homeDir ?? null);
+
     // Auto-correct invalid agent selection after CLI detection completes
     // This handles the case where lastUsedAgent was 'codex' but codex is not installed
     React.useEffect(() => {
@@ -657,6 +661,20 @@ function NewSessionWizard() {
 
         return paths;
     }, [sessions, selectedMachineId, recentMachinePaths]);
+
+    // Merge recent paths with scanned projects for the "All Items" section
+    const allDirectoryItems = React.useMemo(() => {
+        const pathSet = new Set(recentPaths);
+        const scannedOnly: string[] = [];
+
+        for (const project of projectScan.projects) {
+            if (!pathSet.has(project.path)) {
+                scannedOnly.push(project.path);
+            }
+        }
+
+        return [...recentPaths, ...scannedOnly];
+    }, [recentPaths, projectScan.projects]);
 
     // Validation
     const canCreate = React.useMemo(() => {
@@ -1783,14 +1801,22 @@ function NewSessionWizard() {
                                     searchPlaceholder: "Type to filter or enter custom directory...",
                                     recentSectionTitle: "Recent Directories",
                                     favoritesSectionTitle: "Favorite Directories",
-                                    noItemsMessage: "No recent directories",
+                                    allSectionTitle: "Discovered Projects",
+                                    noItemsMessage: projectScan.isScanning ? "Scanning for projects..." : "No recent directories",
+                                    getAllItemIcon: () => (
+                                        <Ionicons
+                                            name="code-slash-outline"
+                                            size={24}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                    ),
                                     showFavorites: true,
                                     showRecent: true,
                                     showSearch: true,
                                     allowCustomInput: true,
                                     compactItems: true,
                                 }}
-                                items={recentPaths}
+                                items={allDirectoryItems}
                                 recentItems={recentPaths}
                                 favoriteItems={(() => {
                                     if (!selectedMachine?.metadata?.homeDir) return [];

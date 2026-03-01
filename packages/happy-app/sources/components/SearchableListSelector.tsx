@@ -62,6 +62,12 @@ export interface SelectorConfig<T> {
 
     // Visual customization
     compactItems?: boolean; // Use reduced padding for more compact lists (default: false)
+
+    // Custom title for the "All Items" section (defaults to recentSectionTitle with "Recent" replaced by "All")
+    allSectionTitle?: string;
+
+    // Custom icon for all-section items (e.g., code-slash for discovered projects)
+    getAllItemIcon?: (item: T) => React.ReactNode;
 }
 
 /**
@@ -315,6 +321,18 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
         return favoriteItems.filter(item => config.filterItem(item, inputText, context));
     }, [favoriteItems, inputText, selectedItem, config, context]);
 
+    // Filter all items (for "All Items" / "Discovered Projects" section)
+    const filteredAllItems = React.useMemo(() => {
+        if (!inputText.trim()) return items;
+
+        const selectedDisplayText = selectedItem ? config.formatForDisplay(selectedItem, context) : null;
+        if (selectedDisplayText && inputText === selectedDisplayText) {
+            return items;
+        }
+
+        return items.filter(item => config.filterItem(item, inputText, context));
+    }, [items, inputText, selectedItem, config, context]);
+
     // Check if current input can be added to favorites
     const canAddToFavorites = React.useMemo(() => {
         if (!onToggleFavorite || !inputText.trim()) return false;
@@ -408,8 +426,8 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
         );
     };
 
-    // Render individual item (for recent items)
-    const renderItem = (item: T, isSelected: boolean, isLast: boolean, showDividerOverride?: boolean, forRecent = false) => {
+    // Render individual item (for recent/all section items)
+    const renderItem = (item: T, isSelected: boolean, isLast: boolean, showDividerOverride?: boolean, forRecent = false, forAll = false) => {
         const itemId = config.getItemId(item);
         const title = config.getItemTitle(item);
         const subtitle = forRecent && config.getRecentItemSubtitle
@@ -417,6 +435,8 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
             : config.getItemSubtitle?.(item);
         const icon = forRecent && config.getRecentItemIcon
             ? config.getRecentItemIcon(item)
+            : forAll && config.getAllItemIcon
+            ? config.getAllItemIcon(item)
             : config.getItemIcon(item);
         const status = config.getItemStatus?.(item, theme);
 
@@ -640,14 +660,14 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
             )}
 
             {/* All Items Section - always shown when items provided */}
-            {items.length > 0 && (
+            {filteredAllItems.length > 0 && (
                 <>
                     <Pressable
                         style={styles.sectionHeader}
                         onPress={toggleAllItemsSection}
                     >
                         <Text style={styles.sectionHeaderText}>
-                            {config.recentSectionTitle.replace('Recent ', 'All ')}
+                            {config.allSectionTitle || config.recentSectionTitle.replace('Recent ', 'All ')}
                         </Text>
                         <Ionicons
                             name={showAllItemsSection ? "chevron-up" : "chevron-down"}
@@ -658,13 +678,13 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
 
                     {showAllItemsSection && (
                         <ItemGroup title="">
-                            {items.map((item, index) => {
+                            {filteredAllItems.map((item, index) => {
                                 const itemId = config.getItemId(item);
                                 const selectedId = selectedItem ? config.getItemId(selectedItem) : null;
                                 const isSelected = itemId === selectedId;
-                                const isLast = index === items.length - 1;
+                                const isLast = index === filteredAllItems.length - 1;
 
-                                return renderItem(item, isSelected, isLast, !isLast, false);
+                                return renderItem(item, isSelected, isLast, !isLast, false, true);
                             })}
                         </ItemGroup>
                     )}
