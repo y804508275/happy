@@ -42,6 +42,7 @@ export class PermissionHandler {
     private allowedBashLiterals = new Set<string>();
     private allowedBashPrefixes = new Set<string>();
     private permissionMode: PermissionMode = 'default';
+    private currentMode: EnhancedMode = { permissionMode: 'default' };
     private autoConfirm: boolean = false;
     private onPermissionRequestCallback?: (toolCallId: string) => void;
 
@@ -66,6 +67,13 @@ export class PermissionHandler {
 
     handleModeChange(mode: PermissionMode) {
         this.permissionMode = mode;
+    }
+
+    /**
+     * Set the full current EnhancedMode (used to preserve model/prompt settings across plan restarts)
+     */
+    setCurrentMode(mode: EnhancedMode): void {
+        this.currentMode = mode;
     }
 
     /**
@@ -98,12 +106,15 @@ export class PermissionHandler {
             logger.debug('Plan mode result received', response);
             if (response.approved) {
                 logger.debug('Plan approved - injecting PLAN_FAKE_RESTART');
-                // Inject the approval message at the beginning of the queue
-                if (response.mode && ['default', 'acceptEdits', 'bypassPermissions'].includes(response.mode)) {
-                    this.session.queue.unshift(PLAN_FAKE_RESTART, { permissionMode: response.mode });
-                } else {
-                    this.session.queue.unshift(PLAN_FAKE_RESTART, { permissionMode: 'default' });
-                }
+                // Build full mode from current mode + approved permission mode
+                const approvedPermissionMode = (response.mode && ['default', 'acceptEdits', 'bypassPermissions'].includes(response.mode))
+                    ? response.mode
+                    : 'default';
+                const fullMode: EnhancedMode = {
+                    ...this.currentMode,
+                    permissionMode: approvedPermissionMode,
+                };
+                this.session.queue.unshift(PLAN_FAKE_RESTART, fullMode);
                 pending.resolve({ behavior: 'deny', message: PLAN_FAKE_REJECT });
             } else {
                 pending.resolve({ behavior: 'deny', message: response.reason || 'Plan rejected' });
@@ -122,6 +133,9 @@ export class PermissionHandler {
      * Creates the canCallTool callback for the SDK
      */
     handleToolCall = async (toolName: string, input: unknown, mode: EnhancedMode, options: { signal: AbortSignal }): Promise<PermissionResult> => {
+
+        // Save current full mode for plan restart
+        this.currentMode = mode;
 
         // Check if tool is explicitly allowed
         if (toolName === 'Bash') {
@@ -354,6 +368,7 @@ export class PermissionHandler {
         this.allowedTools.clear();
         this.allowedBashLiterals.clear();
         this.allowedBashPrefixes.clear();
+        this.currentMode = { permissionMode: 'default' };
 
         // Cancel all pending requests
         for (const [, pending] of this.pendingRequests.entries()) {

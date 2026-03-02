@@ -1,5 +1,5 @@
 import { EnhancedMode } from "./loop";
-import { query, type QueryOptions, type SDKMessage, type SDKSystemMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
+import { query, type QueryOptions, type SDKMessage, type SDKSystemMessage, type SDKResultMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from 'node:path';
@@ -144,6 +144,10 @@ export async function claudeRemote(opts: {
         settingsPath: opts.hookSettingsPath,
     }
 
+    // Auto-resume counter for error_max_turns
+    let autoResumeCount = 0;
+    const MAX_AUTO_RESUMES = 5;
+
     // Track thinking state
     let thinking = false;
     const updateThinking = (newThinking: boolean) => {
@@ -203,7 +207,8 @@ export async function claudeRemote(opts: {
             // Handle result messages
             if (message.type === 'result') {
                 updateThinking(false);
-                logger.debug('[claudeRemote] Result received, exiting claudeRemote');
+                const resultMsg = message as SDKResultMessage;
+                logger.debug(`[claudeRemote] Result received, subtype: ${resultMsg.subtype}`);
 
                 // Send completion messages
                 if (isCompactCommand) {
@@ -214,17 +219,33 @@ export async function claudeRemote(opts: {
                     isCompactCommand = false;
                 }
 
-                // Send ready event
-                opts.onReady();
+                // Auto-continue on error_max_turns (up to MAX_AUTO_RESUMES times)
+                if (resultMsg.subtype === 'error_max_turns' && autoResumeCount < MAX_AUTO_RESUMES) {
+                    autoResumeCount++;
+                    logger.debug(`[claudeRemote] Max turns reached, auto-resuming (${autoResumeCount}/${MAX_AUTO_RESUMES})`);
+                    if (opts.onCompletionEvent) {
+                        opts.onCompletionEvent(`Auto-continuing (${autoResumeCount}/${MAX_AUTO_RESUMES})...`);
+                    }
+                    updateThinking(true);
+                    messages.push({ type: 'user', message: { role: 'user', content: 'Continue' as SDKUserMessage['message']['content'] } });
+                } else {
+                    // Normal flow: wait for user input
+                    if (resultMsg.subtype === 'error_max_turns') {
+                        if (opts.onCompletionEvent) {
+                            opts.onCompletionEvent('Reached auto-continue limit. Please send a message to continue.');
+                        }
+                    }
+                    autoResumeCount = 0; // Reset counter when user sends a manual message
+                    opts.onReady();
 
-                // Push next message
-                const next = await opts.nextMessage();
-                if (!next) {
-                    messages.end();
-                    return;
+                    const next = await opts.nextMessage();
+                    if (!next) {
+                        messages.end();
+                        return;
+                    }
+                    mode = next.mode;
+                    messages.push({ type: 'user', message: { role: 'user', content: next.message as SDKUserMessage['message']['content'] } });
                 }
-                mode = next.mode;
-                messages.push({ type: 'user', message: { role: 'user', content: next.message as SDKUserMessage['message']['content'] } });
             }
 
             // Handle tool result
