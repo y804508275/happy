@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Platform, View, Text, Pressable, ScrollView } from 'react-native';
-import { APP_DEPLOY_VERSION } from '@/version';
 import { getChangelogEntries } from '@/changelog';
 
 export const WebVersionBadge = React.memo(() => {
@@ -29,6 +28,7 @@ export const WebVersionBadge = React.memo(() => {
     }
 
     const entries = getChangelogEntries();
+    const currentVersion = entries.length > 0 ? entries[0].deployVersion : '0.0.0.0';
 
     return (
         <View
@@ -119,7 +119,7 @@ export const WebVersionBadge = React.memo(() => {
                         fontWeight: '500',
                     }}
                 >
-                    v{APP_DEPLOY_VERSION}
+                    v{currentVersion}
                 </Text>
             </Pressable>
         </View>
