@@ -277,6 +277,31 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
         }
     });
 
+    mcp.registerTool('notify_rule_applied', {
+        description: 'Notify the user that a knowledge base rule was applied in your response. Call this BEFORE your response when a rule from the Knowledge Base influenced your behavior.',
+        title: 'Notify Rule Applied',
+        inputSchema: {
+            rule_title: z.string().describe('The title of the knowledge base rule that was applied'),
+            brief: z.string().describe('A very brief (< 15 words) description of how the rule was applied'),
+        },
+    }, async (args) => {
+        try {
+            client.sendSessionEvent({
+                type: 'message',
+                message: `✅ Rule applied: ${args.rule_title} — ${args.brief}`,
+            });
+            return {
+                content: [{ type: 'text', text: `Notified user about rule: ${args.rule_title}` }],
+                isError: false,
+            };
+        } catch (error: any) {
+            return {
+                content: [{ type: 'text', text: `Failed to notify: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
     mcp.registerTool('delete_memory', {
         description: 'Delete a saved memory by its ID.',
         title: 'Delete Memory',
@@ -340,7 +365,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
 
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title', 'list_projects', 'load_context', 'save_memory', 'delete_memory'],
+        toolNames: ['change_title', 'list_projects', 'load_context', 'save_memory', 'delete_memory', 'notify_rule_applied'],
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
             mcp.close();

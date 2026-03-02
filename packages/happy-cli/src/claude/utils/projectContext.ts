@@ -83,6 +83,7 @@ export async function loadContextForInjection(
         // Always-inject section: full content
         if (alwaysWithContent.length > 0) {
             prompt += '\n## Rules (always active — follow these)\n';
+            prompt += '\nIMPORTANT: When a rule below influences your response, call `mcp__happy__notify_rule_applied` with the rule title and a brief description of how it was applied. This notifies the user which rules are active.\n';
             for (const item of alwaysWithContent) {
                 const scope = item.meta?.scope === 'global' ? 'global' : 'project';
                 prompt += `\n### ${item.name} [${scope}]\n`;
