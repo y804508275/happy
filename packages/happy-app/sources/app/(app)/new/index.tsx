@@ -419,6 +419,8 @@ function NewSessionWizard() {
 
     // Image attachment state (web only)
     const [attachedImages, setAttachedImages] = React.useState<Array<{ uri: string; base64: string; mediaType: string }>>([]);
+    // File attachment state (web only)
+    const [attachedFiles, setAttachedFiles] = React.useState<Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf' }>>([]);
 
     const handleImagePaste = React.useCallback(async (files: File[]) => {
         const { processImageFile } = await import('@/utils/imageProcessor');
@@ -436,17 +438,38 @@ function NewSessionWizard() {
         }
     }, []);
 
-    const handleImagePick = React.useCallback(() => {
+    const handleFilePaste = React.useCallback(async (files: File[]) => {
+        const { processFile, isSupportedFile } = await import('@/utils/fileProcessor');
+        for (const file of files) {
+            if (!isSupportedFile(file)) continue;
+            try {
+                const processed = await processFile(file);
+                setAttachedFiles(prev => [...prev, processed]);
+            } catch (e) {
+                console.error('Failed to process file:', e);
+            }
+        }
+    }, []);
+
+    const handleAttachmentPick = React.useCallback(() => {
+        const { FILE_ACCEPT } = require('@/utils/fileProcessor');
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+        input.accept = FILE_ACCEPT;
         input.multiple = true;
         input.onchange = async (e) => {
             const files = Array.from((e.target as HTMLInputElement).files || []);
-            await handleImagePaste(files);
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            const otherFiles = files.filter(f => !f.type.startsWith('image/'));
+            if (imageFiles.length > 0) {
+                await handleImagePaste(imageFiles);
+            }
+            if (otherFiles.length > 0) {
+                await handleFilePaste(otherFiles);
+            }
         };
         input.click();
-    }, [handleImagePaste]);
+    }, [handleImagePaste, handleFilePaste]);
 
     const handleRemoveImage = React.useCallback((index: number) => {
         setAttachedImages(prev => {
@@ -456,6 +479,10 @@ function NewSessionWizard() {
             }
             return prev.filter((_, i) => i !== index);
         });
+    }, []);
+
+    const handleRemoveFile = React.useCallback((index: number) => {
+        setAttachedFiles(prev => prev.filter((_, i) => i !== index));
     }, []);
 
     // Handle machineId route param from picker screens (main's navigation pattern)
@@ -1113,16 +1140,18 @@ function NewSessionWizard() {
                 // Wrapped in separate try/catch so a message send failure
                 // (e.g. encryption error with image data) doesn't prevent
                 // navigation to the already-created session
-                if (sessionPrompt.trim() || attachedImages.length > 0) {
+                if (sessionPrompt.trim() || attachedImages.length > 0 || attachedFiles.length > 0) {
                     const images = attachedImages.length > 0
                         ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
+                    const files = attachedFiles.length > 0 ? attachedFiles : undefined;
                     try {
-                        await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images);
+                        await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images, undefined, files);
                     } catch (sendError) {
                         console.error('Failed to send initial message', sendError);
                     }
                     setAttachedImages([]);
+                    setAttachedFiles([]);
                 }
 
                 router.replace(`/session/${result.sessionId}`, {
@@ -1249,8 +1278,11 @@ function NewSessionWizard() {
                                 onAutoConfirmChange={setAutoConfirm}
                                 attachedImages={attachedImages}
                                 onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
-                                onImagePick={Platform.OS === 'web' ? handleImagePick : undefined}
+                                onAttachmentPick={Platform.OS === 'web' ? handleAttachmentPick : undefined}
                                 onRemoveImage={handleRemoveImage}
+                                attachedFiles={attachedFiles}
+                                onFilePaste={Platform.OS === 'web' ? handleFilePaste : undefined}
+                                onRemoveFile={handleRemoveFile}
                             />
                         </View>
                     </View>
@@ -2024,8 +2056,11 @@ function NewSessionWizard() {
                             onAutoConfirmChange={setAutoConfirm}
                             attachedImages={attachedImages}
                             onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
-                            onImagePick={Platform.OS === 'web' ? handleImagePick : undefined}
+                            onAttachmentPick={Platform.OS === 'web' ? handleAttachmentPick : undefined}
                             onRemoveImage={handleRemoveImage}
+                            attachedFiles={attachedFiles}
+                            onFilePaste={Platform.OS === 'web' ? handleFilePaste : undefined}
+                            onRemoveFile={handleRemoveFile}
                         />
                     </View>
                 </View>

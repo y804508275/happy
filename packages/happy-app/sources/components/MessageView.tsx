@@ -1,6 +1,7 @@
 import * as React from "react";
 import { View, Text, Image as RNImage } from "react-native";
-import { StyleSheet } from 'react-native-unistyles';
+import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
@@ -87,13 +88,16 @@ function UserTextBlock(props: {
   message: UserTextMessage;
   sessionId: string;
 }) {
+  const { theme } = useUnistyles();
   const handleOptionPress = React.useCallback((option: Option) => {
     sync.sendMessage(props.sessionId, option.title);
   }, [props.sessionId]);
 
+  const mdRefs = props.message.meta?.mdReferences;
+
   return (
     <View style={styles.userMessageContainer}>
-      <View style={styles.userMessageBubble}>
+      <View style={[styles.userMessageBubble, !(mdRefs && mdRefs.length > 0) && { marginBottom: 12 }]}>
         {props.message.images && props.message.images.length > 0 && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: props.message.text ? 8 : 0 }}>
             {props.message.images.map((img, i) => (
@@ -106,10 +110,44 @@ function UserTextBlock(props: {
             ))}
           </View>
         )}
+        {props.message.files && props.message.files.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: props.message.text ? 8 : 0 }}>
+            {props.message.files.map((file, i) => (
+              <View key={i} style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                borderRadius: 6,
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                gap: 4,
+              }}>
+                <Ionicons
+                  name={file.mediaType === 'application/pdf' ? 'document-text-outline' : 'document-outline'}
+                  size={13}
+                  color="rgba(255,255,255,0.7)"
+                />
+                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>
+                  {file.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
         {props.message.text ? (
           <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
         ) : null}
       </View>
+      {mdRefs && mdRefs.length > 0 && (
+        <View style={styles.mdRefTagsContainer}>
+          {mdRefs.map((name, i) => (
+            <View key={i} style={styles.mdRefTag}>
+              <Ionicons name="document-text-outline" size={11} color={theme.colors.textSecondary} />
+              <Text style={styles.mdRefTagText} numberOfLines={1}>{name}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -223,8 +261,30 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-    marginBottom: 12,
     maxWidth: '100%',
+  },
+  mdRefTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 4,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  mdRefTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: theme.colors.divider,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  mdRefTagText: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    maxWidth: 120,
   },
   agentMessageContainer: {
     marginHorizontal: 16,

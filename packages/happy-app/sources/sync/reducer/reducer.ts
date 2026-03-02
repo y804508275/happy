@@ -127,6 +127,8 @@ type ReducerMessage = {
     event: AgentEvent | null;
     tool: ToolCall | null;
     images?: Array<{ mediaType: string; data: string }>;
+    documents?: Array<{ mediaType: string; data: string }>;
+    files?: Array<{ name: string; mediaType: string }>;
     meta?: MessageMeta;
 }
 
@@ -612,6 +614,8 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                 tool: null,
                 event: null,
                 ...(msg.images && { images: msg.images }),
+                ...(msg.documents && { documents: msg.documents }),
+                ...(msg.files && { files: msg.files }),
                 meta: msg.meta,
             });
 
@@ -1119,6 +1123,8 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             text: reducerMsg.text,
             ...(reducerMsg.meta?.displayText && { displayText: reducerMsg.meta.displayText }),
             ...(reducerMsg.images && { images: reducerMsg.images }),
+            ...(reducerMsg.documents && { documents: reducerMsg.documents }),
+            ...(reducerMsg.files && { files: reducerMsg.files }),
             meta: reducerMsg.meta
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.text !== null) {

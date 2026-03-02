@@ -15,7 +15,16 @@ const UserImageContentSchema = z.object({
   }),
 });
 
-const UserContentBlockSchema = z.union([UserTextContentSchema, UserImageContentSchema]);
+const UserDocumentContentSchema = z.object({
+  type: z.literal('document'),
+  source: z.object({
+    type: z.literal('base64'),
+    media_type: z.string(),
+    data: z.string(),
+  }),
+});
+
+const UserContentBlockSchema = z.union([UserTextContentSchema, UserImageContentSchema, UserDocumentContentSchema]);
 
 export const UserMessageSchema = z.object({
   role: z.literal('user'),

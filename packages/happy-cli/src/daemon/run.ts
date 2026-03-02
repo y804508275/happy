@@ -663,6 +663,69 @@ export async function startDaemon(): Promise<void> {
       return false;
     };
 
+    // Reactivate a stopped session when user sends a new message
+    const reactivateSession = async (options: {
+      happySessionId: string;
+      directory: string;
+      claudeSessionId?: string;
+      agent?: 'claude' | 'codex' | 'gemini';
+    }): Promise<SpawnSessionResult> => {
+      const { happySessionId, directory, claudeSessionId, agent } = options;
+      logger.debug(`[DAEMON RUN] Reactivating session ${happySessionId}, dir=${directory}, claude=${claudeSessionId}`);
+
+      // Check if there's already a running process for this session
+      for (const [, session] of pidToTrackedSession) {
+        if (session.happySessionId === happySessionId) {
+          logger.debug(`[DAEMON RUN] Session ${happySessionId} already has a running process, skipping reactivation`);
+          return { type: 'success', sessionId: happySessionId };
+        }
+      }
+
+      // Read session info file for encryption keys
+      const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+      const sessionInfoPath = join(sessionsDir, `${happySessionId}.json`);
+
+      if (!existsSync(sessionInfoPath)) {
+        logger.debug(`[DAEMON RUN] No session info file for ${happySessionId}, cannot reactivate`);
+        return { type: 'error', errorMessage: 'Session info file not found, cannot reactivate' };
+      }
+
+      try {
+        const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
+
+        // Create restart file with encryption info (reuses existing pattern)
+        const restartFilePath = join(sessionsDir, `restart-${happySessionId}.json`);
+        const { writeFileSync: writeSync } = await import('fs');
+        writeSync(restartFilePath, JSON.stringify({
+          sessionId: sessionInfo.sessionId,
+          encryptionKey: sessionInfo.encryptionKey,
+          encryptionVariant: sessionInfo.encryptionVariant,
+        }), { mode: 0o600 });
+
+        // Brief delay to let any old socket disconnect propagate
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Use the effective claudeSessionId (from RPC params or session info file)
+        const effectiveClaudeSessionId = claudeSessionId || sessionInfo.claudeSessionId;
+
+        const result = await spawnSession({
+          directory: directory || sessionInfo.directory,
+          resumeClaudeSessionId: effectiveClaudeSessionId,
+          restartFilePath,
+          agent: agent || sessionInfo.agent || 'claude',
+        });
+
+        logger.debug(`[DAEMON RUN] Reactivation spawn result: ${JSON.stringify(result)}`);
+        return result;
+      } catch (error) {
+        logger.debug(`[DAEMON RUN] Failed to reactivate session ${happySessionId}:`, error);
+        return {
+          type: 'error',
+          errorMessage: `Failed to reactivate session: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
+    };
+
     // Track respawn attempts to prevent crash loops
     const sessionRespawnAttempts = new Map<string, { count: number, lastAttempt: number }>();
     const MAX_RESPAWN_ATTEMPTS = 3;
@@ -880,7 +943,8 @@ export async function startDaemon(): Promise<void> {
     apiMachine.setRPCHandlers({
       spawnSession,
       stopSession,
-      requestShutdown: () => requestShutdown('happy-app')
+      requestShutdown: () => requestShutdown('happy-app'),
+      reactivateSession
     });
 
     // Connect to server

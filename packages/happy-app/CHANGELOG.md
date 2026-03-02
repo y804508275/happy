@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 8 (2026.03.02.4) - 2026-03-02
+
+新增 MD 引用文件和文件附件功能，支持更丰富的上下文注入。
+
+- 新增 MD 引用功能：创建、编辑和附加 Markdown 引用文件到消息中，快速注入上下文
+- 新增 Web 端文件附件支持：可直接在输入框中附加文本文件和 PDF
+- 更新同步协议以支持文件附件和 MD 引用元数据
+- 新增项目上下文文档 (HAPPY_CONTEXT.md)
+- 更新全部 11 种语言的翻译
+
 ## Version 7 (2026.03.02.3) - 2026-03-02
 
 Fixed session time not updating when messages are sent.

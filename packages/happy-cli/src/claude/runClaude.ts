@@ -209,6 +209,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             directory: process.cwd(),
             pid: process.pid,
             startedAt: Date.now(),
+            agent: 'claude',
         }), { mode: 0o600 });
         logger.debug(`[START] Wrote session info file: ${sessionInfoFilePath}`);
     } catch (error) {
@@ -276,6 +277,16 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
                     logger.debug(`[START] Claude session ID changed: ${previousSessionId} -> ${sessionId}`);
                     currentSession.onSessionFound(sessionId);
                 }
+            }
+
+            // Persist claudeSessionId to session info file for reactivation support
+            try {
+                const existing = JSON.parse(readFileSync(sessionInfoFilePath, 'utf-8'));
+                existing.claudeSessionId = sessionId;
+                writeFileSync(sessionInfoFilePath, JSON.stringify(existing), { mode: 0o600 });
+                logger.debug(`[START] Updated session info file with claudeSessionId: ${sessionId}`);
+            } catch (err) {
+                logger.debug('[START] Failed to update session info with claudeSessionId:', err);
             }
         }
     });
@@ -487,8 +498,8 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             hookServer.stop();
             cleanupHookSettingsFile(hookSettingsPath);
 
-            // Remove session info file on clean exit (crash leaves it for respawn)
-            try { unlinkSync(sessionInfoFilePath); } catch {}
+            // Keep session info file for reactivation support
+            // (allows daemon to respawn the session when user sends a new message)
 
             logger.debug('[START] Cleanup complete, exiting');
             process.exit(0);

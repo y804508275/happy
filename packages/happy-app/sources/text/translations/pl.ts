@@ -406,6 +406,28 @@ export const pl: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `Usunąć "${name}"? Tej operacji nie można cofnąć.`,
     },
 
+    mdReference: {
+        title: 'ODNIESIENIA MD',
+        globalSection: 'GLOBALNE',
+        projectSection: 'PROJEKT',
+        emptyDescription: 'Twórz pliki referencyjne Markdown, aby szybko dodawać kontekst do wiadomości.',
+        newButton: 'Nowy',
+        createTitle: 'Nowe odniesienie MD',
+        editTitle: 'Edytuj odniesienie MD',
+        nameLabel: 'Tytuł',
+        namePlaceholder: 'Tytuł odniesienia',
+        descriptionLabel: 'Opis',
+        descriptionPlaceholder: 'Krótki opis (opcjonalnie)',
+        contentLabel: 'Treść',
+        contentPlaceholder: 'Treść Markdown...',
+        scopeLabel: 'Zakres',
+        scopeGlobal: 'Globalny',
+        scopeProject: 'Projekt',
+        save: 'Zapisz',
+        deleteConfirm: 'Usuń odniesienie',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Usunąć "${name}"? Tej operacji nie można cofnąć.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -969,6 +991,11 @@ export const pl: TranslationStructure = {
             confirm: 'Usuń',
             cancel: 'Anuluj',
         },
+    },
+
+    preview: {
+        urlPlaceholder: 'Wpisz URL...',
+        loadingError: 'Nie można załadować tej strony',
     },
 
     notifications: {

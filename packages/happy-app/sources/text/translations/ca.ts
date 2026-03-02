@@ -396,6 +396,28 @@ export const ca: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `Eliminar "${name}"? Aquesta acció no es pot desfer.`,
     },
 
+    mdReference: {
+        title: 'REFERÈNCIES MD',
+        globalSection: 'GLOBAL',
+        projectSection: 'PROJECTE',
+        emptyDescription: 'Crea fitxers de referència Markdown per afegir context ràpidament als teus missatges.',
+        newButton: 'Nou',
+        createTitle: 'Nova referència MD',
+        editTitle: 'Edita referència MD',
+        nameLabel: 'Títol',
+        namePlaceholder: 'Títol de la referència',
+        descriptionLabel: 'Descripció',
+        descriptionPlaceholder: 'Descripció breu (opcional)',
+        contentLabel: 'Contingut',
+        contentPlaceholder: 'Contingut Markdown...',
+        scopeLabel: 'Abast',
+        scopeGlobal: 'Global',
+        scopeProject: 'Projecte',
+        save: 'Desa',
+        deleteConfirm: 'Elimina referència',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Eliminar "${name}"? Aquesta acció no es pot desfer.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -944,6 +966,11 @@ export const ca: TranslationStructure = {
         friendRequestGeneric: 'Nova sol·licitud d\'amistat',
         friendAccepted: ({ name }: { name: string }) => `Ara ets amic de ${name}`,
         friendAcceptedGeneric: 'Sol·licitud d\'amistat acceptada',
+    },
+
+    preview: {
+        urlPlaceholder: 'Introdueix URL...',
+        loadingError: 'No s\'ha pogut carregar aquesta pàgina',
     },
 
     notifications: {

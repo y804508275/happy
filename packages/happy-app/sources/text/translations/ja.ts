@@ -428,6 +428,28 @@ export const ja: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `「${name}」を削除しますか？この操作は取り消せません。`,
     },
 
+    mdReference: {
+        title: 'MDリファレンス',
+        globalSection: 'グローバル',
+        projectSection: 'プロジェクト',
+        emptyDescription: 'Markdownリファレンスファイルを作成して、メッセージにコンテキストを追加できます。',
+        newButton: '新規',
+        createTitle: '新規MDリファレンス',
+        editTitle: 'MDリファレンスを編集',
+        nameLabel: 'タイトル',
+        namePlaceholder: 'リファレンスタイトル',
+        descriptionLabel: '説明',
+        descriptionPlaceholder: '簡単な説明（任意）',
+        contentLabel: '内容',
+        contentPlaceholder: 'Markdownコンテンツ...',
+        scopeLabel: 'スコープ',
+        scopeGlobal: 'グローバル',
+        scopeProject: 'プロジェクト',
+        save: '保存',
+        deleteConfirm: 'リファレンスを削除',
+        deleteConfirmMessage: ({ name }: { name: string }) => `「${name}」を削除しますか？この操作は元に戻せません。`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -947,6 +969,11 @@ export const ja: TranslationStructure = {
         friendRequestGeneric: '新しい友達リクエスト',
         friendAccepted: ({ name }: { name: string }) => `${name}さんと友達になりました`,
         friendAcceptedGeneric: '友達リクエストが承認されました',
+    },
+
+    preview: {
+        urlPlaceholder: 'URLを入力...',
+        loadingError: 'このページを読み込めません',
     },
 
     notifications: {

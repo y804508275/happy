@@ -425,6 +425,28 @@ export const it: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `Eliminare "${name}"? Questa azione non può essere annullata.`,
     },
 
+    mdReference: {
+        title: 'RIFERIMENTI MD',
+        globalSection: 'GLOBALE',
+        projectSection: 'PROGETTO',
+        emptyDescription: 'Crea file di riferimento Markdown per aggiungere rapidamente contesto ai tuoi messaggi.',
+        newButton: 'Nuovo',
+        createTitle: 'Nuovo riferimento MD',
+        editTitle: 'Modifica riferimento MD',
+        nameLabel: 'Titolo',
+        namePlaceholder: 'Titolo del riferimento',
+        descriptionLabel: 'Descrizione',
+        descriptionPlaceholder: 'Breve descrizione (opzionale)',
+        contentLabel: 'Contenuto',
+        contentPlaceholder: 'Contenuto Markdown...',
+        scopeLabel: 'Ambito',
+        scopeGlobal: 'Globale',
+        scopeProject: 'Progetto',
+        save: 'Salva',
+        deleteConfirm: 'Elimina riferimento',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Eliminare "${name}"? Questa azione non può essere annullata.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -944,6 +966,11 @@ export const it: TranslationStructure = {
         friendRequestGeneric: 'Nuova richiesta di amicizia',
         friendAccepted: ({ name }: { name: string }) => `Ora sei amico di ${name}`,
         friendAcceptedGeneric: 'Richiesta di amicizia accettata',
+    },
+
+    preview: {
+        urlPlaceholder: 'Inserisci URL...',
+        loadingError: 'Impossibile caricare questa pagina',
     },
 
     notifications: {

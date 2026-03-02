@@ -19,6 +19,8 @@ export const LocalSettingsSchema = z.object({
     notifyError: z.boolean().describe('Notify on session errors'),
     notifyIdleTimeout: z.boolean().describe('Notify when session is idle too long'),
     notifyIdleTimeoutMinutes: z.number().describe('Idle timeout threshold in minutes'),
+    // Browser preview
+    lastPreviewUrl: z.string().describe('Last URL used in the browser preview panel'),
 });
 
 //
@@ -46,6 +48,7 @@ export const localSettingsDefaults: LocalSettings = {
     notifyError: true,
     notifyIdleTimeout: false,
     notifyIdleTimeoutMinutes: 10,
+    lastPreviewUrl: '',
 };
 Object.freeze(localSettingsDefaults);
 

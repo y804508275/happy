@@ -16,6 +16,7 @@ import { FloatingOverlay } from './FloatingOverlay';
 import { TextInputState, MultiTextInputHandle } from './MultiTextInput';
 import { applySuggestion } from './autocomplete/applySuggestion';
 import { GitStatusBadge, useHasMeaningfulGitStatus } from './GitStatusBadge';
+import { MdReferenceChips } from './MdReferenceChips';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useSetting } from '@/sync/storage';
 import { hackMode, hackModes } from '@/sync/modeHacks';
@@ -84,6 +85,17 @@ interface AgentInputProps {
     onImagePaste?: (files: File[]) => void;
     onImagePick?: () => void;
     onRemoveImage?: (index: number) => void;
+    // File support
+    attachedFiles?: Array<{ name: string; mediaType: string }>;
+    onFilePaste?: (files: File[]) => void;
+    onAttachmentPick?: () => void;
+    onRemoveFile?: (index: number) => void;
+    // MD Reference support
+    selectedMdRefs?: Array<{ id: string; name: string }>;
+    onMdRefButtonPress?: () => void;
+    onMdRefRemove?: (id: string) => void;
+    mdRefSelectorVisible?: boolean;
+    mdRefSelectorContent?: React.ReactNode;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -310,7 +322,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
     const hasText = props.value.trim().length > 0;
     const hasImages = (props.attachedImages?.length ?? 0) > 0;
-    const hasContent = hasText || hasImages;
+    const hasFiles = (props.attachedFiles?.length ?? 0) > 0;
+    const hasContent = hasText || hasImages || hasFiles;
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -742,6 +755,21 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                     </>
                 )}
 
+                {/* MD Reference selector overlay */}
+                {props.mdRefSelectorVisible && props.mdRefSelectorContent && (
+                    <>
+                        <TouchableWithoutFeedback onPress={props.onMdRefButtonPress}>
+                            <View style={styles.overlayBackdrop} />
+                        </TouchableWithoutFeedback>
+                        <View style={[
+                            styles.settingsOverlay,
+                            { paddingHorizontal: screenWidth > 700 ? 0 : 8 }
+                        ]}>
+                            {props.mdRefSelectorContent}
+                        </View>
+                    </>
+                )}
+
                 {/* Connection status, context warning, and permission mode */}
                 {(props.connectionStatus || contextWarning || displayPermissionMode || props.modelMode) && (
                     <View style={{
@@ -966,6 +994,14 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
                 {/* Box 2: Action Area (Input + Send) */}
                 <View style={styles.unifiedPanel}>
+                    {/* MD Reference chips */}
+                    {props.selectedMdRefs && props.selectedMdRefs.length > 0 && props.onMdRefRemove && (
+                        <MdReferenceChips
+                            items={props.selectedMdRefs}
+                            onRemove={props.onMdRefRemove}
+                        />
+                    )}
+
                     {/* Image preview strip */}
                     {props.attachedImages && props.attachedImages.length > 0 && (
                         <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 10, gap: 8, flexWrap: 'wrap' }}>
@@ -996,6 +1032,45 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                         </View>
                     )}
 
+                    {/* File preview chips */}
+                    {props.attachedFiles && props.attachedFiles.length > 0 && (
+                        <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 10, gap: 8, flexWrap: 'wrap' }}>
+                            {props.attachedFiles.map((file, index) => (
+                                <View key={`file-${index}`} style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: theme.colors.input.background,
+                                    borderRadius: 8,
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 6,
+                                    gap: 6,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.divider,
+                                }}>
+                                    <Ionicons
+                                        name={file.mediaType === 'application/pdf' ? 'document-text-outline' : 'document-outline'}
+                                        size={14}
+                                        color={theme.colors.textSecondary}
+                                    />
+                                    <Text style={{
+                                        fontSize: 12,
+                                        color: theme.colors.text,
+                                        maxWidth: 150,
+                                        ...Typography.default(),
+                                    }} numberOfLines={1}>
+                                        {file.name}
+                                    </Text>
+                                    <Pressable
+                                        onPress={() => props.onRemoveFile?.(index)}
+                                        hitSlop={4}
+                                    >
+                                        <Ionicons name="close-circle" size={14} color={theme.colors.textSecondary} />
+                                    </Pressable>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
                     {/* Input field */}
                     <View style={[styles.inputContainer, props.minHeight ? { minHeight: props.minHeight } : undefined]}>
                         <MultiTextInput
@@ -1009,6 +1084,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             onStateChange={handleInputStateChange}
                             maxHeight={120}
                             onImagePaste={props.onImagePaste}
+                            onFilePaste={props.onFilePaste}
                         />
                     </View>
 
@@ -1115,12 +1191,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* Image upload button (web only) */}
-                                {Platform.OS === 'web' && props.onImagePick && (
+                                {/* Attachment upload button (web only) */}
+                                {Platform.OS === 'web' && (props.onAttachmentPick || props.onImagePick) && (
                                     <Pressable
                                         onPress={() => {
                                             hapticsLight();
-                                            props.onImagePick?.();
+                                            (props.onAttachmentPick || props.onImagePick)?.();
                                         }}
                                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                         style={(p) => ({
@@ -1135,10 +1211,57 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         })}
                                     >
                                         <Ionicons
-                                            name="image-outline"
+                                            name="attach-outline"
+                                            size={18}
+                                            color={theme.colors.button.secondary.tint}
+                                        />
+                                    </Pressable>
+                                )}
+
+                                {/* MD Reference button */}
+                                {props.onMdRefButtonPress && (
+                                    <Pressable
+                                        onPress={() => {
+                                            hapticsLight();
+                                            props.onMdRefButtonPress?.();
+                                        }}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                            gap: 4,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="document-text-outline"
                                             size={16}
                                             color={theme.colors.button.secondary.tint}
                                         />
+                                        {(props.selectedMdRefs?.length ?? 0) > 0 && (
+                                            <View style={{
+                                                backgroundColor: theme.colors.textLink,
+                                                borderRadius: 8,
+                                                minWidth: 16,
+                                                height: 16,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                paddingHorizontal: 4,
+                                            }}>
+                                                <Text style={{
+                                                    fontSize: 10,
+                                                    color: '#fff',
+                                                    ...Typography.default('semiBold'),
+                                                }}>
+                                                    {props.selectedMdRefs!.length}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </Pressable>
                                 )}
 

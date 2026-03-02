@@ -30,6 +30,8 @@ export type UserTextMessage = {
     text: string;
     displayText?: string; // Optional text to display in UI instead of actual text
     images?: Array<{ mediaType: string; data: string }>;
+    documents?: Array<{ mediaType: string; data: string }>;
+    files?: Array<{ name: string; mediaType: string }>; // File metadata for display
     meta?: MessageMeta;
 }
 

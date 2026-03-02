@@ -42,6 +42,7 @@ interface MultiTextInputProps {
     onSelectionChange?: (selection: { start: number; end: number }) => void;
     onStateChange?: (state: TextInputState) => void;
     onImagePaste?: (files: File[]) => void;
+    onFilePaste?: (files: File[]) => void;
 }
 
 export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextInputProps>((props, ref) => {
@@ -131,20 +132,37 @@ export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextIn
     }, [onChangeText, onStateChange, onSelectionChange]);
 
     const handlePaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-        console.log("[paste] fired"); if (!props.onImagePaste) return;
-
         const items = Array.from(e.clipboardData.items);
-        const imageFiles = items
-            .filter(item => item.type.startsWith('image/'))
-            .map(item => item.getAsFile())
-            .filter((f): f is File => f !== null);
 
-        if (imageFiles.length > 0) {
-            e.preventDefault();
-            props.onImagePaste(imageFiles);
+        // Check for image files first
+        if (props.onImagePaste) {
+            const imageFiles = items
+                .filter(item => item.type.startsWith('image/'))
+                .map(item => item.getAsFile())
+                .filter((f): f is File => f !== null);
+
+            if (imageFiles.length > 0) {
+                e.preventDefault();
+                props.onImagePaste(imageFiles);
+                return;
+            }
         }
-        // If no images, let the default paste behavior handle text
-    }, [props.onImagePaste]);
+
+        // Check for non-image files
+        if (props.onFilePaste) {
+            const otherFiles = items
+                .filter(item => item.kind === 'file' && !item.type.startsWith('image/'))
+                .map(item => item.getAsFile())
+                .filter((f): f is File => f !== null);
+
+            if (otherFiles.length > 0) {
+                e.preventDefault();
+                props.onFilePaste(otherFiles);
+                return;
+            }
+        }
+        // If no files, let the default paste behavior handle text
+    }, [props.onImagePaste, props.onFilePaste]);
 
     const handleSelect = React.useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
         const target = e.target as HTMLTextAreaElement;

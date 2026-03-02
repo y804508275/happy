@@ -1,6 +1,20 @@
 {
   "entries": [
     {
+      "version": 8,
+      "deployVersion": "2026.03.02.4",
+      "date": "2026-03-02",
+      "summary": "新增 MD 引用文件和文件附件功能，支持更丰富的上下文注入。",
+      "changes": [
+        "新增 MD 引用功能：创建、编辑和附加 Markdown 引用文件到消息中，快速注入上下文",
+        "新增 Web 端文件附件支持：可直接在输入框中附加文本文件和 PDF",
+        "更新同步协议以支持文件附件和 MD 引用元数据",
+        "新增项目上下文文档 (HAPPY_CONTEXT.md)",
+        "更新全部 11 种语言的翻译"
+      ],
+      "rawMarkdown": "## Version 8 (2026.03.02.4) - 2026-03-02\n\n\n新增 MD 引用文件和文件附件功能，支持更丰富的上下文注入。\n\n- 新增 MD 引用功能：创建、编辑和附加 Markdown 引用文件到消息中，快速注入上下文\n- 新增 Web 端文件附件支持：可直接在输入框中附加文本文件和 PDF\n- 更新同步协议以支持文件附件和 MD 引用元数据\n- 新增项目上下文文档 (HAPPY_CONTEXT.md)\n- 更新全部 11 种语言的翻译"
+    },
+    {
       "version": 7,
       "deployVersion": "2026.03.02.3",
       "date": "2026-03-02",
@@ -97,5 +111,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 7
+  "latestVersion": 8
 }

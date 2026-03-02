@@ -396,6 +396,28 @@ export const es: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `¿Eliminar "${name}"? Esta acción no se puede deshacer.`,
     },
 
+    mdReference: {
+        title: 'REFERENCIAS MD',
+        globalSection: 'GLOBAL',
+        projectSection: 'PROYECTO',
+        emptyDescription: 'Crea archivos de referencia Markdown para agregar contexto rápidamente a tus mensajes.',
+        newButton: 'Nuevo',
+        createTitle: 'Nueva referencia MD',
+        editTitle: 'Editar referencia MD',
+        nameLabel: 'Título',
+        namePlaceholder: 'Título de la referencia',
+        descriptionLabel: 'Descripción',
+        descriptionPlaceholder: 'Descripción breve (opcional)',
+        contentLabel: 'Contenido',
+        contentPlaceholder: 'Contenido Markdown...',
+        scopeLabel: 'Alcance',
+        scopeGlobal: 'Global',
+        scopeProject: 'Proyecto',
+        save: 'Guardar',
+        deleteConfirm: 'Eliminar referencia',
+        deleteConfirmMessage: ({ name }: { name: string }) => `¿Eliminar "${name}"? Esta acción no se puede deshacer.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -946,6 +968,11 @@ export const es: TranslationStructure = {
             confirm: 'Eliminar',
             cancel: 'Cancelar',
         },
+    },
+
+    preview: {
+        urlPlaceholder: 'Ingrese URL...',
+        loadingError: 'No se pudo cargar esta página',
     },
 
     notifications: {

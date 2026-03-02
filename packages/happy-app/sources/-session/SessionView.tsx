@@ -3,6 +3,9 @@ import { AgentInput } from '@/components/AgentInput';
 import { FixedAskUserQuestionBar } from '@/components/tools/FixedAskUserQuestionBar';
 import { InlineOptionsProvider } from '@/hooks/useInlineOptions';
 import { FixedPermissionBar } from '@/components/tools/FixedPermissionBar';
+import { MdReferenceSelector } from '@/components/MdReferenceSelector';
+import { useMdReferences } from '@/hooks/useMdReferences';
+import { useAuth } from '@/auth/AuthContext';
 import {
     getAvailableModels,
     getAvailablePermissionModes,
@@ -180,6 +183,12 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         base64: string;
         mediaType: string;
     }>>([]);
+    const [attachedFiles, setAttachedFiles] = React.useState<Array<{
+        name: string;
+        content: string;
+        mediaType: string;
+        kind: 'text' | 'pdf';
+    }>>([]);
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
@@ -218,6 +227,12 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const alwaysShowContextSize = useSetting('alwaysShowContextSize');
     const experiments = useSetting('experiments');
 
+    // MD References
+    const { credentials } = useAuth();
+    const workingDirectory = session?.metadata?.path || '';
+    const mdRefs = useMdReferences(credentials, workingDirectory);
+    const [showMdRefSelector, setShowMdRefSelector] = React.useState(false);
+
     // Use draft hook for auto-saving message drafts
     const { clearDraft } = useDraft(sessionId, message, setMessage);
 
@@ -238,18 +253,40 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, []);
 
-    // Image file picker handler
-    const handleImagePick = React.useCallback(() => {
+    // File paste handler (non-image files)
+    const handleFilePaste = React.useCallback(async (files: File[]) => {
+        const { processFile, isSupportedFile } = await import('@/utils/fileProcessor');
+        for (const file of files) {
+            if (!isSupportedFile(file)) continue;
+            try {
+                const processed = await processFile(file);
+                setAttachedFiles(prev => [...prev, processed]);
+            } catch (e) {
+                console.error('Failed to process file:', e);
+            }
+        }
+    }, []);
+
+    // Unified attachment picker handler
+    const handleAttachmentPick = React.useCallback(() => {
+        const { FILE_ACCEPT } = require('@/utils/fileProcessor');
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+        input.accept = FILE_ACCEPT;
         input.multiple = true;
         input.onchange = async (e) => {
             const files = Array.from((e.target as HTMLInputElement).files || []);
-            await handleImagePaste(files);
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            const otherFiles = files.filter(f => !f.type.startsWith('image/'));
+            if (imageFiles.length > 0) {
+                await handleImagePaste(imageFiles);
+            }
+            if (otherFiles.length > 0) {
+                await handleFilePaste(otherFiles);
+            }
         };
         input.click();
-    }, [handleImagePaste]);
+    }, [handleImagePaste, handleFilePaste]);
 
     // Remove attached image
     const handleRemoveImage = React.useCallback((index: number) => {
@@ -260,6 +297,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             }
             return prev.filter((_, i) => i !== index);
         });
+    }, []);
+
+    // Remove attached file
+    const handleRemoveFile = React.useCallback((index: number) => {
+        setAttachedFiles(prev => prev.filter((_, i) => i !== index));
     }, []);
 
     // Handle dismissing CLI version warning
@@ -388,15 +430,19 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 dotColor: sessionStatus.statusDotColor,
                 isPulsing: sessionStatus.isPulsing
             }}
-            onSend={() => {
-                if (message.trim() || attachedImages.length > 0) {
+            onSend={async () => {
+                if (message.trim() || attachedImages.length > 0 || attachedFiles.length > 0) {
                     const images = attachedImages.length > 0
                         ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
+                    const files = attachedFiles.length > 0 ? attachedFiles : undefined;
+                    const mdRefContents = await mdRefs.getSelectedContents();
                     setMessage('');
                     setAttachedImages([]);
+                    setAttachedFiles([]);
+                    mdRefs.clearSelection();
                     clearDraft();
-                    sync.sendMessage(sessionId, message, undefined, images);
+                    sync.sendMessage(sessionId, message, undefined, images, mdRefContents.length > 0 ? mdRefContents : undefined, files);
                     trackMessageSent();
                 }
             }}
@@ -406,8 +452,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             showAbortButton={sessionStatus.state === 'thinking'}
             attachedImages={attachedImages}
             onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
-            onImagePick={Platform.OS === 'web' ? handleImagePick : undefined}
+            onAttachmentPick={Platform.OS === 'web' ? handleAttachmentPick : undefined}
             onRemoveImage={handleRemoveImage}
+            attachedFiles={attachedFiles}
+            onFilePaste={Platform.OS === 'web' ? handleFilePaste : undefined}
+            onRemoveFile={handleRemoveFile}
             onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => !v) : undefined}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
             autoConfirm={autoConfirm}
@@ -429,6 +478,24 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 contextSize: session.latestUsage.contextSize
             } : undefined}
             alwaysShowContextSize={alwaysShowContextSize}
+            // MD Reference props
+            selectedMdRefs={mdRefs.getSelectedSummaries()}
+            onMdRefButtonPress={() => setShowMdRefSelector(v => !v)}
+            onMdRefRemove={mdRefs.removeSelection}
+            mdRefSelectorVisible={showMdRefSelector}
+            mdRefSelectorContent={showMdRefSelector ? (
+                <MdReferenceSelector
+                    globalItems={mdRefs.globalItems}
+                    projectItems={mdRefs.projectItems}
+                    selectedIds={mdRefs.selectedIds}
+                    loading={mdRefs.loading}
+                    onToggle={mdRefs.toggleSelection}
+                    onCreateItem={mdRefs.createItem}
+                    onEditItem={mdRefs.updateItem}
+                    onDeleteItem={mdRefs.deleteItem}
+                    fetchItemContent={mdRefs.fetchItemContent}
+                />
+            ) : undefined}
         />
         </>
     );

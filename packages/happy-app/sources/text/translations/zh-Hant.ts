@@ -397,6 +397,28 @@ export const zhHant: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `確定刪除「${name}」？此操作不可撤銷。`,
     },
 
+    mdReference: {
+        title: 'MD 引用',
+        globalSection: '全域',
+        projectSection: '專案',
+        emptyDescription: '建立 Markdown 引用檔案，快速為訊息新增上下文。',
+        newButton: '新增',
+        createTitle: '新增 MD 引用',
+        editTitle: '編輯 MD 引用',
+        nameLabel: '標題',
+        namePlaceholder: '引用標題',
+        descriptionLabel: '描述',
+        descriptionPlaceholder: '簡短描述（選填）',
+        contentLabel: '內容',
+        contentPlaceholder: 'Markdown 內容...',
+        scopeLabel: '範圍',
+        scopeGlobal: '全域',
+        scopeProject: '專案',
+        save: '儲存',
+        deleteConfirm: '刪除引用',
+        deleteConfirmMessage: ({ name }: { name: string }) => `確定刪除「${name}」？此操作無法復原。`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -946,6 +968,11 @@ export const zhHant: TranslationStructure = {
             confirm: '刪除',
             cancel: '取消',
         },
+    },
+
+    preview: {
+        urlPlaceholder: '輸入 URL...',
+        loadingError: '無法載入此頁面',
     },
 
     notifications: {

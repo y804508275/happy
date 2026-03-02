@@ -396,6 +396,28 @@ export const en = {
             `Delete "${name}"? This cannot be undone.`,
     },
 
+    mdReference: {
+        title: 'MD REFERENCES',
+        globalSection: 'GLOBAL',
+        projectSection: 'PROJECT',
+        emptyDescription: 'Create markdown reference files to quickly add context to your messages.',
+        newButton: 'New',
+        createTitle: 'New MD Reference',
+        editTitle: 'Edit MD Reference',
+        nameLabel: 'Title',
+        namePlaceholder: 'Reference title',
+        descriptionLabel: 'Description',
+        descriptionPlaceholder: 'Brief description (optional)',
+        contentLabel: 'Content',
+        contentPlaceholder: 'Markdown content...',
+        scopeLabel: 'Scope',
+        scopeGlobal: 'Global',
+        scopeProject: 'Project',
+        save: 'Save',
+        deleteConfirm: 'Delete Reference',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Delete "${name}"? This cannot be undone.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -948,6 +970,11 @@ export const en = {
         },
     },
 
+    preview: {
+        urlPlaceholder: 'Enter URL...',
+        loadingError: 'Unable to load this page',
+    },
+
     notifications: {
         title: 'Notifications',
         subtitle: 'Configure push notification rules',
@@ -964,7 +991,7 @@ export const en = {
         enableIdleTimeout: 'Enable Idle Timeout',
         enableIdleTimeoutDesc: 'Notify when session is idle beyond threshold',
         minutesOption: ({ count }: { count: number }) => `${count} minutes`,
-    }
+    },
 } as const;
 
 export type Translations = typeof en;

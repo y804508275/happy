@@ -80,6 +80,7 @@ class Sync {
     private sessionDataKeys = new Map<string, Uint8Array>(); // Store session data encryption keys internally
     private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
     private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
+    private reactivatingSessionIds = new Set<string>(); // Dedup reactivation attempts
     private settingsSync: InvalidateSync;
     private profileSync: InvalidateSync;
     private purchasesSync: InvalidateSync;
@@ -446,7 +447,7 @@ class Sync {
         this.backgroundSendStartedAt = null;
     }
 
-    async sendMessage(sessionId: string, text: string, displayText?: string, images?: Array<{ base64: string; mediaType: string }>) {
+    async sendMessage(sessionId: string, text: string, displayText?: string, images?: Array<{ base64: string; mediaType: string }>, mdReferences?: Array<{ name: string; content: string }>, files?: Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf' }>) {
 
         // Get encryption
         const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -486,20 +487,52 @@ class Sync {
 
         const fallbackModel: string | null = null;
 
+        // Build appendSystemPrompt with optional MD references
+        let finalSystemPrompt = systemPrompt;
+        if (mdReferences && mdReferences.length > 0) {
+            finalSystemPrompt += '\n\n# Referenced Documents\nThe user has attached the following reference documents. Use them as context.\n';
+            for (const ref of mdReferences) {
+                finalSystemPrompt += `\n## ${ref.name}\n${ref.content}\n`;
+            }
+        }
+
+        // Prepend text file contents to message text
+        let actualText = text;
+        const textFiles = files?.filter(f => f.kind === 'text') || [];
+        if (textFiles.length > 0) {
+            const fileBlocks = textFiles.map(f => `[File: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``).join('\n\n');
+            actualText = fileBlocks + (text.trim() ? '\n\n' + text : '');
+            if (!displayText) {
+                displayText = text;
+            }
+        }
+
+        // Build file metadata for display (all file types)
+        const filesMeta = files && files.length > 0
+            ? files.map(f => ({ name: f.name, mediaType: f.mediaType }))
+            : undefined;
+
         const meta = {
             sentFrom,
             permissionMode,
             model,
             fallbackModel,
-            appendSystemPrompt: systemPrompt,
-            ...(displayText && { displayText })
+            appendSystemPrompt: finalSystemPrompt,
+            ...(displayText && { displayText }),
+            ...(filesMeta && { files: filesMeta }),
+            ...(mdReferences && mdReferences.length > 0 && { mdReferences: mdReferences.map(r => r.name) }),
         };
 
-        // Build content: use array format when images are present, legacy object otherwise
+        // Check for binary attachments (images, PDFs)
+        const pdfFiles = files?.filter(f => f.kind === 'pdf') || [];
+        const hasImages = images && images.length > 0;
+        const hasPdfs = pdfFiles.length > 0;
+
+        // Build content: use array format when multimodal content is present
         let messageContent: any;
-        if (images && images.length > 0) {
+        if (hasImages || hasPdfs) {
             const contentBlocks: any[] = [];
-            for (const img of images) {
+            for (const img of (images || [])) {
                 contentBlocks.push({
                     type: 'image',
                     source: {
@@ -509,12 +542,22 @@ class Sync {
                     },
                 });
             }
-            if (text.trim()) {
-                contentBlocks.push({ type: 'text', text });
+            for (const pdf of pdfFiles) {
+                contentBlocks.push({
+                    type: 'document',
+                    source: {
+                        type: 'base64',
+                        media_type: pdf.mediaType,
+                        data: pdf.content,
+                    },
+                });
+            }
+            if (actualText.trim()) {
+                contentBlocks.push({ type: 'text', text: actualText });
             }
             messageContent = contentBlocks;
         } else {
-            messageContent = { type: 'text', text };
+            messageContent = { type: 'text', text: actualText };
         }
 
         // Create user message content with metadata
@@ -544,6 +587,36 @@ class Sync {
 
         this.getSendSync(sessionId).invalidate();
         this.maybeStartBackgroundSendWatchdog();
+
+        // If session is inactive, trigger reactivation so a new Claude Code process
+        // picks up this message. The user's UI remains unchanged (silent reactivation).
+        if (session && !session.active && session.metadata?.machineId) {
+            this.tryReactivateSession(sessionId, session);
+        }
+    }
+
+    private async tryReactivateSession(sessionId: string, session: Session) {
+        if (this.reactivatingSessionIds.has(sessionId)) return;
+        this.reactivatingSessionIds.add(sessionId);
+
+        try {
+            const machineId = session.metadata!.machineId!;
+            const params = {
+                happySessionId: sessionId,
+                directory: session.metadata!.path,
+                claudeSessionId: session.metadata!.claudeSessionId,
+                agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini') || undefined,
+            };
+            const result = await apiSocket.machineRPC(machineId, 'reactivate-session', params);
+            log.log(`Session reactivation result: ${JSON.stringify(result)}`);
+        } catch (error) {
+            console.warn('Failed to reactivate session:', error);
+        } finally {
+            // Keep the dedup guard for 30s to prevent rapid re-triggers
+            setTimeout(() => {
+                this.reactivatingSessionIds.delete(sessionId);
+            }, 30_000);
+        }
     }
 
     applySettings = (delta: Partial<Settings>) => {
@@ -1799,12 +1872,16 @@ class Sync {
                     }
 
                     // Update session
+                    const isUserMessage = rawContent?.role === 'user';
                     const session = storage.getState().sessions[updateData.body.sid];
                     if (session) {
                         this.applySessions([{
                             ...session,
                             updatedAt: updateData.createdAt,
                             seq: updateData.seq,
+                            // Only bump sort timestamp for user messages;
+                            // AI completion is handled by thinking: true→false in applySessions
+                            ...(isUserMessage ? { sortTimestamp: Date.now() } : {}),
                             // Update thinking state based on task lifecycle events
                             ...(isTaskComplete ? { thinking: false } : {}),
                             ...(isTaskStarted ? { thinking: true } : {})

@@ -443,11 +443,19 @@ const rawRecordSchema = z.preprocess(
             content: z.union([
                 // Legacy format: single text object (backward compatible)
                 z.object({ type: z.literal('text'), text: z.string() }),
-                // New format: array of content blocks (text + images)
+                // New format: array of content blocks (text + images + documents)
                 z.array(z.union([
                     z.object({ type: z.literal('text'), text: z.string() }),
                     z.object({
                         type: z.literal('image'),
+                        source: z.object({
+                            type: z.literal('base64'),
+                            media_type: z.string(),
+                            data: z.string(),
+                        }),
+                    }),
+                    z.object({
+                        type: z.literal('document'),
                         source: z.object({
                             type: z.literal('base64'),
                             media_type: z.string(),
@@ -528,6 +536,8 @@ export type NormalizedMessage = ({
         text: string;
     }
     images?: Array<{ mediaType: string; data: string }>
+    documents?: Array<{ mediaType: string; data: string }>
+    files?: Array<{ name: string; mediaType: string }>
 } | {
     role: 'agent'
     content: NormalizedAgentContent[]
@@ -741,7 +751,7 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
             return null;
         }
 
-        // Handle array content (multimodal: text + images)
+        // Handle array content (multimodal: text + images + documents)
         if (Array.isArray(raw.content)) {
             const textParts = raw.content
                 .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
@@ -749,6 +759,10 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
             const images = raw.content
                 .filter((b): b is { type: 'image'; source: { type: 'base64'; media_type: string; data: string } } => b.type === 'image')
                 .map(b => ({ mediaType: b.source.media_type, data: b.source.data }));
+            const documents = raw.content
+                .filter((b): b is { type: 'document'; source: { type: 'base64'; media_type: string; data: string } } => b.type === 'document')
+                .map(b => ({ mediaType: b.source.media_type, data: b.source.data }));
+            const filesMeta = raw.meta?.files;
             return {
                 id,
                 localId,
@@ -756,17 +770,21 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
                 role: 'user',
                 content: { type: 'text' as const, text: textParts.join('\n') },
                 images: images.length > 0 ? images : undefined,
+                documents: documents.length > 0 ? documents : undefined,
+                files: filesMeta,
                 isSidechain: false,
                 meta: raw.meta,
             };
         }
 
+        const filesMeta = raw.meta?.files;
         return {
             id,
             localId,
             createdAt,
             role: 'user',
             content: raw.content,
+            files: filesMeta,
             isSidechain: false,
             meta: raw.meta,
         };

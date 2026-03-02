@@ -69,10 +69,18 @@ interface DaemonToServerEvents {
     }) => void) => void;
 }
 
+export interface ReactivateSessionOptions {
+    happySessionId: string;
+    directory: string;
+    claudeSessionId?: string;
+    agent?: 'claude' | 'codex' | 'gemini';
+}
+
 type MachineRpcHandlers = {
     spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
+    reactivateSession: (options: ReactivateSessionOptions) => Promise<SpawnSessionResult>;
 }
 
 export class ApiMachineClient {
@@ -98,7 +106,8 @@ export class ApiMachineClient {
     setRPCHandlers({
         spawnSession,
         stopSession,
-        requestShutdown
+        requestShutdown,
+        reactivateSession
     }: MachineRpcHandlers) {
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
@@ -153,6 +162,30 @@ export class ApiMachineClient {
             }, 100);
 
             return { message: 'Daemon stop request acknowledged, starting shutdown sequence...' };
+        });
+
+        // Register reactivate session handler
+        this.rpcHandlerManager.registerHandler('reactivate-session', async (params: any) => {
+            const { happySessionId, directory, claudeSessionId, agent } = params || {};
+            logger.debug(`[API MACHINE] Reactivating session with params: ${JSON.stringify(params)}`);
+
+            if (!happySessionId) {
+                throw new Error('Happy session ID is required');
+            }
+
+            const result = await reactivateSession({ happySessionId, directory, claudeSessionId, agent });
+
+            switch (result.type) {
+                case 'success':
+                    logger.debug(`[API MACHINE] Reactivated session ${result.sessionId}`);
+                    return { type: 'success', sessionId: result.sessionId };
+
+                case 'error':
+                    throw new Error(result.errorMessage);
+
+                default:
+                    return result;
+            }
         });
     }
 

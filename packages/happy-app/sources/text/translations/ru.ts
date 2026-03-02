@@ -369,6 +369,28 @@ export const ru: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `Удалить "${name}"? Это действие нельзя отменить.`,
     },
 
+    mdReference: {
+        title: 'MD ССЫЛКИ',
+        globalSection: 'ГЛОБАЛЬНЫЕ',
+        projectSection: 'ПРОЕКТ',
+        emptyDescription: 'Создавайте файлы Markdown для быстрого добавления контекста к сообщениям.',
+        newButton: 'Создать',
+        createTitle: 'Новая MD ссылка',
+        editTitle: 'Редактировать MD ссылку',
+        nameLabel: 'Название',
+        namePlaceholder: 'Название ссылки',
+        descriptionLabel: 'Описание',
+        descriptionPlaceholder: 'Краткое описание (необязательно)',
+        contentLabel: 'Содержимое',
+        contentPlaceholder: 'Markdown содержимое...',
+        scopeLabel: 'Область',
+        scopeGlobal: 'Глобальная',
+        scopeProject: 'Проект',
+        save: 'Сохранить',
+        deleteConfirm: 'Удалить ссылку',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Удалить "${name}"? Это действие нельзя отменить.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -968,6 +990,11 @@ export const ru: TranslationStructure = {
             confirm: 'Удалить',
             cancel: 'Отмена',
         },
+    },
+
+    preview: {
+        urlPlaceholder: 'Введите URL...',
+        loadingError: 'Не удалось загрузить страницу',
     },
 
     notifications: {

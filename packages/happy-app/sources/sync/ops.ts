@@ -185,6 +185,34 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
 }
 
 /**
+ * Reactivate a stopped session on a specific machine
+ * When a user sends a message to an inactive session, this triggers the daemon
+ * to spawn a new CLI process that reconnects to the same Happy session with --resume
+ */
+export async function machineReactivateSession(options: {
+    machineId: string;
+    happySessionId: string;
+    directory: string;
+    claudeSessionId?: string;
+    agent?: 'codex' | 'claude' | 'gemini';
+}): Promise<SpawnSessionResult> {
+    const { machineId, ...params } = options;
+    try {
+        const result = await apiSocket.machineRPC<SpawnSessionResult, typeof params>(
+            machineId,
+            'reactivate-session',
+            params
+        );
+        return result;
+    } catch (error) {
+        return {
+            type: 'error',
+            errorMessage: error instanceof Error ? error.message : 'Failed to reactivate session'
+        };
+    }
+}
+
+/**
  * Stop the daemon on a specific machine
  */
 export async function machineStopDaemon(machineId: string): Promise<{ message: string }> {

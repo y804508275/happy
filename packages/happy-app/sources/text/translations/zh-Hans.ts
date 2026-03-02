@@ -398,6 +398,28 @@ export const zhHans: TranslationStructure = {
         deleteConfirmMessage: ({ name }: { name: string }) => `确定删除"${name}"？此操作不可撤销。`,
     },
 
+    mdReference: {
+        title: 'MD 引用',
+        globalSection: '全局',
+        projectSection: '项目',
+        emptyDescription: '创建 Markdown 引用文件，快速为消息添加上下文。',
+        newButton: '新建',
+        createTitle: '新建 MD 引用',
+        editTitle: '编辑 MD 引用',
+        nameLabel: '标题',
+        namePlaceholder: '引用标题',
+        descriptionLabel: '描述',
+        descriptionPlaceholder: '简短描述（可选）',
+        contentLabel: '内容',
+        contentPlaceholder: 'Markdown 内容...',
+        scopeLabel: '范围',
+        scopeGlobal: '全局',
+        scopeProject: '项目',
+        save: '保存',
+        deleteConfirm: '删除引用',
+        deleteConfirmMessage: ({ name }: { name: string }) => `确定删除 "${name}"？此操作无法撤销。`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component
@@ -946,6 +968,11 @@ export const zhHans: TranslationStructure = {
         friendRequestGeneric: '新的好友请求',
         friendAccepted: ({ name }: { name: string }) => `您现在与 ${name} 成为了好友`,
         friendAcceptedGeneric: '好友请求已接受',
+    },
+
+    preview: {
+        urlPlaceholder: '输入 URL...',
+        loadingError: '无法加载此页面',
     },
 
     notifications: {
