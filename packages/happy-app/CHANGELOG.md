@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 6 (2026.03.02.2) - 2026-03-02
+
+Added clickable version badge with version history panel on web.
+
+- Version badge in bottom-right corner is now clickable with hover effect
+- Clicking opens a floating panel showing all version history
+- Each version entry displays deploy version number, date, summary, and changes
+- Panel closes when clicking outside or clicking the badge again
+- Changelog now uses deploy version format (YYYY.MM.DD.N)
+
 ## Version 5 (2025.12.22.1) - 2025-12-22
 
 This release expands AI agent support and refines the voice experience, while improving markdown rendering for a better chat experience.
