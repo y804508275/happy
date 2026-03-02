@@ -193,6 +193,14 @@ export function v3SessionRoutes(app: Fastify) {
             };
         });
 
+        // Update session lastActiveAt if new messages were created (also triggers @updatedAt)
+        if (txResult.createdMessages.length > 0) {
+            await db.session.update({
+                where: { id: sessionId },
+                data: { lastActiveAt: new Date() }
+            });
+        }
+
         for (const message of txResult.createdMessages) {
             const content = message.localId ? contentByLocalId.get(message.localId) : null;
             if (!content) {

@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": 7,
+      "deployVersion": "2026.03.02.3",
+      "date": "2026-03-02",
+      "summary": "Fixed session time not updating when messages are sent.",
+      "changes": [
+        "Server: Update session lastActiveAt when messages are created via WebSocket and REST API",
+        "Server: Session updatedAt now auto-updates via Prisma @updatedAt on message creation",
+        "Client: Fix sortTimestamp merge priority so new values take effect",
+        "Client: Pass sortTimestamp on new-message events so conversations move to top of list"
+      ],
+      "rawMarkdown": "## Version 7 (2026.03.02.3) - 2026-03-02\n\n\nFixed session time not updating when messages are sent.\n\n- Server: Update session lastActiveAt when messages are created via WebSocket and REST API\n- Server: Session updatedAt now auto-updates via Prisma @updatedAt on message creation\n- Client: Fix sortTimestamp merge priority so new values take effect\n- Client: Pass sortTimestamp on new-message events so conversations move to top of list"
+    },
+    {
       "version": 6,
       "deployVersion": "2026.03.02.2",
       "date": "2026-03-02",
@@ -12,7 +25,7 @@
         "Panel closes when clicking outside or clicking the badge again",
         "Changelog now uses deploy version format (YYYY.MM.DD.N)"
       ],
-      "rawMarkdown": "## Version 6 (2026.03.02.2) - 2026-03-02\n\nAdded clickable version badge with version history panel on web.\n\n- Version badge in bottom-right corner is now clickable with hover effect\n- Clicking opens a floating panel showing all version history\n- Each version entry displays deploy version number, date, summary, and changes\n- Panel closes when clicking outside or clicking the badge again\n- Changelog now uses deploy version format (YYYY.MM.DD.N)"
+      "rawMarkdown": "## Version 6 (2026.03.02.2) - 2026-03-02\n\n\nAdded clickable version badge with version history panel on web.\n\n- Version badge in bottom-right corner is now clickable with hover effect\n- Clicking opens a floating panel showing all version history\n- Each version entry displays deploy version number, date, summary, and changes\n- Panel closes when clicking outside or clicking the badge again\n- Changelog now uses deploy version format (YYYY.MM.DD.N)"
     },
     {
       "version": 5,
@@ -84,5 +97,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 6
+  "latestVersion": 7
 }

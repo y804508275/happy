@@ -231,6 +231,12 @@ export function sessionUpdateHandler(userId: string, socket: Socket, connection:
                     }
                 });
 
+                // Update session lastActiveAt (also triggers @updatedAt)
+                await db.session.update({
+                    where: { id: sid },
+                    data: { lastActiveAt: new Date() }
+                });
+
                 // Emit new message update to relevant clients
                 const updatePayload = buildNewMessageUpdate(msg, sid, updSeq, randomKeyNaked(12));
                 eventRouter.emitUpdate({

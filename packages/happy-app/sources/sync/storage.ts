@@ -374,7 +374,7 @@ export const storage = create<StorageState>()((set, get) => {
                 mergedSessions[session.id] = {
                     ...session,
                     presence,
-                    sortTimestamp: existingSortTimestamp || session.sortTimestamp || session.createdAt,
+                    sortTimestamp: session.sortTimestamp || existingSortTimestamp || session.createdAt,
                     draft: existingDraft || savedDraft || session.draft || null,
                     permissionMode: resolvedPermissionMode
                 };

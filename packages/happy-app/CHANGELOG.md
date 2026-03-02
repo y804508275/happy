@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 7 (2026.03.02.3) - 2026-03-02
+
+Fixed session time not updating when messages are sent.
+
+- Server: Update session lastActiveAt when messages are created via WebSocket and REST API
+- Server: Session updatedAt now auto-updates via Prisma @updatedAt on message creation
+- Client: Fix sortTimestamp merge priority so new values take effect
+- Client: Pass sortTimestamp on new-message events so conversations move to top of list
+
 ## Version 6 (2026.03.02.2) - 2026-03-02
 
 Added clickable version badge with version history panel on web.
