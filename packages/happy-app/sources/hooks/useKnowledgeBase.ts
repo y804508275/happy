@@ -34,6 +34,23 @@ async function fetchKBItem(credentials: AuthCredentials, id: string): Promise<Sh
     return await response.json();
 }
 
+async function updateKBItem(
+    credentials: AuthCredentials,
+    id: string,
+    data: { name?: string; content?: string; expectedContentVersion?: number; meta?: any },
+): Promise<{ success: boolean; contentVersion?: number }> {
+    const response = await fetch(`${getServerUrl()}/v1/shared-items/${id}`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(`Failed: ${response.status}`);
+    return await response.json();
+}
+
 async function deleteKBItem(credentials: AuthCredentials, id: string): Promise<void> {
     const response = await fetch(`${getServerUrl()}/v1/shared-items/${id}`, {
         method: 'DELETE',
@@ -71,13 +88,7 @@ export function useKnowledgeBase(credentials: AuthCredentials | null, workingDir
             });
 
             setGlobalItems(memories.filter((item) => item.meta?.scope === 'global'));
-            setProjectItems(
-                memories.filter(
-                    (item) =>
-                        item.meta?.scope === 'project' &&
-                        item.meta?.projectPath === workingDirectory,
-                ),
-            );
+            setProjectItems(memories.filter((item) => item.meta?.scope === 'project'));
         } catch {
             // Silent failure - show empty state
         } finally {
@@ -123,5 +134,25 @@ export function useKnowledgeBase(credentials: AuthCredentials | null, workingDir
         [credentials],
     );
 
-    return { globalItems, projectItems, loading, fetchItemContent, deleteItem, refresh: fetchItems };
+    const updateItem = React.useCallback(
+        async (itemId: string, data: { name?: string; content?: string; expectedContentVersion?: number; meta?: any }) => {
+            if (!credentials) return;
+            try {
+                await updateKBItem(credentials, itemId, data);
+                // Clear content cache for this item so it's re-fetched
+                setContentCache((prev) => {
+                    const next = { ...prev };
+                    delete next[itemId];
+                    return next;
+                });
+                // Refresh the full list
+                await fetchItems();
+            } catch {
+                // Error handled silently
+            }
+        },
+        [credentials, fetchItems],
+    );
+
+    return { globalItems, projectItems, loading, fetchItemContent, deleteItem, updateItem, refresh: fetchItems };
 }

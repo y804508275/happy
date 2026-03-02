@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { configuration } from '@/configuration';
 import { logger } from '@/ui/logger';
-import { type ScannedProject, findProjectForPath } from './projectScanner';
+import { type ScannedProject } from './projectScanner';
 
 /**
  * Load knowledge base items and build a context prompt for system prompt injection.
@@ -31,23 +31,13 @@ export async function loadContextForInjection(
             timeout: 5000,
         });
 
-        // Filter to matching items: global or matching project
-        const currentProject = findProjectForPath(workingDirectory, projects);
+        // Include all memory items (global + all project-scoped).
+        // Project rules are labeled with their project name so Claude can
+        // decide relevance based on conversation context.
         const matchingItems = (response.data.items || []).filter((item: any) => {
             const meta = item.meta as any;
             if (!meta || meta.memoryType !== 'memory') return false;
-            if (meta.scope === 'global') return true;
-            if (meta.scope === 'project') {
-                // Match by project root: both workingDirectory and saved projectPath
-                // resolve to the same scanned project
-                if (currentProject && meta.projectPath) {
-                    const savedProject = findProjectForPath(meta.projectPath, projects);
-                    if (savedProject && savedProject.path === currentProject.path) return true;
-                }
-                // Fallback: exact path match (backward compatibility)
-                if (meta.projectPath === workingDirectory) return true;
-            }
-            return false;
+            return true;
         });
 
         if (matchingItems.length === 0) {
@@ -84,9 +74,15 @@ export async function loadContextForInjection(
         if (alwaysWithContent.length > 0) {
             prompt += '\n## Rules (always active — follow these)\n';
             prompt += '\nIMPORTANT: When a rule below influences your response, call `mcp__happy__notify_rule_applied` with the rule title and a brief description of how it was applied. This notifies the user which rules are active.\n';
+            prompt += '\nProject-scoped rules should only be applied when the conversation is relevant to that project.\n';
             for (const item of alwaysWithContent) {
-                const scope = item.meta?.scope === 'global' ? 'global' : 'project';
-                prompt += `\n### ${item.name} [${scope}]\n`;
+                const meta = item.meta || {};
+                let scopeLabel = 'global';
+                if (meta.scope === 'project' && meta.projectPath) {
+                    const projectName = meta.projectPath.split('/').filter(Boolean).pop() || 'unknown';
+                    scopeLabel = `project: ${projectName}`;
+                }
+                prompt += `\n### ${item.name} [${scopeLabel}]\n`;
                 if (item.content) {
                     prompt += `${item.content}\n`;
                 } else if (item.description) {
@@ -99,11 +95,16 @@ export async function loadContextForInjection(
         if (onDemandItems.length > 0) {
             prompt += '\n## Reference (use mcp__happy__load_context to load when relevant)\n';
             for (const item of onDemandItems) {
-                const tags = (item.meta?.tags as string[]) || [];
+                const meta = item.meta || {};
+                const tags = (meta.tags as string[]) || [];
                 const tagsStr = tags.length > 0 ? ` (tags: ${tags.join(', ')})` : '';
                 const descStr = item.description ? ` — ${item.description}` : '';
-                const scope = item.meta?.scope === 'global' ? 'global' : 'project';
-                prompt += `- [${item.id}] "${item.name}"${tagsStr}${descStr} [${scope}]\n`;
+                let scopeLabel = 'global';
+                if (meta.scope === 'project' && meta.projectPath) {
+                    const projectName = meta.projectPath.split('/').filter(Boolean).pop() || 'unknown';
+                    scopeLabel = `project: ${projectName}`;
+                }
+                prompt += `- [${item.id}] "${item.name}"${tagsStr}${descStr} [${scopeLabel}]\n`;
             }
         }
 

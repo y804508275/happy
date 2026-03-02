@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/constants/Typography';
@@ -13,7 +13,156 @@ import { useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
-import type { SharedItemFull } from '@/sync/sharedItemTypes';
+import type { SharedItemFull, SharedItemSummary } from '@/sync/sharedItemTypes';
+
+// ── Edit Modal Component ────────────────────────────────────────────
+
+function EditRuleModal({ item, onClose, onSave }: {
+    item: SharedItemFull;
+    onClose: () => void;
+    onSave: (name: string, content: string) => void;
+}) {
+    const { theme } = useUnistyles();
+    const [name, setName] = useState(item.name);
+    const [content, setContent] = useState(item.content || '');
+
+    const handleSave = () => {
+        if (!name.trim()) return;
+        onSave(name.trim(), content.trim());
+        onClose();
+    };
+
+    return (
+        <View style={{
+            backgroundColor: theme.colors.surface,
+            borderRadius: 14,
+            width: 400,
+            maxWidth: '90%',
+            overflow: 'hidden',
+            shadowColor: theme.colors.shadow.color,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+        }}>
+            <View style={{ paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16 }}>
+                <Text style={{
+                    fontSize: 17,
+                    textAlign: 'center',
+                    color: theme.colors.text,
+                    marginBottom: 16,
+                    ...Typography.default('semiBold'),
+                }}>
+                    Edit Rule
+                </Text>
+
+                <Text style={{
+                    fontSize: 13,
+                    color: theme.colors.textSecondary,
+                    marginBottom: 6,
+                    ...Typography.default('medium'),
+                }}>
+                    Title
+                </Text>
+                <TextInput
+                    style={{
+                        height: 36,
+                        borderWidth: 1,
+                        borderColor: theme.colors.divider,
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        fontSize: 14,
+                        color: theme.colors.text,
+                        backgroundColor: theme.colors.input.background,
+                        ...Typography.default(),
+                    }}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Rule title"
+                    placeholderTextColor={theme.colors.input.placeholder}
+                    autoFocus={Platform.OS === 'web'}
+                />
+
+                <Text style={{
+                    fontSize: 13,
+                    color: theme.colors.textSecondary,
+                    marginBottom: 6,
+                    marginTop: 12,
+                    ...Typography.default('medium'),
+                }}>
+                    Content
+                </Text>
+                <TextInput
+                    style={{
+                        minHeight: 120,
+                        maxHeight: 300,
+                        borderWidth: 1,
+                        borderColor: theme.colors.divider,
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                        fontSize: 14,
+                        color: theme.colors.text,
+                        backgroundColor: theme.colors.input.background,
+                        textAlignVertical: 'top',
+                        ...Typography.default(),
+                    }}
+                    value={content}
+                    onChangeText={setContent}
+                    placeholder="Rule content"
+                    placeholderTextColor={theme.colors.input.placeholder}
+                    multiline
+                />
+            </View>
+
+            <View style={{
+                borderTopWidth: 1,
+                borderTopColor: theme.colors.divider,
+                flexDirection: 'row',
+            }}>
+                <Pressable
+                    style={({ pressed }) => ({
+                        flex: 1,
+                        paddingVertical: 11,
+                        alignItems: 'center' as const,
+                        justifyContent: 'center' as const,
+                        backgroundColor: pressed ? theme.colors.divider : 'transparent',
+                    })}
+                    onPress={onClose}
+                >
+                    <Text style={{
+                        fontSize: 17,
+                        color: theme.colors.textLink,
+                        ...Typography.default(),
+                    }}>
+                        Cancel
+                    </Text>
+                </Pressable>
+                <View style={{ width: 1, backgroundColor: theme.colors.divider }} />
+                <Pressable
+                    style={({ pressed }) => ({
+                        flex: 1,
+                        paddingVertical: 11,
+                        alignItems: 'center' as const,
+                        justifyContent: 'center' as const,
+                        backgroundColor: pressed ? theme.colors.divider : 'transparent',
+                    })}
+                    onPress={handleSave}
+                >
+                    <Text style={{
+                        fontSize: 17,
+                        color: theme.colors.textLink,
+                        ...Typography.default('semiBold'),
+                    }}>
+                        Save
+                    </Text>
+                </Pressable>
+            </View>
+        </View>
+    );
+}
+
+// ── Main Content ────────────────────────────────────────────────────
 
 function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
     const { theme } = useUnistyles();
@@ -21,7 +170,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
     const { credentials } = useAuth();
     const workingDirectory = session?.metadata?.path || '';
 
-    const { globalItems, projectItems, loading, deleteItem, fetchItemContent } =
+    const { globalItems, projectItems, loading, deleteItem, updateItem, fetchItemContent } =
         useKnowledgeBase(credentials, workingDirectory);
 
     // Track expanded item content by ID
@@ -50,6 +199,54 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
             });
         }
     }, [expanded, fetchItemContent]);
+
+    const handleEdit = useCallback(async (itemId: string) => {
+        // Fetch full content first
+        const full = await fetchItemContent(itemId);
+        if (!full) return;
+
+        Modal.show({
+            component: EditRuleModal,
+            props: {
+                item: full,
+                onSave: (name: string, content: string) => {
+                    updateItem(itemId, {
+                        name,
+                        content,
+                        expectedContentVersion: full.contentVersion,
+                    });
+                    // Update expanded content if visible
+                    setExpanded((prev) => {
+                        if (!prev[itemId]) return prev;
+                        return { ...prev, [itemId]: { ...full, name, content } };
+                    });
+                },
+            },
+        });
+    }, [fetchItemContent, updateItem]);
+
+    const handleToggleScope = useCallback(async (item: SharedItemSummary) => {
+        const currentScope = item.meta?.scope;
+        const isGlobal = currentScope === 'global';
+        const newScope = isGlobal ? 'project' : 'global';
+        const label = isGlobal ? 'Move to Project' : 'Move to Global';
+
+        const confirmed = await Modal.confirm(
+            label,
+            isGlobal
+                ? `Move "${item.name}" to project scope? It will only apply to the current project.`
+                : `Move "${item.name}" to global scope? It will apply to all projects.`,
+        );
+        if (!confirmed) return;
+
+        const newMeta = { ...item.meta, scope: newScope };
+        if (newScope === 'project') {
+            newMeta.projectPath = workingDirectory;
+        } else {
+            delete newMeta.projectPath;
+        }
+        await updateItem(item.id, { meta: newMeta });
+    }, [updateItem, workingDirectory]);
 
     const handleDelete = useCallback((itemId: string, itemName: string) => {
         Modal.alert(
@@ -101,6 +298,51 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
         );
     }
 
+    const renderActions = (item: SharedItemSummary) => {
+        const isGlobal = item.meta?.scope === 'global';
+        return (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Pressable
+                    onPress={(e) => { e.stopPropagation(); handleEdit(item.id); }}
+                    style={({ pressed }) => ({
+                        padding: 6,
+                        borderRadius: 6,
+                        backgroundColor: pressed ? theme.colors.divider : 'transparent',
+                    })}
+                    hitSlop={4}
+                >
+                    <Ionicons name="pencil-outline" size={18} color={theme.colors.textSecondary} />
+                </Pressable>
+                <Pressable
+                    onPress={(e) => { e.stopPropagation(); handleToggleScope(item); }}
+                    style={({ pressed }) => ({
+                        padding: 6,
+                        borderRadius: 6,
+                        backgroundColor: pressed ? theme.colors.divider : 'transparent',
+                    })}
+                    hitSlop={4}
+                >
+                    <Ionicons
+                        name={isGlobal ? 'folder-outline' : 'globe-outline'}
+                        size={18}
+                        color={theme.colors.textSecondary}
+                    />
+                </Pressable>
+                <Pressable
+                    onPress={(e) => { e.stopPropagation(); handleDelete(item.id, item.name); }}
+                    style={({ pressed }) => ({
+                        padding: 6,
+                        borderRadius: 6,
+                        backgroundColor: pressed ? theme.colors.divider : 'transparent',
+                    })}
+                    hitSlop={4}
+                >
+                    <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                </Pressable>
+            </View>
+        );
+    };
+
     const renderExpandedContent = (itemId: string) => {
         const data = expanded[itemId];
         if (!data) return null;
@@ -148,7 +390,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                                         subtitle={subtitle}
                                         icon={<Ionicons name="globe-outline" size={29} color="#007AFF" />}
                                         onPress={() => handlePress(item.id)}
-                                        onLongPress={() => handleDelete(item.id, item.name)}
+                                        rightElement={renderActions(item)}
                                         showChevron={false}
                                     />
                                     {renderExpandedContent(item.id)}
@@ -159,45 +401,13 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                 )}
 
                 {projectItems.length > 0 && (
-                    <ItemGroup title={(() => {
-                        const projectName = workingDirectory.split('/').filter(Boolean).pop() || '';
-                        return (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={{
-                                    ...Typography.default('regular'),
-                                    color: theme.colors.groupped.sectionTitle,
-                                    fontSize: Platform.select({ ios: 13, default: 14 }),
-                                    lineHeight: Platform.select({ ios: 18, default: 20 }),
-                                    letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
-                                    textTransform: 'uppercase',
-                                    fontWeight: Platform.select({ ios: 'normal', default: '500' }),
-                                }}>
-                                    {t('knowledgeBase.projectContext')}
-                                </Text>
-                                {projectName ? (
-                                    <View style={{
-                                        backgroundColor: 'rgba(88, 86, 214, 0.15)',
-                                        paddingHorizontal: 8,
-                                        paddingVertical: 2,
-                                        borderRadius: 6,
-                                    }}>
-                                        <Text style={{
-                                            color: '#5856D6',
-                                            fontSize: 12,
-                                            fontWeight: '500',
-                                            ...Typography.default('medium'),
-                                        }}>
-                                            {projectName}
-                                        </Text>
-                                    </View>
-                                ) : null}
-                            </View>
-                        );
-                    })()}>
+                    <ItemGroup title={t('knowledgeBase.projectContext')}>
                         {projectItems.map((item) => {
                             const tags = (item.meta?.tags as string[]) || [];
                             const isAlways = item.meta?.alwaysApply !== false;
+                            const projectName = item.meta?.projectPath?.split('/').filter(Boolean).pop() || '';
                             const parts: string[] = [isAlways ? 'Always active' : 'On-demand'];
+                            if (projectName) parts.push(projectName);
                             if (item.description) parts.push(item.description);
                             if (tags.length > 0) parts.push(`Tags: ${tags.join(', ')}`);
                             const subtitle = parts.join(' | ') || undefined;
@@ -208,7 +418,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                                         subtitle={subtitle}
                                         icon={<Ionicons name="folder-outline" size={29} color="#5856D6" />}
                                         onPress={() => handlePress(item.id)}
-                                        onLongPress={() => handleDelete(item.id, item.name)}
+                                        rightElement={renderActions(item)}
                                         showChevron={false}
                                     />
                                     {renderExpandedContent(item.id)}
