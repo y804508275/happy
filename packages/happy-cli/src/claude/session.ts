@@ -24,8 +24,8 @@ export class Session {
     readonly jsRuntime: JsRuntime;
     /** Discovered local projects on this machine */
     readonly projects: ScannedProject[];
-    /** Pre-loaded project knowledge base context */
-    readonly projectContext?: string | null;
+    /** Project knowledge base context (reloaded before each query) */
+    projectContext?: string | null;
 
     sessionId: string | null;
     mode: 'local' | 'remote' = 'local';
@@ -83,6 +83,23 @@ export class Session {
         }, 2000);
     }
     
+    /**
+     * Reload project knowledge base context from server.
+     * Called before each launcher iteration to pick up newly saved rules.
+     */
+    reloadProjectContext = async (): Promise<void> => {
+        try {
+            const { loadContextForInjection } = await import('@/claude/utils/projectContext');
+            const { contextPrompt } = await loadContextForInjection(
+                this.client.getAuthToken(), this.path, this.projects
+            );
+            this.projectContext = contextPrompt;
+            logger.debug(`[Session] Reloaded project context: ${contextPrompt ? `${contextPrompt.length} chars` : 'none'}`);
+        } catch (error) {
+            logger.debug('[Session] Failed to reload project context:', error);
+        }
+    }
+
     /**
      * Cleanup resources (call when session is no longer needed)
      */

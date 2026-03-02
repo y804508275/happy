@@ -120,6 +120,23 @@ export async function getProjects(): Promise<ScannedProject[]> {
 }
 
 /**
+ * Find the scanned project that contains the given directory path.
+ * Returns the most specific (longest path) match, or null if no project matches.
+ */
+export function findProjectForPath(dir: string, projects: ScannedProject[]): ScannedProject | null {
+    if (!dir) return null;
+    let best: ScannedProject | null = null;
+    for (const p of projects) {
+        if (dir === p.path || dir.startsWith(p.path + '/')) {
+            if (!best || p.path.length > best.path.length) {
+                best = p;
+            }
+        }
+    }
+    return best;
+}
+
+/**
  * Format project list for inclusion in system prompt.
  * Returns empty string if no projects found.
  */

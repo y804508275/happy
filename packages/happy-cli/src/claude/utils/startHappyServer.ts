@@ -12,7 +12,7 @@ import { z } from "zod";
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
-import { type ScannedProject, scanProjects, readProjectCache } from "./projectScanner";
+import { type ScannedProject, scanProjects, readProjectCache, findProjectForPath } from "./projectScanner";
 import axios from "axios";
 import { configuration } from "@/configuration";
 
@@ -216,7 +216,8 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                 alwaysApply: args.alwaysApply,
             };
             if (args.scope === 'project' && workingDirectory) {
-                meta.projectPath = workingDirectory;
+                const matchedProject = findProjectForPath(workingDirectory, currentProjects);
+                meta.projectPath = matchedProject?.path || workingDirectory;
             }
 
             const response = await axios.post(`${apiBase}/v1/shared-items`, {
@@ -245,7 +246,8 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                     alwaysApply: args.alwaysApply,
                 };
                 if (args.scope === 'project' && workingDirectory) {
-                    meta.projectPath = workingDirectory;
+                    const matchedProject = findProjectForPath(workingDirectory, currentProjects);
+                    meta.projectPath = matchedProject?.path || workingDirectory;
                 }
                 try {
                     const response = await axios.post(`${apiBase}/v1/shared-items`, {

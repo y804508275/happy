@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { configuration } from '@/configuration';
 import { logger } from '@/ui/logger';
+import { type ScannedProject, findProjectForPath } from './projectScanner';
 
 /**
  * Load knowledge base items and build a context prompt for system prompt injection.
@@ -9,11 +10,13 @@ import { logger } from '@/ui/logger';
  * - alwaysApply=true (default): full content injected as rules
  * - alwaysApply=false: only title/tags/description listed as on-demand reference
  *
- * Called once at session start. Fails silently so it never blocks startup.
+ * Called at session start and on each new query to pick up newly saved rules.
+ * Fails silently so it never blocks startup.
  */
 export async function loadContextForInjection(
     authToken: string,
-    workingDirectory: string
+    workingDirectory: string,
+    projects: ScannedProject[] = []
 ): Promise<{ contextPrompt: string | null }> {
     try {
         const headers = {
@@ -29,11 +32,21 @@ export async function loadContextForInjection(
         });
 
         // Filter to matching items: global or matching project
+        const currentProject = findProjectForPath(workingDirectory, projects);
         const matchingItems = (response.data.items || []).filter((item: any) => {
             const meta = item.meta as any;
             if (!meta || meta.memoryType !== 'memory') return false;
             if (meta.scope === 'global') return true;
-            if (meta.scope === 'project' && meta.projectPath === workingDirectory) return true;
+            if (meta.scope === 'project') {
+                // Match by project root: both workingDirectory and saved projectPath
+                // resolve to the same scanned project
+                if (currentProject && meta.projectPath) {
+                    const savedProject = findProjectForPath(meta.projectPath, projects);
+                    if (savedProject && savedProject.path === currentProject.path) return true;
+                }
+                // Fallback: exact path match (backward compatibility)
+                if (meta.projectPath === workingDirectory) return true;
+            }
             return false;
         });
 

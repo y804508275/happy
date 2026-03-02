@@ -101,6 +101,9 @@ export async function claudeLocalLauncher(session: Session): Promise<LauncherRes
                 return exitReason;
             }
 
+            // Reload knowledge base context before each launch
+            await session.reloadProjectContext();
+
             // Launch
             logger.debug('[local]: launch');
             try {

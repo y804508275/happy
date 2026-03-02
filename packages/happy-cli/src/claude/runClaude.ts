@@ -257,7 +257,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
 
     // Load knowledge base for system prompt injection (always-active rules + on-demand directory)
     const { loadContextForInjection } = await import('@/claude/utils/projectContext');
-    const { contextPrompt: projectContext } = await loadContextForInjection(session.getAuthToken(), workingDirectory);
+    const { contextPrompt: projectContext } = await loadContextForInjection(session.getAuthToken(), workingDirectory, projects);
     logger.debug(`[START] Knowledge base context: ${projectContext ? `${projectContext.length} chars loaded` : 'none'}`);
 
     // Variable to track current session instance (updated via onSessionReady callback)

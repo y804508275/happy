@@ -302,6 +302,9 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
         // See: https://github.com/anthropics/happy-cli/issues/143
         let previousSessionId: string | null = null;
         while (!exitReason) {
+            // Reload knowledge base context before each launch
+            await session.reloadProjectContext();
+
             logger.debug('[remote]: launch');
             messageBuffer.addMessage('═'.repeat(40), 'status');
 

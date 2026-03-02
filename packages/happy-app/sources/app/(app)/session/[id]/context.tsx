@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/constants/Typography';
@@ -159,7 +159,41 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                 )}
 
                 {projectItems.length > 0 && (
-                    <ItemGroup title={t('knowledgeBase.projectContext')}>
+                    <ItemGroup title={(() => {
+                        const projectName = workingDirectory.split('/').filter(Boolean).pop() || '';
+                        return (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={{
+                                    ...Typography.default('regular'),
+                                    color: theme.colors.groupped.sectionTitle,
+                                    fontSize: Platform.select({ ios: 13, default: 14 }),
+                                    lineHeight: Platform.select({ ios: 18, default: 20 }),
+                                    letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
+                                    textTransform: 'uppercase',
+                                    fontWeight: Platform.select({ ios: 'normal', default: '500' }),
+                                }}>
+                                    {t('knowledgeBase.projectContext')}
+                                </Text>
+                                {projectName ? (
+                                    <View style={{
+                                        backgroundColor: 'rgba(88, 86, 214, 0.15)',
+                                        paddingHorizontal: 8,
+                                        paddingVertical: 2,
+                                        borderRadius: 6,
+                                    }}>
+                                        <Text style={{
+                                            color: '#5856D6',
+                                            fontSize: 12,
+                                            fontWeight: '500',
+                                            ...Typography.default('medium'),
+                                        }}>
+                                            {projectName}
+                                        </Text>
+                                    </View>
+                                ) : null}
+                            </View>
+                        );
+                    })()}>
                         {projectItems.map((item) => {
                             const tags = (item.meta?.tags as string[]) || [];
                             const isAlways = item.meta?.alwaysApply !== false;
