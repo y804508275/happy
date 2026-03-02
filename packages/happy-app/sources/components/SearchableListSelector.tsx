@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, Pressable, Platform } from 'react-native';
+import { View, Text, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { Typography } from '@/constants/Typography';
@@ -82,6 +82,7 @@ export interface SearchableListSelectorProps<T> {
     onSelect: (item: T) => void;
     onToggleFavorite?: (item: T) => void;
     context?: any;  // Additional context (e.g., homeDir for paths)
+    isLoading?: boolean;  // Show loading indicator (e.g., while scanning for projects)
 
     // Optional overrides
     showFavorites?: boolean;
@@ -227,6 +228,7 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
         onSelect,
         onToggleFavorite,
         context,
+        isLoading = false,
         showFavorites = config.showFavorites !== false,
         showRecent = config.showRecent !== false,
         showSearch = config.showSearch !== false,
@@ -659,8 +661,8 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
                 </>
             )}
 
-            {/* All Items Section - always shown when items provided */}
-            {filteredAllItems.length > 0 && (
+            {/* All Items Section - shown when items provided OR loading/empty */}
+            {(filteredAllItems.length > 0 || isLoading || (items.length === 0 && filteredRecentItems.length === 0 && filteredFavoriteItems.length === 0)) && (
                 <>
                     <Pressable
                         style={styles.sectionHeader}
@@ -668,6 +670,7 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
                     >
                         <Text style={styles.sectionHeaderText}>
                             {config.allSectionTitle || config.recentSectionTitle.replace('Recent ', 'All ')}
+                            {isLoading ? ' ...' : ''}
                         </Text>
                         <Ionicons
                             name={showAllItemsSection ? "chevron-up" : "chevron-down"}
@@ -678,6 +681,21 @@ export function SearchableListSelector<T>(props: SearchableListSelectorProps<T>)
 
                     {showAllItemsSection && (
                         <ItemGroup title="">
+                            {isLoading && filteredAllItems.length === 0 && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 }}>
+                                    <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 14, ...Typography.default() }}>
+                                        {config.noItemsMessage}
+                                    </Text>
+                                </View>
+                            )}
+                            {!isLoading && filteredAllItems.length === 0 && (
+                                <View style={{ padding: 16 }}>
+                                    <Text style={{ color: theme.colors.textSecondary, fontSize: 14, ...Typography.default() }}>
+                                        {config.noItemsMessage}
+                                    </Text>
+                                </View>
+                            )}
                             {filteredAllItems.map((item, index) => {
                                 const itemId = config.getItemId(item);
                                 const selectedId = selectedItem ? config.getItemId(selectedItem) : null;

@@ -1865,6 +1865,7 @@ function NewSessionWizard() {
                                     compactItems: true,
                                 }}
                                 items={discoveredProjects}
+                                isLoading={projectScan.isScanning}
                                 recentItems={recentPaths}
                                 favoriteItems={(() => {
                                     if (!selectedMachine?.metadata?.homeDir) return [];
@@ -1904,20 +1905,6 @@ function NewSessionWizard() {
                                     context={{ homeDir: selectedMachine?.metadata?.homeDir }}
                                 />
 
-                                {/* Project scan status */}
-                                {selectedMachineId && (
-                                    <View style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-                                        <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>
-                                            {projectScan.isScanning
-                                                ? '🔍 Scanning for projects...'
-                                                : projectScan.error
-                                                ? `⚠️ Scan error: ${projectScan.error}`
-                                                : discoveredProjects.length > 0
-                                                ? `Found ${discoveredProjects.length} projects on device`
-                                                : '⏳ No projects discovered yet'}
-                                        </Text>
-                                    </View>
-                                )}
                             </View>
 
                             {/* Section 4: Permission Mode */}
