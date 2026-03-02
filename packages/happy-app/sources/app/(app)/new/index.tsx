@@ -1110,11 +1110,18 @@ function NewSessionWizard() {
                 }
 
                 // Send initial message if provided (text or images)
+                // Wrapped in separate try/catch so a message send failure
+                // (e.g. encryption error with image data) doesn't prevent
+                // navigation to the already-created session
                 if (sessionPrompt.trim() || attachedImages.length > 0) {
                     const images = attachedImages.length > 0
                         ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
-                    await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images);
+                    try {
+                        await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images);
+                    } catch (sendError) {
+                        console.error('Failed to send initial message', sendError);
+                    }
                     setAttachedImages([]);
                 }
 
