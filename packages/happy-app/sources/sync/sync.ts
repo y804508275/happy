@@ -599,6 +599,7 @@ class Sync {
         if (this.reactivatingSessionIds.has(sessionId)) return;
         this.reactivatingSessionIds.add(sessionId);
 
+        let succeeded = false;
         try {
             const machineId = session.metadata!.machineId!;
             const params = {
@@ -607,15 +608,35 @@ class Sync {
                 claudeSessionId: session.metadata!.claudeSessionId,
                 agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini') || undefined,
             };
-            const result = await apiSocket.machineRPC(machineId, 'reactivate-session', params);
-            log.log(`Session reactivation result: ${JSON.stringify(result)}`);
+
+            // Retry up to 3 times with increasing delays
+            // After sleep/wake, the daemon may need time to reconnect its socket
+            const delays = [0, 3_000, 8_000];
+            for (let attempt = 0; attempt < delays.length; attempt++) {
+                if (attempt > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+                }
+                try {
+                    const result = await apiSocket.machineRPC(machineId, 'reactivate-session', params);
+                    log.log(`Session reactivation result (attempt ${attempt + 1}): ${JSON.stringify(result)}`);
+                    succeeded = true;
+                    break;
+                } catch (error) {
+                    log.log(`Session reactivation attempt ${attempt + 1} failed: ${error}`);
+                    if (attempt === delays.length - 1) {
+                        console.warn('Failed to reactivate session after all attempts:', error);
+                    }
+                }
+            }
         } catch (error) {
             console.warn('Failed to reactivate session:', error);
         } finally {
-            // Keep the dedup guard for 30s to prevent rapid re-triggers
+            // On success: 30s guard to prevent redundant re-triggers
+            // On failure: 5s guard to allow quick retry on next user message
+            const guardMs = succeeded ? 30_000 : 5_000;
             setTimeout(() => {
                 this.reactivatingSessionIds.delete(sessionId);
-            }, 30_000);
+            }, guardMs);
         }
     }
 

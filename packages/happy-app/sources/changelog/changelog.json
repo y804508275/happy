@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": 9,
+      "deployVersion": "2026.03.02.5",
+      "date": "2026-03-02",
+      "summary": "修复会话断开后无法重新激活的问题，提升休眠唤醒后的会话恢复可靠性。",
+      "changes": [
+        "修复 daemon 崩溃重启达到上限后删除 session info 文件的问题，保留文件以支持用户触发的重新激活",
+        "前端重新激活 RPC 增加重试机制（最多 3 次，间隔递增），应对休眠唤醒后 daemon socket 重连延迟",
+        "失败时缩短 dedup 守卫时间（30s → 5s），允许用户快速重试"
+      ],
+      "rawMarkdown": "## Version 9 (2026.03.02.5) - 2026-03-02\n\n\n修复会话断开后无法重新激活的问题，提升休眠唤醒后的会话恢复可靠性。\n\n- 修复 daemon 崩溃重启达到上限后删除 session info 文件的问题，保留文件以支持用户触发的重新激活\n- 前端重新激活 RPC 增加重试机制（最多 3 次，间隔递增），应对休眠唤醒后 daemon socket 重连延迟\n- 失败时缩短 dedup 守卫时间（30s → 5s），允许用户快速重试"
+    },
+    {
       "version": 8,
       "deployVersion": "2026.03.02.4",
       "date": "2026-03-02",
@@ -111,5 +123,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 8
+  "latestVersion": 9
 }

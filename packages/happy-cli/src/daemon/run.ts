@@ -767,9 +767,16 @@ export async function startDaemon(): Promise<void> {
         return;
       }
 
-      // Exit code 0 = clean exit, don't respawn
+      // Exit code 0 handling: distinguish intentional stops from external kills
       if (code === 0) {
-        logger.debug(`[DAEMON RUN] Session exited cleanly (code=0), not respawning`);
+        // If trackedSession is gone, it was stopped via stopSession() — don't respawn
+        if (!trackedSession || !trackedSession.happySessionId) {
+          logger.debug(`[DAEMON RUN] Session exited cleanly (code=0), not respawning (stopped intentionally)`);
+          return;
+        }
+        // Session was killed externally (not via stopSession) — try auto-respawn
+        logger.debug(`[DAEMON RUN] Session PID ${pid} exited with code 0 but was not stopped intentionally, attempting auto-respawn`);
+        await tryRespawnSession(trackedSession.happySessionId, `unexpected clean exit (code=0, signal=${signal})`);
         return;
       }
 
@@ -797,9 +804,8 @@ export async function startDaemon(): Promise<void> {
       const now = Date.now();
       if (attempts) {
         if (now - attempts.lastAttempt < RESPAWN_COOLDOWN_MS && attempts.count >= MAX_RESPAWN_ATTEMPTS) {
-          logger.debug(`[DAEMON RUN] Respawn limit reached for ${sessionId} (${attempts.count} attempts), skipping`);
-          // Clean up the session info file to prevent future attempts
-          try { unlinkSync(sessionInfoPath); } catch {}
+          logger.debug(`[DAEMON RUN] Respawn limit reached for ${sessionId} (${attempts.count} attempts), skipping auto-respawn`);
+          // Keep session info file so user-triggered reactivation can still work
           return;
         }
         if (now - attempts.lastAttempt >= RESPAWN_COOLDOWN_MS) {
@@ -833,6 +839,8 @@ export async function startDaemon(): Promise<void> {
         const result = await spawnSession({
           directory: sessionInfo.directory,
           restartFilePath,
+          resumeClaudeSessionId: sessionInfo.claudeSessionId,
+          agent: sessionInfo.agent || 'claude',
         });
         logger.debug('[DAEMON RUN] Auto-respawn result:', JSON.stringify(result));
       } catch (error) {
@@ -1016,7 +1024,7 @@ export async function startDaemon(): Promise<void> {
           // Process is dead
           logger.debug(`[DAEMON RUN] Removing stale session with PID ${pid} (process no longer exists)`);
 
-          // For re-adopted sessions (no ChildProcess), check if restart file exists
+          // For re-adopted sessions (no ChildProcess), try to auto-respawn
           if (!session.childProcess) {
             const restartFilePath = `/tmp/happy-restart-${pid}.json`;
             if (existsSync(restartFilePath)) {
@@ -1041,6 +1049,19 @@ export async function startDaemon(): Promise<void> {
                 })();
                 continue;
               }
+            }
+            // No restart file — try respawn via session info file (external kill scenario)
+            if (session.happySessionId) {
+              logger.debug(`[DAEMON RUN] Re-adopted session PID ${pid} died without restart file, attempting respawn via session info`);
+              const sessionId = session.happySessionId;
+              pidToTrackedSession.delete(pid);
+              sessionsChanged = true;
+              // Fire-and-forget respawn using tryRespawnSession
+              (async () => {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await tryRespawnSession(sessionId, `re-adopted session died (PID ${pid})`);
+              })();
+              continue;
             }
           }
 
