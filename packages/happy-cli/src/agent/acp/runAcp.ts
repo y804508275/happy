@@ -851,7 +851,12 @@ export async function runAcp(opts: {
   backend.onMessage(onBackendMessage);
 
   session.onUserMessage((message) => {
-    if (!message.content.text) {
+    // Extract text from content (handles both legacy object and new array format)
+    const messageText = Array.isArray(message.content)
+      ? message.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+      : message.content.text;
+
+    if (!messageText) {
       return;
     }
 
@@ -865,7 +870,7 @@ export async function runAcp(opts: {
       logger.debug(`[${opts.agentName}] Requested ACP model: ${currentModel ?? 'null'}`);
     }
 
-    messageQueue.push(message.content.text, {
+    messageQueue.push(messageText, {
       permissionMode: currentPermissionMode,
       model: currentModel,
     });
@@ -940,7 +945,7 @@ export async function runAcp(opts: {
         if (typeof batch.mode.model === 'string' && batch.mode.model.length > 0) {
           await switchModelIfRequested(batch.mode.model);
         }
-        await backend.sendPrompt(acpSessionId, batch.message);
+        await backend.sendPrompt(acpSessionId, typeof batch.message === 'string' ? batch.message : String(batch.message));
         await turnEnded;
         sendEnvelopes(sessionManager.endTurn('completed'));
         session.sendSessionEvent({ type: 'ready' });

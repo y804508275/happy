@@ -386,6 +386,16 @@ export const ca: TranslationStructure = {
         
     },
 
+    knowledgeBase: {
+        title: 'Base de coneixement',
+        globalContext: 'Context global',
+        projectContext: 'Context del projecte',
+        emptyTitle: 'Sense elements a la base de coneixement',
+        emptyDescription: 'Els elements desats de les sessions de codi apareixeran aquí.',
+        deleteConfirm: 'Eliminar element',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Eliminar "${name}"? Aquesta acció no es pot desfer.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

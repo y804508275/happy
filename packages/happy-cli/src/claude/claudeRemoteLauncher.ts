@@ -291,7 +291,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
 
     try {
         let pending: {
-            message: string;
+            message: string | Array<unknown>;
             mode: EnhancedMode;
         } | null = null;
 

@@ -19,7 +19,7 @@ import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { initialMachineMetadata } from '@/daemon/run';
 import { configuration } from '@/configuration';
 import packageJson from '../../package.json';
-import { MessageQueue2 } from '@/utils/MessageQueue2';
+import { MessageQueue2, QueueMessageContent } from '@/utils/MessageQueue2';
 import { hashObject } from '@/utils/deterministicJson';
 import { projectPath } from '@/projectPath';
 import { startHappyServer } from '@/claude/utils/startHappyServer';
@@ -262,7 +262,10 @@ export async function runGemini(opts: {
 
     // Build the full prompt with appendSystemPrompt if provided
     // Only include system prompt for the first message to avoid forcing tool usage on every message
-    const originalUserMessage = message.content.text;
+    // Extract text from content (handles both legacy object and new array format)
+    const originalUserMessage = Array.isArray(message.content)
+      ? message.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+      : message.content.text;
     let fullPrompt = originalUserMessage;
     if (isFirstMessage && message.meta?.appendSystemPrompt) {
       // Prepend system prompt to user message only for first message
@@ -888,10 +891,10 @@ export async function runGemini(opts: {
 
   try {
     let currentModeHash: string | null = null;
-    let pending: { message: string; mode: GeminiMode; isolate: boolean; hash: string } | null = null;
+    let pending: { message: QueueMessageContent; mode: GeminiMode; isolate: boolean; hash: string } | null = null;
 
     while (!shouldExit) {
-      let message: { message: string; mode: GeminiMode; isolate: boolean; hash: string } | null = pending;
+      let message: { message: QueueMessageContent; mode: GeminiMode; isolate: boolean; hash: string } | null = pending;
       pending = null;
 
       if (!message) {
@@ -913,6 +916,11 @@ export async function runGemini(opts: {
       if (!message) {
         break;
       }
+
+      // Extract text from queue content (Gemini only supports text)
+      const messageText = typeof message.message === 'string'
+        ? message.message
+        : (message.message as any[]).filter(b => b.type === 'text').map(b => b.text).join('\n');
 
       // Track if we need to inject conversation history (after model change)
       let injectHistoryContext = false;
@@ -985,7 +993,7 @@ export async function runGemini(opts: {
 
       currentModeHash = message.hash;
       // Show only original user message in UI, not the full prompt with system prompt
-      const userMessageToShow = message.mode?.originalUserMessage || message.message;
+      const userMessageToShow = message.mode?.originalUserMessage || messageText;
       messageBuffer.addMessage(userMessageToShow, 'user');
 
       // Mark that we're processing a message to synchronize session swaps
@@ -1051,8 +1059,8 @@ export async function runGemini(opts: {
         
         // Track if this prompt contains change_title instruction
         // If so, don't send task_complete until change_title is completed
-        pendingChangeTitle = message.message.includes('change_title') || 
-                             message.message.includes('happy__change_title');
+        pendingChangeTitle = messageText.includes('change_title') ||
+                             messageText.includes('happy__change_title');
         changeTitleCompleted = false;
         
         if (!geminiBackend || !acpSessionId) {
@@ -1061,7 +1069,7 @@ export async function runGemini(opts: {
         
         // The prompt already includes system prompt and change_title instruction (added in onUserMessage handler)
         // This is done in the message queue, so message.message already contains everything
-        let promptToSend = message.message;
+        let promptToSend = messageText;
         
         // Inject conversation history context if model was just changed
         if (injectHistoryContext && conversationHistory.hasHistory()) {

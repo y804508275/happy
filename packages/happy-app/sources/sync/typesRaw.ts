@@ -440,10 +440,22 @@ const rawRecordSchema = z.preprocess(
         }),
         z.object({
             role: z.literal('user'),
-            content: z.object({
-                type: z.literal('text'),
-                text: z.string()
-            }),
+            content: z.union([
+                // Legacy format: single text object (backward compatible)
+                z.object({ type: z.literal('text'), text: z.string() }),
+                // New format: array of content blocks (text + images)
+                z.array(z.union([
+                    z.object({ type: z.literal('text'), text: z.string() }),
+                    z.object({
+                        type: z.literal('image'),
+                        source: z.object({
+                            type: z.literal('base64'),
+                            media_type: z.string(),
+                            data: z.string(),
+                        }),
+                    }),
+                ])),
+            ]),
             meta: MessageMetaSchema.optional()
         }),
         z.object({
@@ -515,6 +527,7 @@ export type NormalizedMessage = ({
         type: 'text';
         text: string;
     }
+    images?: Array<{ mediaType: string; data: string }>
 } | {
     role: 'agent'
     content: NormalizedAgentContent[]
@@ -726,6 +739,26 @@ export function normalizeRawMessage(id: string, localId: string | null, createdA
     if (raw.role === 'user') {
         if (isSessionProtocolSendEnabled()) {
             return null;
+        }
+
+        // Handle array content (multimodal: text + images)
+        if (Array.isArray(raw.content)) {
+            const textParts = raw.content
+                .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+                .map(b => b.text);
+            const images = raw.content
+                .filter((b): b is { type: 'image'; source: { type: 'base64'; media_type: string; data: string } } => b.type === 'image')
+                .map(b => ({ mediaType: b.source.media_type, data: b.source.data }));
+            return {
+                id,
+                localId,
+                createdAt,
+                role: 'user',
+                content: { type: 'text' as const, text: textParts.join('\n') },
+                images: images.length > 0 ? images : undefined,
+                isSidechain: false,
+                meta: raw.meta,
+            };
         }
 
         return {

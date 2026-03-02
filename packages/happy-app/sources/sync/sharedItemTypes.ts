@@ -7,6 +7,7 @@ export interface SharedItemSummary {
     name: string;
     slug: string;
     description: string | null;
+    meta: any;
     usageCount: number;
     starCount: number;
     isStarred: boolean;

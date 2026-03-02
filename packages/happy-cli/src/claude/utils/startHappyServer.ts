@@ -147,6 +147,53 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
             .slice(0, 70) || 'untitled';
     }
 
+    mcp.registerTool('load_context', {
+        description: 'Load full content of knowledge base items by their IDs. Use this to retrieve detailed content for entries listed in the knowledge base directory.',
+        title: 'Load Context',
+        inputSchema: {
+            ids: z.array(z.string()).min(1).max(20).describe('Array of knowledge base item IDs to load.'),
+        },
+    }, async (args) => {
+        try {
+            const results = await Promise.all(
+                args.ids.map(async (id: string) => {
+                    try {
+                        const resp = await axios.get(`${apiBase}/v1/shared-items/${id}`, {
+                            headers: apiHeaders(),
+                            timeout: 10000,
+                        });
+                        return resp.data;
+                    } catch {
+                        return null;
+                    }
+                })
+            );
+
+            const validItems = results.filter(Boolean);
+            if (validItems.length === 0) {
+                return {
+                    content: [{ type: 'text', text: 'No items found for the given IDs.' }],
+                    isError: false,
+                };
+            }
+
+            const formatted = validItems.map((item: any) => {
+                const tags = item.meta?.tags?.length ? ` (tags: ${item.meta.tags.join(', ')})` : '';
+                return `## ${item.name}${tags}\n\n${item.content}`;
+            }).join('\n\n---\n\n');
+
+            return {
+                content: [{ type: 'text', text: formatted }],
+                isError: false,
+            };
+        } catch (error: any) {
+            return {
+                content: [{ type: 'text', text: `Failed to load context: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
     mcp.registerTool('save_memory', {
         description: 'Save a memory (important fact, preference, decision, or context) for future retrieval across sessions.',
         title: 'Save Memory',
@@ -155,6 +202,8 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
             title: z.string().max(200).describe('A short, descriptive title for the memory.'),
             scope: z.enum(['global', 'project']).default('project').describe('global = applies everywhere. project = applies only to the current project/directory.'),
             tags: z.array(z.string()).optional().describe('Optional tags for categorization, e.g. ["preference", "architecture"]'),
+            description: z.string().max(500).optional().describe('Brief summary for the knowledge base directory listing.'),
+            alwaysApply: z.boolean().default(true).describe('true (default) = always injected as a rule. false = on-demand reference, loaded only when relevant.'),
         },
     }, async (args) => {
         try {
@@ -164,6 +213,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                 scope: args.scope,
                 tags: args.tags || [],
                 createdBy: 'claude-auto',
+                alwaysApply: args.alwaysApply,
             };
             if (args.scope === 'project' && workingDirectory) {
                 meta.projectPath = workingDirectory;
@@ -174,7 +224,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                 visibility: 'private',
                 name: args.title,
                 slug,
-                description: args.tags?.join(', ') || null,
+                description: args.description || args.tags?.join(', ') || null,
                 content: args.content,
                 meta,
             }, { headers: apiHeaders(), timeout: 10000 });
@@ -192,6 +242,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                     scope: args.scope,
                     tags: args.tags || [],
                     createdBy: 'claude-auto',
+                    alwaysApply: args.alwaysApply,
                 };
                 if (args.scope === 'project' && workingDirectory) {
                     meta.projectPath = workingDirectory;
@@ -202,7 +253,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                         visibility: 'private',
                         name: args.title,
                         slug: retrySlug,
-                        description: args.tags?.join(', ') || null,
+                        description: args.description || args.tags?.join(', ') || null,
                         content: args.content,
                         meta,
                     }, { headers: apiHeaders(), timeout: 10000 });
@@ -287,7 +338,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
 
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title', 'list_projects', 'save_memory', 'delete_memory'],
+        toolNames: ['change_title', 'list_projects', 'load_context', 'save_memory', 'delete_memory'],
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
             mcp.close();

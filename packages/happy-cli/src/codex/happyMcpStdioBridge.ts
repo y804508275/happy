@@ -93,6 +93,12 @@ async function main() {
     { title: z.string().describe('The new title for the chat session') }
   );
 
+  registerForwardTool('load_context',
+    'Load full content of knowledge base items by their IDs.',
+    'Load Context',
+    { ids: z.array(z.string()).min(1).max(20).describe('Array of knowledge base item IDs to load.') }
+  );
+
   registerForwardTool('save_memory',
     'Save a memory for future retrieval across sessions.',
     'Save Memory',
@@ -101,6 +107,8 @@ async function main() {
       title: z.string().max(200).describe('A short, descriptive title.'),
       scope: z.enum(['global', 'project']).default('project').describe('global or project scope.'),
       tags: z.array(z.string()).optional().describe('Optional tags.'),
+      description: z.string().max(500).optional().describe('Brief summary for the directory listing.'),
+      alwaysApply: z.boolean().default(true).describe('true = always injected as a rule. false = on-demand reference.'),
     }
   );
 

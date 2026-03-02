@@ -41,6 +41,7 @@ interface MultiTextInputProps {
     onKeyPress?: OnKeyPressCallback;
     onSelectionChange?: (selection: { start: number; end: number }) => void;
     onStateChange?: (state: TextInputState) => void;
+    onImagePaste?: (files: File[]) => void;
 }
 
 export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextInputProps>((props, ref) => {
@@ -129,6 +130,22 @@ export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextIn
         }
     }, [onChangeText, onStateChange, onSelectionChange]);
 
+    const handlePaste = React.useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        console.log("[paste] fired"); if (!props.onImagePaste) return;
+
+        const items = Array.from(e.clipboardData.items);
+        const imageFiles = items
+            .filter(item => item.type.startsWith('image/'))
+            .map(item => item.getAsFile())
+            .filter((f): f is File => f !== null);
+
+        if (imageFiles.length > 0) {
+            e.preventDefault();
+            props.onImagePaste(imageFiles);
+        }
+        // If no images, let the default paste behavior handle text
+    }, [props.onImagePaste]);
+
     const handleSelect = React.useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
         const target = e.target as HTMLTextAreaElement;
         const selection = { 
@@ -200,6 +217,7 @@ export const MultiTextInput = React.forwardRef<MultiTextInputHandle, MultiTextIn
                 onChange={handleChange}
                 onSelect={handleSelect}
                 onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
                 maxRows={maxRows}
                 autoCapitalize="sentences"
                 autoCorrect="on"

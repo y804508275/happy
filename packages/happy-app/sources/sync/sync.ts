@@ -446,7 +446,7 @@ class Sync {
         this.backgroundSendStartedAt = null;
     }
 
-    async sendMessage(sessionId: string, text: string, displayText?: string) {
+    async sendMessage(sessionId: string, text: string, displayText?: string, images?: Array<{ base64: string; mediaType: string }>) {
 
         // Get encryption
         const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -486,21 +486,42 @@ class Sync {
 
         const fallbackModel: string | null = null;
 
+        const meta = {
+            sentFrom,
+            permissionMode,
+            model,
+            fallbackModel,
+            appendSystemPrompt: systemPrompt,
+            ...(displayText && { displayText })
+        };
+
+        // Build content: use array format when images are present, legacy object otherwise
+        let messageContent: any;
+        if (images && images.length > 0) {
+            const contentBlocks: any[] = [];
+            for (const img of images) {
+                contentBlocks.push({
+                    type: 'image',
+                    source: {
+                        type: 'base64',
+                        media_type: img.mediaType,
+                        data: img.base64,
+                    },
+                });
+            }
+            if (text.trim()) {
+                contentBlocks.push({ type: 'text', text });
+            }
+            messageContent = contentBlocks;
+        } else {
+            messageContent = { type: 'text', text };
+        }
+
         // Create user message content with metadata
         const content: RawRecord = {
             role: 'user',
-            content: {
-                type: 'text',
-                text
-            },
-            meta: {
-                sentFrom,
-                permissionMode,
-                model,
-                fallbackModel,
-                appendSystemPrompt: systemPrompt,
-                ...(displayText && { displayText }) // Add displayText if provided
-            }
+            content: messageContent,
+            meta
         };
         const encryptedRawRecord = await encryption.encryptRawRecord(content);
 
@@ -2162,6 +2183,7 @@ class Sync {
                 name: item.name,
                 slug: item.slug,
                 description: item.description,
+                meta: (item as any).meta ?? null,
                 usageCount: 0,
                 starCount: 0,
                 isStarred: false,

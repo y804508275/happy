@@ -126,6 +126,7 @@ type ReducerMessage = {
     isThinking?: boolean;
     event: AgentEvent | null;
     tool: ToolCall | null;
+    images?: Array<{ mediaType: string; data: string }>;
     meta?: MessageMeta;
 }
 
@@ -610,6 +611,7 @@ export function reducer(state: ReducerState, messages: NormalizedMessage[], agen
                 text: msg.content.text,
                 tool: null,
                 event: null,
+                ...(msg.images && { images: msg.images }),
                 meta: msg.meta,
             });
 
@@ -1116,6 +1118,7 @@ function convertReducerMessageToMessage(reducerMsg: ReducerMessage, state: Reduc
             kind: 'user-text',
             text: reducerMsg.text,
             ...(reducerMsg.meta?.displayText && { displayText: reducerMsg.meta.displayText }),
+            ...(reducerMsg.images && { images: reducerMsg.images }),
             meta: reducerMsg.meta
         };
     } else if (reducerMsg.role === 'agent' && reducerMsg.text !== null) {

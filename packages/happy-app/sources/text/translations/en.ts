@@ -401,6 +401,16 @@ export const en: TranslationStructure = {
 
     },
 
+    knowledgeBase: {
+        title: 'Knowledge Base',
+        globalContext: 'Global Context',
+        projectContext: 'Project Context',
+        emptyTitle: 'No Knowledge Base Items',
+        emptyDescription: 'Items saved from your coding sessions will appear here.',
+        deleteConfirm: 'Delete Item',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Delete "${name}"? This cannot be undone.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

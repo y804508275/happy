@@ -1,7 +1,9 @@
 import { logger } from "@/ui/logger";
 
+export type QueueMessageContent = string | Array<unknown>;
+
 interface QueueItem<T> {
-    message: string;
+    message: QueueMessageContent;
     mode: T;
     modeHash: string;
     isolate?: boolean; // If true, this message must be processed alone
@@ -15,12 +17,12 @@ export class MessageQueue2<T> {
     public queue: QueueItem<T>[] = []; // Made public for testing
     private waiter: ((hasMessages: boolean) => void) | null = null;
     private closed = false;
-    private onMessageHandler: ((message: string, mode: T) => void) | null = null;
+    private onMessageHandler: ((message: QueueMessageContent, mode: T) => void) | null = null;
     modeHasher: (mode: T) => string;
 
     constructor(
         modeHasher: (mode: T) => string,
-        onMessageHandler: ((message: string, mode: T) => void) | null = null
+        onMessageHandler: ((message: QueueMessageContent, mode: T) => void) | null = null
     ) {
         this.modeHasher = modeHasher;
         this.onMessageHandler = onMessageHandler;
@@ -30,14 +32,14 @@ export class MessageQueue2<T> {
     /**
      * Set a handler that will be called when a message arrives
      */
-    setOnMessage(handler: ((message: string, mode: T) => void) | null): void {
+    setOnMessage(handler: ((message: QueueMessageContent, mode: T) => void) | null): void {
         this.onMessageHandler = handler;
     }
 
     /**
      * Push a message to the queue with a mode.
      */
-    push(message: string, mode: T): void {
+    push(message: QueueMessageContent, mode: T): void {
         if (this.closed) {
             throw new Error('Cannot push to closed queue');
         }
@@ -72,7 +74,7 @@ export class MessageQueue2<T> {
      * Push a message immediately without batching delay.
      * Does not clear the queue or enforce isolation.
      */
-    pushImmediate(message: string, mode: T): void {
+    pushImmediate(message: QueueMessageContent, mode: T): void {
         if (this.closed) {
             throw new Error('Cannot push to closed queue');
         }
@@ -108,7 +110,7 @@ export class MessageQueue2<T> {
      * Clears any pending messages and ensures this message is never batched with others.
      * Used for special commands that require dedicated processing.
      */
-    pushIsolateAndClear(message: string, mode: T): void {
+    pushIsolateAndClear(message: QueueMessageContent, mode: T): void {
         if (this.closed) {
             throw new Error('Cannot push to closed queue');
         }
@@ -145,7 +147,7 @@ export class MessageQueue2<T> {
     /**
      * Push a message to the beginning of the queue with a mode.
      */
-    unshift(message: string, mode: T): void {
+    unshift(message: QueueMessageContent, mode: T): void {
         if (this.closed) {
             throw new Error('Cannot unshift to closed queue');
         }
@@ -218,10 +220,10 @@ export class MessageQueue2<T> {
     }
 
     /**
-     * Wait for messages and return all messages with the same mode as a single string
-     * Returns { message: string, mode: T } or null if aborted/closed
+     * Wait for messages and return all messages with the same mode
+     * Returns { message, mode } or null if aborted/closed
      */
-    async waitForMessagesAndGetAsString(abortSignal?: AbortSignal): Promise<{ message: string, mode: T, isolate: boolean, hash: string } | null> {
+    async waitForMessagesAndGetAsString(abortSignal?: AbortSignal): Promise<{ message: QueueMessageContent, mode: T, isolate: boolean, hash: string } | null> {
         // If we have messages, return them immediately
         if (this.queue.length > 0) {
             return this.collectBatch();
@@ -245,13 +247,12 @@ export class MessageQueue2<T> {
     /**
      * Collect a batch of messages with the same mode, respecting isolation requirements
      */
-    private collectBatch(): { message: string, mode: T, hash: string, isolate: boolean } | null {
+    private collectBatch(): { message: QueueMessageContent, mode: T, hash: string, isolate: boolean } | null {
         if (this.queue.length === 0) {
             return null;
         }
 
         const firstItem = this.queue[0];
-        const sameModeMessages: string[] = [];
         let mode = firstItem.mode;
         let isolate = firstItem.isolate ?? false;
         const targetModeHash = firstItem.modeHash;
@@ -259,22 +260,48 @@ export class MessageQueue2<T> {
         // If the first message requires isolation, only process it alone
         if (firstItem.isolate) {
             const item = this.queue.shift()!;
-            sameModeMessages.push(item.message);
             logger.debug(`[MessageQueue2] Collected isolated message with mode hash: ${targetModeHash}`);
-        } else {
-            // Collect all messages with the same mode until we hit an isolated message
-            while (this.queue.length > 0 &&
-                this.queue[0].modeHash === targetModeHash &&
-                !this.queue[0].isolate) {
-                const item = this.queue.shift()!;
-                sameModeMessages.push(item.message);
-            }
-            logger.debug(`[MessageQueue2] Collected batch of ${sameModeMessages.length} messages with mode hash: ${targetModeHash}`);
+            return {
+                message: item.message,
+                mode,
+                hash: targetModeHash,
+                isolate
+            };
         }
 
-        // Join all messages with newlines
-        const combinedMessage = sameModeMessages.join('\n');
+        // Collect all messages with the same mode until we hit an isolated message
+        const batch: QueueItem<T>[] = [];
+        while (this.queue.length > 0 &&
+            this.queue[0].modeHash === targetModeHash &&
+            !this.queue[0].isolate) {
+            batch.push(this.queue.shift()!);
+        }
+        logger.debug(`[MessageQueue2] Collected batch of ${batch.length} messages with mode hash: ${targetModeHash}`);
 
+        if (batch.length === 1) {
+            return {
+                message: batch[0].message,
+                mode,
+                hash: targetModeHash,
+                isolate
+            };
+        }
+
+        // Multiple messages: only join string messages.
+        // If any contain arrays (multimodal), use the last one.
+        const hasArrayContent = batch.some(item => Array.isArray(item.message));
+        if (hasArrayContent) {
+            const lastItem = batch[batch.length - 1];
+            return {
+                message: lastItem.message,
+                mode,
+                hash: targetModeHash,
+                isolate
+            };
+        }
+
+        // All strings: join with newline (existing behavior)
+        const combinedMessage = (batch.map(b => b.message) as string[]).join('\n');
         return {
             message: combinedMessage,
             mode,

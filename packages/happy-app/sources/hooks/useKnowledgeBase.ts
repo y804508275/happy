@@ -1,0 +1,127 @@
+import * as React from 'react';
+import type { AuthCredentials } from '@/auth/tokenStorage';
+import type { SharedItemSummary, SharedItemFull } from '@/sync/sharedItemTypes';
+import { getServerUrl } from '@/sync/serverConfig';
+
+/**
+ * Hook to fetch and manage knowledge base items (memories) for a session.
+ *
+ * Uses direct fetch (no backoff) to avoid infinite retries blocking the UI.
+ * Fetches all private context shared items, filters by meta.memoryType === 'memory',
+ * splits into global vs project-scoped items matching the working directory.
+ */
+
+async function fetchKBItems(credentials: AuthCredentials, params: Record<string, string>): Promise<{ items: SharedItemSummary[] }> {
+    const searchParams = new URLSearchParams(params);
+    const response = await fetch(`${getServerUrl()}/v1/shared-items?${searchParams}`, {
+        headers: {
+            'Authorization': `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+        },
+    });
+    if (!response.ok) throw new Error(`Failed: ${response.status}`);
+    return await response.json();
+}
+
+async function fetchKBItem(credentials: AuthCredentials, id: string): Promise<SharedItemFull> {
+    const response = await fetch(`${getServerUrl()}/v1/shared-items/${id}`, {
+        headers: {
+            'Authorization': `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+        },
+    });
+    if (!response.ok) throw new Error(`Failed: ${response.status}`);
+    return await response.json();
+}
+
+async function deleteKBItem(credentials: AuthCredentials, id: string): Promise<void> {
+    const response = await fetch(`${getServerUrl()}/v1/shared-items/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+        },
+    });
+    if (!response.ok) throw new Error(`Failed: ${response.status}`);
+}
+
+export function useKnowledgeBase(credentials: AuthCredentials | null, workingDirectory: string) {
+    const [globalItems, setGlobalItems] = React.useState<SharedItemSummary[]>([]);
+    const [projectItems, setProjectItems] = React.useState<SharedItemSummary[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [contentCache, setContentCache] = React.useState<Record<string, SharedItemFull>>({});
+
+    const fetchItems = React.useCallback(async () => {
+        if (!credentials) {
+            setLoading(false);
+            return;
+        }
+        try {
+            setLoading(true);
+            const result = await fetchKBItems(credentials, {
+                type: 'context',
+                visibility: 'private',
+                limit: '100',
+            });
+
+            const memories = (result.items || []).filter((item) => {
+                const meta = item.meta;
+                if (!meta || meta.memoryType !== 'memory') return false;
+                return true;
+            });
+
+            setGlobalItems(memories.filter((item) => item.meta?.scope === 'global'));
+            setProjectItems(
+                memories.filter(
+                    (item) =>
+                        item.meta?.scope === 'project' &&
+                        item.meta?.projectPath === workingDirectory,
+                ),
+            );
+        } catch {
+            // Silent failure - show empty state
+        } finally {
+            setLoading(false);
+        }
+    }, [credentials, workingDirectory]);
+
+    React.useEffect(() => {
+        fetchItems();
+    }, [fetchItems]);
+
+    const fetchItemContent = React.useCallback(
+        async (itemId: string): Promise<SharedItemFull | null> => {
+            if (contentCache[itemId]) return contentCache[itemId];
+            if (!credentials) return null;
+            try {
+                const full = await fetchKBItem(credentials, itemId);
+                setContentCache((prev) => ({ ...prev, [itemId]: full }));
+                return full;
+            } catch {
+                return null;
+            }
+        },
+        [credentials, contentCache],
+    );
+
+    const deleteItem = React.useCallback(
+        async (itemId: string) => {
+            if (!credentials) return;
+            try {
+                await deleteKBItem(credentials, itemId);
+                setGlobalItems((prev) => prev.filter((i) => i.id !== itemId));
+                setProjectItems((prev) => prev.filter((i) => i.id !== itemId));
+                setContentCache((prev) => {
+                    const next = { ...prev };
+                    delete next[itemId];
+                    return next;
+                });
+            } catch {
+                // Error handled silently
+            }
+        },
+        [credentials],
+    );
+
+    return { globalItems, projectItems, loading, fetchItemContent, deleteItem, refresh: fetchItems };
+}

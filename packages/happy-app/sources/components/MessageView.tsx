@@ -1,5 +1,5 @@
 import * as React from "react";
-import { View, Text } from "react-native";
+import { View, Text, Image as RNImage } from "react-native";
 import { StyleSheet } from 'react-native-unistyles';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MarkdownView } from "./markdown/MarkdownView";
@@ -94,10 +94,21 @@ function UserTextBlock(props: {
   return (
     <View style={styles.userMessageContainer}>
       <View style={styles.userMessageBubble}>
-        <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
-        {/* {__DEV__ && (
-          <Text style={styles.debugText}>{JSON.stringify(props.message.meta)}</Text>
-        )} */}
+        {props.message.images && props.message.images.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: props.message.text ? 8 : 0 }}>
+            {props.message.images.map((img, i) => (
+              <RNImage
+                key={i}
+                source={{ uri: `data:${img.mediaType};base64,${img.data}` }}
+                style={{ width: 160, height: 160, borderRadius: 8 }}
+                resizeMode="cover"
+              />
+            ))}
+          </View>
+        )}
+        {props.message.text ? (
+          <MarkdownView markdown={props.message.displayText || props.message.text} onOptionPress={handleOptionPress} />
+        ) : null}
       </View>
     </View>
   );

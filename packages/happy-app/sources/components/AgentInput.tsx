@@ -79,6 +79,11 @@ interface AgentInputProps {
     onProfileClick?: () => void;
     autoConfirm?: boolean;
     onAutoConfirmChange?: (enabled: boolean) => void;
+    // Image support
+    attachedImages?: Array<{ uri: string; mediaType: string }>;
+    onImagePaste?: (files: File[]) => void;
+    onImagePick?: () => void;
+    onRemoveImage?: (index: number) => void;
 }
 
 const MAX_CONTEXT_SIZE = 190000;
@@ -304,6 +309,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     const screenWidth = useWindowDimensions().width;
 
     const hasText = props.value.trim().length > 0;
+    const hasImages = (props.attachedImages?.length ?? 0) > 0;
+    const hasContent = hasText || hasImages;
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -519,7 +526,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 if (props.showAbortButton) {
                     return true; // Consume the key, don't send
                 }
-                if (props.value.trim()) {
+                if (props.value.trim() || hasImages) {
                     props.onSend();
                     return true; // Key was handled
                 }
@@ -535,7 +542,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         }
         return false; // Key was not handled
-    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState]);
+    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState, hasImages]);
 
 
 
@@ -959,6 +966,36 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
                 {/* Box 2: Action Area (Input + Send) */}
                 <View style={styles.unifiedPanel}>
+                    {/* Image preview strip */}
+                    {props.attachedImages && props.attachedImages.length > 0 && (
+                        <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 10, gap: 8, flexWrap: 'wrap' }}>
+                            {props.attachedImages.map((img, index) => (
+                                <View key={index} style={{ position: 'relative' }}>
+                                    <RNImage
+                                        source={{ uri: img.uri }}
+                                        style={{ width: 72, height: 72, borderRadius: 8 }}
+                                    />
+                                    <Pressable
+                                        onPress={() => props.onRemoveImage?.(index)}
+                                        style={{
+                                            position: 'absolute',
+                                            top: -6,
+                                            right: -6,
+                                            backgroundColor: theme.colors.button.secondary.tint,
+                                            borderRadius: 10,
+                                            width: 20,
+                                            height: 20,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="close" size={12} color={theme.colors.input.background} />
+                                    </Pressable>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
                     {/* Input field */}
                     <View style={[styles.inputContainer, props.minHeight ? { minHeight: props.minHeight } : undefined]}>
                         <MultiTextInput
@@ -971,6 +1008,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             onKeyPress={handleKeyPress}
                             onStateChange={handleInputStateChange}
                             maxHeight={120}
+                            onImagePaste={props.onImagePaste}
                         />
                     </View>
 
@@ -1077,6 +1115,33 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
+                                {/* Image upload button (web only) */}
+                                {Platform.OS === 'web' && props.onImagePick && (
+                                    <Pressable
+                                        onPress={() => {
+                                            hapticsLight();
+                                            props.onImagePick?.();
+                                        }}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 8,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed ? 0.7 : 1,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="image-outline"
+                                            size={16}
+                                            color={theme.colors.button.secondary.tint}
+                                        />
+                                    </Pressable>
+                                )}
+
                                 {/* Preview button (web only) */}
                                 {Platform.OS === 'web' && props.onPreviewPress && (
                                     <Pressable
@@ -1167,7 +1232,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 handleAbortPress();
                                             } else {
                                                 hapticsLight();
-                                                if (hasText) {
+                                                if (hasContent) {
                                                     props.onSend();
                                                 } else {
                                                     props.onMicPress?.();

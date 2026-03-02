@@ -359,6 +359,16 @@ export const ru: TranslationStructure = {
         sessionDeleted: 'Сессия успешно удалена',
     },
 
+    knowledgeBase: {
+        title: 'База знаний',
+        globalContext: 'Глобальный контекст',
+        projectContext: 'Контекст проекта',
+        emptyTitle: 'Нет элементов базы знаний',
+        emptyDescription: 'Здесь появятся элементы, сохранённые из ваших сессий.',
+        deleteConfirm: 'Удалить элемент',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Удалить "${name}"? Это действие нельзя отменить.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

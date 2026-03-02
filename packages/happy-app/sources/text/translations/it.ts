@@ -415,6 +415,16 @@ export const it: TranslationStructure = {
         
     },
 
+    knowledgeBase: {
+        title: 'Base di conoscenza',
+        globalContext: 'Contesto globale',
+        projectContext: 'Contesto del progetto',
+        emptyTitle: 'Nessun elemento nella base di conoscenza',
+        emptyDescription: 'Gli elementi salvati dalle sessioni di codifica appariranno qui.',
+        deleteConfirm: 'Elimina elemento',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Eliminare "${name}"? Questa azione non può essere annullata.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

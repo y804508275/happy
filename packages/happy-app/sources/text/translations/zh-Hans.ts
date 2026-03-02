@@ -388,6 +388,16 @@ export const zhHans: TranslationStructure = {
         
     },
 
+    knowledgeBase: {
+        title: '知识库',
+        globalContext: '全局上下文',
+        projectContext: '项目上下文',
+        emptyTitle: '暂无知识库条目',
+        emptyDescription: '编码会话中保存的条目将显示在此处。',
+        deleteConfirm: '删除条目',
+        deleteConfirmMessage: ({ name }: { name: string }) => `确定删除"${name}"？此操作不可撤销。`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

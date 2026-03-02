@@ -96,6 +96,7 @@ export const SessionView = React.memo((props: { id: string }) => {
             subtitle: session.metadata?.path ? formatPathRelativeToHome(session.metadata.path, session.metadata?.homeDir) : undefined,
             avatarId: getSessionAvatarId(session),
             onAvatarPress: () => router.push(`/session/${sessionId}/info`),
+            onContextPress: session.metadata?.path ? () => router.push(`/session/${sessionId}/context`) : undefined,
             isConnected: isConnected,
             flavor: session.metadata?.flavor || null,
             tintColor: isConnected ? '#000' : '#8E8E93'
@@ -177,6 +178,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const deviceType = useDeviceType();
     const [message, setMessage] = React.useState('');
     const [previewVisible, setPreviewVisible] = React.useState(false);
+    const [attachedImages, setAttachedImages] = React.useState<Array<{
+        uri: string;
+        base64: string;
+        mediaType: string;
+    }>>([]);
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
@@ -217,6 +223,47 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     // Use draft hook for auto-saving message drafts
     const { clearDraft } = useDraft(sessionId, message, setMessage);
+
+    // Image paste handler
+    const handleImagePaste = React.useCallback(async (files: File[]) => {
+        const { processImageFile } = await import('@/utils/imageProcessor');
+        for (const file of files) {
+            try {
+                const processed = await processImageFile(file);
+                setAttachedImages(prev => [...prev, {
+                    uri: processed.uri,
+                    base64: processed.base64,
+                    mediaType: processed.mediaType,
+                }]);
+            } catch (e) {
+                console.error('Failed to process pasted image:', e);
+            }
+        }
+    }, []);
+
+    // Image file picker handler
+    const handleImagePick = React.useCallback(() => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+        input.multiple = true;
+        input.onchange = async (e) => {
+            const files = Array.from((e.target as HTMLInputElement).files || []);
+            await handleImagePaste(files);
+        };
+        input.click();
+    }, [handleImagePaste]);
+
+    // Remove attached image
+    const handleRemoveImage = React.useCallback((index: number) => {
+        setAttachedImages(prev => {
+            const removed = prev[index];
+            if (removed?.uri) {
+                URL.revokeObjectURL(removed.uri);
+            }
+            return prev.filter((_, i) => i !== index);
+        });
+    }, []);
 
     // Handle dismissing CLI version warning
     const handleDismissCliWarning = React.useCallback(() => {
@@ -383,10 +430,14 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 isPulsing: sessionStatus.isPulsing
             }}
             onSend={() => {
-                if (message.trim()) {
+                if (message.trim() || attachedImages.length > 0) {
+                    const images = attachedImages.length > 0
+                        ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
+                        : undefined;
                     setMessage('');
+                    setAttachedImages([]);
                     clearDraft();
-                    sync.sendMessage(sessionId, message);
+                    sync.sendMessage(sessionId, message, undefined, images);
                     trackMessageSent();
                 }
             }}
@@ -394,6 +445,10 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             isMicActive={micButtonState.isMicActive}
             onAbort={() => sessionAbort(sessionId)}
             showAbortButton={sessionStatus.state === 'thinking'}
+            attachedImages={attachedImages}
+            onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
+            onImagePick={Platform.OS === 'web' ? handleImagePick : undefined}
+            onRemoveImage={handleRemoveImage}
             onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => !v) : undefined}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
             // Autocomplete configuration

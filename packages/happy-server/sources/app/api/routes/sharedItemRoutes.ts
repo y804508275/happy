@@ -71,7 +71,7 @@ export function sharedItemRoutes(app: Fastify) {
                 visibility: SharedItemVisibilitySchema,
                 teamId: z.string().optional(),
                 name: z.string().min(1).max(200),
-                slug: z.string().min(1).max(80).regex(/^[a-z0-9-]+$/).optional(),
+                slug: z.string().min(1).max(80).regex(/^[a-z0-9\u4e00-\u9fff-]+$/).optional(),
                 description: z.string().max(1000).optional(),
                 content: z.string().max(100000),
                 meta: z.any().optional()

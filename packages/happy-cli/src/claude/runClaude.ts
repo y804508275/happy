@@ -255,10 +255,10 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     const happyServer = await startHappyServer(session, projects, workingDirectory);
     logger.debug(`[START] Happy MCP server started at ${happyServer.url}`);
 
-    // Load project knowledge base context for system prompt injection
-    const { loadProjectContext } = await import('@/claude/utils/projectContext');
-    const projectContext = await loadProjectContext(session.getAuthToken(), workingDirectory);
-    logger.debug(`[START] Project context: ${projectContext ? `${projectContext.length} chars loaded` : 'none'}`);
+    // Load knowledge base for system prompt injection (always-active rules + on-demand directory)
+    const { loadContextForInjection } = await import('@/claude/utils/projectContext');
+    const { contextPrompt: projectContext } = await loadContextForInjection(session.getAuthToken(), workingDirectory);
+    logger.debug(`[START] Knowledge base context: ${projectContext ? `${projectContext.length} chars loaded` : 'none'}`);
 
     // Variable to track current session instance (updated via onSessionReady callback)
     // Used by hook server to notify Session when Claude changes session ID
@@ -394,8 +394,18 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             logger.debug(`[loop] User message received with no disallowed tools override, using current: ${currentDisallowedTools ? currentDisallowedTools.join(', ') : 'none'}`);
         }
 
+        // Extract text from content (handles both legacy object and new array format)
+        const messageText = Array.isArray(message.content)
+            ? message.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+            : message.content.text;
+
+        // Determine what to push to the queue:
+        // - For multimodal (array with images), push the array as-is for Claude SDK
+        // - For text-only, push the text string (backward compatible)
+        const queueContent = Array.isArray(message.content) ? message.content : messageText;
+
         // Check for special commands before processing
-        const specialCommand = parseSpecialCommand(message.content.text);
+        const specialCommand = parseSpecialCommand(messageText);
 
         if (specialCommand.type === 'compact') {
             logger.debug('[start] Detected /compact command');
@@ -408,7 +418,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
                 allowedTools: messageAllowedTools,
                 disallowedTools: messageDisallowedTools
             };
-            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || message.content.text, enhancedMode);
+            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || messageText, enhancedMode);
             logger.debugLargeJson('[start] /compact command pushed to queue:', message);
             return;
         }
@@ -424,7 +434,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
                 allowedTools: messageAllowedTools,
                 disallowedTools: messageDisallowedTools
             };
-            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || message.content.text, enhancedMode);
+            messageQueue.pushIsolateAndClear(specialCommand.originalMessage || messageText, enhancedMode);
             logger.debugLargeJson('[start] /compact command pushed to queue:', message);
             return;
         }
@@ -439,7 +449,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             allowedTools: messageAllowedTools,
             disallowedTools: messageDisallowedTools
         };
-        messageQueue.push(message.content.text, enhancedMode);
+        messageQueue.push(queueContent, enhancedMode);
         logger.debugLargeJson('User message pushed to queue:', message)
     });
 

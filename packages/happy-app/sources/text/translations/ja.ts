@@ -418,6 +418,16 @@ export const ja: TranslationStructure = {
 
     },
 
+    knowledgeBase: {
+        title: 'ナレッジベース',
+        globalContext: 'グローバルコンテキスト',
+        projectContext: 'プロジェクトコンテキスト',
+        emptyTitle: 'ナレッジベースの項目がありません',
+        emptyDescription: 'コーディングセッションで保存された項目がここに表示されます。',
+        deleteConfirm: '項目を削除',
+        deleteConfirmMessage: ({ name }: { name: string }) => `「${name}」を削除しますか？この操作は取り消せません。`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

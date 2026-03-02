@@ -3,25 +3,32 @@ import { configuration } from '@/configuration';
 import { logger } from '@/ui/logger';
 
 /**
- * Load project-specific and global knowledge base contexts from the Happy API.
- * Called once at session start; the result is injected into the system prompt.
- * Fails silently on error so it never blocks session startup.
+ * Load knowledge base items and build a context prompt for system prompt injection.
+ *
+ * Uses conditional injection:
+ * - alwaysApply=true (default): full content injected as rules
+ * - alwaysApply=false: only title/tags/description listed as on-demand reference
+ *
+ * Called once at session start. Fails silently so it never blocks startup.
  */
-export async function loadProjectContext(
+export async function loadContextForInjection(
     authToken: string,
     workingDirectory: string
-): Promise<string | null> {
+): Promise<{ contextPrompt: string | null }> {
     try {
+        const headers = {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+        };
+
+        // Fetch all memory items (summary only — no content)
         const response = await axios.get(`${configuration.serverUrl}/v1/shared-items`, {
             params: { type: 'context', visibility: 'private', limit: 100 },
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json'
-            },
+            headers,
             timeout: 5000,
         });
 
-        // Filter to memory items matching this project or global scope
+        // Filter to matching items: global or matching project
         const matchingItems = (response.data.items || []).filter((item: any) => {
             const meta = item.meta as any;
             if (!meta || meta.memoryType !== 'memory') return false;
@@ -30,44 +37,65 @@ export async function loadProjectContext(
             return false;
         });
 
-        if (matchingItems.length === 0) return null;
+        if (matchingItems.length === 0) {
+            return { contextPrompt: null };
+        }
 
-        // Fetch full content for each matching item (list API returns summaries only)
-        const fullItems = await Promise.all(
-            matchingItems.map((item: any) =>
-                axios.get(`${configuration.serverUrl}/v1/shared-items/${item.id}`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` },
-                    timeout: 5000,
-                }).then(r => r.data).catch(() => null)
-            )
+        // Split into always-inject vs on-demand
+        const alwaysItems = matchingItems.filter((item: any) =>
+            item.meta?.alwaysApply !== false // default true for backward compatibility
+        );
+        const onDemandItems = matchingItems.filter((item: any) =>
+            item.meta?.alwaysApply === false
         );
 
-        const validItems = fullItems.filter(Boolean);
-        if (validItems.length === 0) return null;
+        // Fetch full content for always-inject items (parallel)
+        const alwaysWithContent = await Promise.all(
+            alwaysItems.map(async (item: any) => {
+                try {
+                    const resp = await axios.get(
+                        `${configuration.serverUrl}/v1/shared-items/${item.id}`,
+                        { headers, timeout: 10000 }
+                    );
+                    return resp.data;
+                } catch {
+                    return item; // fallback to summary if fetch fails
+                }
+            })
+        );
 
-        const globalItems = validItems.filter((i: any) => i.meta?.scope === 'global');
-        const projectItems = validItems.filter((i: any) => i.meta?.scope === 'project');
+        // Build prompt
+        let prompt = '# Knowledge Base\n';
 
-        let result = '# Project Knowledge Base\n\n';
-        result += 'The following context was saved from previous sessions. Use it to inform your responses.\n\n';
-
-        if (globalItems.length > 0) {
-            result += '## Global Context\n\n';
-            for (const item of globalItems) {
-                result += `### ${item.name}\n${item.content}\n\n`;
+        // Always-inject section: full content
+        if (alwaysWithContent.length > 0) {
+            prompt += '\n## Rules (always active — follow these)\n';
+            for (const item of alwaysWithContent) {
+                const scope = item.meta?.scope === 'global' ? 'global' : 'project';
+                prompt += `\n### ${item.name} [${scope}]\n`;
+                if (item.content) {
+                    prompt += `${item.content}\n`;
+                } else if (item.description) {
+                    prompt += `${item.description}\n`;
+                }
             }
         }
 
-        if (projectItems.length > 0) {
-            result += '## Project Context\n\n';
-            for (const item of projectItems) {
-                result += `### ${item.name}\n${item.content}\n\n`;
+        // On-demand section: directory only
+        if (onDemandItems.length > 0) {
+            prompt += '\n## Reference (use mcp__happy__load_context to load when relevant)\n';
+            for (const item of onDemandItems) {
+                const tags = (item.meta?.tags as string[]) || [];
+                const tagsStr = tags.length > 0 ? ` (tags: ${tags.join(', ')})` : '';
+                const descStr = item.description ? ` — ${item.description}` : '';
+                const scope = item.meta?.scope === 'global' ? 'global' : 'project';
+                prompt += `- [${item.id}] "${item.name}"${tagsStr}${descStr} [${scope}]\n`;
             }
         }
 
-        return result.trim();
+        return { contextPrompt: prompt.trim() };
     } catch (error) {
-        logger.debug('[projectContext] Failed to load project context:', error);
-        return null;
+        logger.debug('[projectContext] Failed to load context:', error);
+        return { contextPrompt: null };
     }
 }

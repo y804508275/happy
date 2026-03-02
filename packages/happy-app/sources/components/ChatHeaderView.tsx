@@ -14,6 +14,7 @@ interface ChatHeaderViewProps {
     subtitle?: string;
     onBackPress?: () => void;
     onAvatarPress?: () => void;
+    onContextPress?: () => void;
     avatarId?: string;
     backgroundColor?: string;
     tintColor?: string;
@@ -26,6 +27,7 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
     subtitle,
     onBackPress,
     onAvatarPress,
+    onContextPress,
     avatarId,
     isConnected = true,
     flavor,
@@ -87,6 +89,20 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                     )}
                 </View>
                 
+                {onContextPress && (
+                    <Pressable
+                        onPress={onContextPress}
+                        hitSlop={15}
+                        style={styles.contextButton}
+                    >
+                        <Ionicons
+                            name="book-outline"
+                            size={22}
+                            color={theme.colors.header.tint}
+                        />
+                    </Pressable>
+                )}
+
                 {avatarId && onAvatarPress && (
                     <Pressable
                         onPress={onAvatarPress}
@@ -145,6 +161,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '400',
         lineHeight: 14,
+    },
+    contextButton: {
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 4,
     },
     avatarButton: {
         width: 44,

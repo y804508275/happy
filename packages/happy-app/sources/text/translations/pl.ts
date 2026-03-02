@@ -396,6 +396,16 @@ export const pl: TranslationStructure = {
         sessionDeleted: 'Sesja została pomyślnie usunięta',
     },
 
+    knowledgeBase: {
+        title: 'Baza wiedzy',
+        globalContext: 'Kontekst globalny',
+        projectContext: 'Kontekst projektu',
+        emptyTitle: 'Brak elementów bazy wiedzy',
+        emptyDescription: 'Elementy zapisane z sesji kodowania pojawią się tutaj.',
+        deleteConfirm: 'Usuń element',
+        deleteConfirmMessage: ({ name }: { name: string }) => `Usunąć "${name}"? Tej operacji nie można cofnąć.`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

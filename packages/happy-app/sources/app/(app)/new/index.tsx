@@ -417,6 +417,47 @@ function NewSessionWizard() {
     const [autoConfirm, setAutoConfirm] = React.useState(false);
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
+    // Image attachment state (web only)
+    const [attachedImages, setAttachedImages] = React.useState<Array<{ uri: string; base64: string; mediaType: string }>>([]);
+
+    const handleImagePaste = React.useCallback(async (files: File[]) => {
+        const { processImageFile } = await import('@/utils/imageProcessor');
+        for (const file of files) {
+            try {
+                const processed = await processImageFile(file);
+                setAttachedImages(prev => [...prev, {
+                    uri: processed.uri,
+                    base64: processed.base64,
+                    mediaType: processed.mediaType,
+                }]);
+            } catch (e) {
+                console.error('Failed to process image:', e);
+            }
+        }
+    }, []);
+
+    const handleImagePick = React.useCallback(() => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+        input.multiple = true;
+        input.onchange = async (e) => {
+            const files = Array.from((e.target as HTMLInputElement).files || []);
+            await handleImagePaste(files);
+        };
+        input.click();
+    }, [handleImagePaste]);
+
+    const handleRemoveImage = React.useCallback((index: number) => {
+        setAttachedImages(prev => {
+            const removed = prev[index];
+            if (removed?.uri) {
+                URL.revokeObjectURL(removed.uri);
+            }
+            return prev.filter((_, i) => i !== index);
+        });
+    }, []);
+
     // Handle machineId route param from picker screens (main's navigation pattern)
     React.useEffect(() => {
         if (typeof machineIdParam !== 'string' || machines.length === 0) {
@@ -1068,9 +1109,13 @@ function NewSessionWizard() {
                     await sessionAutoConfirm(result.sessionId, true);
                 }
 
-                // Send initial message if provided
-                if (sessionPrompt.trim()) {
-                    await sync.sendMessage(result.sessionId, sessionPrompt);
+                // Send initial message if provided (text or images)
+                if (sessionPrompt.trim() || attachedImages.length > 0) {
+                    const images = attachedImages.length > 0
+                        ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
+                        : undefined;
+                    await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images);
+                    setAttachedImages([]);
                 }
 
                 router.replace(`/session/${result.sessionId}`, {
@@ -1094,7 +1139,7 @@ function NewSessionWizard() {
             Modal.alert(t('common.error'), errorMessage);
             setIsCreating(false);
         }
-    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, autoConfirm, recentMachinePaths, profileMap, router]);
+    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, autoConfirm, recentMachinePaths, profileMap, router, attachedImages]);
 
     const screenWidth = useWindowDimensions().width;
 
@@ -1195,6 +1240,10 @@ function NewSessionWizard() {
                                 onPathClick={handlePathClick}
                                 autoConfirm={autoConfirm}
                                 onAutoConfirmChange={setAutoConfirm}
+                                attachedImages={attachedImages}
+                                onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
+                                onImagePick={Platform.OS === 'web' ? handleImagePick : undefined}
+                                onRemoveImage={handleRemoveImage}
                             />
                         </View>
                     </View>
@@ -1979,6 +2028,10 @@ function NewSessionWizard() {
                             onProfileClick={handleAgentInputProfileClick}
                             autoConfirm={autoConfirm}
                             onAutoConfirmChange={setAutoConfirm}
+                            attachedImages={attachedImages}
+                            onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
+                            onImagePick={Platform.OS === 'web' ? handleImagePick : undefined}
+                            onRemoveImage={handleRemoveImage}
                         />
                     </View>
                 </View>

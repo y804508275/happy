@@ -387,6 +387,16 @@ export const zhHant: TranslationStructure = {
 
     },
 
+    knowledgeBase: {
+        title: '知識庫',
+        globalContext: '全域上下文',
+        projectContext: '專案上下文',
+        emptyTitle: '暫無知識庫條目',
+        emptyDescription: '編碼會話中儲存的條目將顯示在此處。',
+        deleteConfirm: '刪除條目',
+        deleteConfirmMessage: ({ name }: { name: string }) => `確定刪除「${name}」？此操作不可撤銷。`,
+    },
+
     components: {
         emptyMainScreen: {
             // Used by EmptyMainScreen component

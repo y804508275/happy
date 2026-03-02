@@ -12,7 +12,7 @@ import { initialMachineMetadata } from '@/daemon/run';
 import { configuration } from '@/configuration';
 import packageJson from '../../package.json';
 import os from 'node:os';
-import { MessageQueue2 } from '@/utils/MessageQueue2';
+import { MessageQueue2, QueueMessageContent } from '@/utils/MessageQueue2';
 import { hashObject } from '@/utils/deterministicJson';
 import { projectPath } from '@/projectPath';
 import { resolve, join } from 'node:path';
@@ -191,7 +191,11 @@ export async function runCodex(opts: {
             permissionMode: messagePermissionMode || 'default',
             model: messageModel,
         };
-        messageQueue.push(message.content.text, enhancedMode);
+        // Extract text from content (handles both legacy object and new array format)
+        const messageText = Array.isArray(message.content)
+            ? message.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+            : message.content.text;
+        messageQueue.push(messageText, enhancedMode);
     });
     let thinking = false;
     let currentTurnId: string | null = null;
@@ -540,14 +544,14 @@ export async function runCodex(opts: {
         logger.debug('[codex]: client.connect done');
         let wasCreated = false;
         let currentModeHash: string | null = null;
-        let pending: { message: string; mode: EnhancedMode; isolate: boolean; hash: string } | null = null;
+        let pending: { message: QueueMessageContent; mode: EnhancedMode; isolate: boolean; hash: string } | null = null;
         // If we restart (e.g., mode change), use this to carry a resume file
         let nextExperimentalResume: string | null = null;
 
         while (!shouldExit) {
             logActiveHandles('loop-top');
             // Get next batch; respect mode boundaries like Claude
-            let message: { message: string; mode: EnhancedMode; isolate: boolean; hash: string } | null = pending;
+            let message: { message: QueueMessageContent; mode: EnhancedMode; isolate: boolean; hash: string } | null = pending;
             pending = null;
             if (!message) {
                 // Capture the current signal to distinguish idle-abort from queue close
@@ -569,6 +573,11 @@ export async function runCodex(opts: {
             if (!message) {
                 break;
             }
+
+            // Extract text from queue content (Codex only supports text)
+            const messageText = typeof message.message === 'string'
+                ? message.message
+                : (message.message as any[]).filter(b => b.type === 'text').map(b => b.text).join('\n');
 
             // If a session exists and mode changed, restart on next iteration
             if (wasCreated && currentModeHash && message.hash !== currentModeHash) {
@@ -602,7 +611,7 @@ export async function runCodex(opts: {
             }
 
             // Display user messages in the UI
-            messageBuffer.addMessage(message.message, 'user');
+            messageBuffer.addMessage(messageText, 'user');
             currentModeHash = message.hash;
 
             try {
@@ -615,7 +624,7 @@ export async function runCodex(opts: {
 
                 if (!wasCreated) {
                     const startConfig: CodexSessionConfig = {
-                        prompt: first ? message.message + '\n\n' + CHANGE_TITLE_INSTRUCTION : message.message,
+                        prompt: first ? messageText + '\n\n' + CHANGE_TITLE_INSTRUCTION : messageText,
                         sandbox: executionPolicy.sandbox,
                         'approval-policy': executionPolicy.approvalPolicy,
                         config: { mcp_servers: mcpServers }
@@ -657,7 +666,7 @@ export async function runCodex(opts: {
                     first = false;
                 } else {
                     const response = await client.continueSession(
-                        message.message,
+                        messageText,
                         { signal: abortController.signal }
                     );
                     logger.debug('[Codex] continueSession response:', response);

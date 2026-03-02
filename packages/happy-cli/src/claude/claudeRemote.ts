@@ -35,7 +35,7 @@ export async function claudeRemote(opts: {
     projectContext?: string | null,
 
     // Dynamic parameters
-    nextMessage: () => Promise<{ message: string, mode: EnhancedMode } | null>,
+    nextMessage: () => Promise<{ message: string | Array<unknown>, mode: EnhancedMode } | null>,
     onReady: () => void,
     isAborted: (toolCallId: string) => boolean,
 
@@ -92,8 +92,13 @@ export async function claudeRemote(opts: {
         return;
     }
 
+    // Extract text for special command parsing (handles both string and array content)
+    const initialText = typeof initial.message === 'string'
+        ? initial.message
+        : (initial.message as any[]).filter(b => b.type === 'text').map(b => b.text).join('\n');
+
     // Handle special commands
-    const specialCommand = parseSpecialCommand(initial.message);
+    const specialCommand = parseSpecialCommand(initialText);
 
     // Handle /clear command
     if (specialCommand.type === 'clear') {
@@ -157,7 +162,7 @@ export async function claudeRemote(opts: {
         type: 'user',
         message: {
             role: 'user',
-            content: initial.message,
+            content: initial.message as SDKUserMessage['message']['content'],
         },
     });
 
@@ -219,7 +224,7 @@ export async function claudeRemote(opts: {
                     return;
                 }
                 mode = next.mode;
-                messages.push({ type: 'user', message: { role: 'user', content: next.message } });
+                messages.push({ type: 'user', message: { role: 'user', content: next.message as SDKUserMessage['message']['content'] } });
             }
 
             // Handle tool result
