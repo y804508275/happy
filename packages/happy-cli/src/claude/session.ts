@@ -90,11 +90,22 @@ export class Session {
     reloadProjectContext = async (): Promise<void> => {
         try {
             const { loadContextForInjection } = await import('@/claude/utils/projectContext');
-            const { contextPrompt } = await loadContextForInjection(
+            const { contextPrompt, rulesCount, refsCount } = await loadContextForInjection(
                 this.client.getAuthToken(), this.path, this.projects
             );
             this.projectContext = contextPrompt;
             logger.debug(`[Session] Reloaded project context: ${contextPrompt ? `${contextPrompt.length} chars` : 'none'}`);
+
+            // Notify UI about loaded context
+            if (rulesCount > 0 || refsCount > 0) {
+                const parts: string[] = [];
+                if (rulesCount > 0) parts.push(`${rulesCount} rules`);
+                if (refsCount > 0) parts.push(`${refsCount} refs`);
+                this.client.sendSessionEvent({
+                    type: 'message',
+                    message: `📚 Loaded ${parts.join(' + ')} from knowledge base`,
+                });
+            }
         } catch (error) {
             logger.debug('[Session] Failed to reload project context:', error);
         }
