@@ -94,6 +94,14 @@ export async function loadContextForInjection(
             }
         }
 
+        // Summary line for Claude to acknowledge loaded context
+        const ruleNames = alwaysWithContent.map((item: any) => item.name);
+        const refCount = onDemandItems.length;
+        const parts: string[] = [];
+        if (ruleNames.length > 0) parts.push(`${ruleNames.length} active rules: ${ruleNames.join(', ')}`);
+        if (refCount > 0) parts.push(`${refCount} on-demand references`);
+        prompt += `\n## Important\nWhen you start a new conversation, briefly acknowledge the loaded knowledge base context in your first reply (e.g. "Loaded ${parts.join(' and ')}"). Keep it to one short line.\n`;
+
         // On-demand section: directory only
         if (onDemandItems.length > 0) {
             prompt += '\n## Reference (use mcp__happy__load_context to load when relevant)\n';
