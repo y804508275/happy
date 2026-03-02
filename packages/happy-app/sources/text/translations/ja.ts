@@ -844,6 +844,8 @@ export const ja: TranslationStructure = {
         codeCopied: 'コードをコピーしました',
         copyFailed: 'コピーに失敗しました',
         mermaidRenderFailed: 'Mermaidダイアグラムのレンダリングに失敗しました',
+        expandCode: ({ lines }: { lines: number }) => `${lines}行を表示`,
+        collapseCode: '折りたたむ',
     },
 
     artifacts: {

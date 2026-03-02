@@ -841,6 +841,8 @@ export const it: TranslationStructure = {
         codeCopied: 'Codice copiato',
         copyFailed: 'Copia non riuscita',
         mermaidRenderFailed: 'Impossibile renderizzare il diagramma mermaid',
+        expandCode: ({ lines }: { lines: number }) => `Mostra ${lines} righe`,
+        collapseCode: 'Comprimi',
     },
 
     artifacts: {

@@ -812,6 +812,8 @@ export const en = {
         codeCopied: 'Code copied',
         copyFailed: 'Copy failed',
         mermaidRenderFailed: 'Failed to render mermaid diagram',
+        expandCode: ({ lines }: { lines: number }) => `Show ${lines} lines`,
+        collapseCode: 'Collapse',
     },
 
     artifacts: {

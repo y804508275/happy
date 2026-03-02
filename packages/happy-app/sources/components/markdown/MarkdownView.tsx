@@ -133,8 +133,25 @@ function RenderNumberedListBlock(props: { items: { number: number, spans: Markdo
     );
 }
 
+const CODE_COLLAPSE_THRESHOLD = 15;
+const CODE_PREVIEW_LINES = 5;
+
 function RenderCodeBlock(props: { content: string, language: string | null, first: boolean, last: boolean, selectable: boolean }) {
     const [isHovered, setIsHovered] = React.useState(false);
+
+    const lines = React.useMemo(() => props.content.split('\n'), [props.content]);
+    const lineCount = lines.length;
+    const shouldCollapse = lineCount > CODE_COLLAPSE_THRESHOLD;
+    const [collapsed, setCollapsed] = React.useState(shouldCollapse);
+
+    // When collapsed, only render first N lines; copy always uses full content
+    const displayCode = shouldCollapse && collapsed
+        ? lines.slice(0, CODE_PREVIEW_LINES).join('\n')
+        : props.content;
+
+    const toggleCollapsed = React.useCallback(() => {
+        setCollapsed(prev => !prev);
+    }, []);
 
     const copyCode = React.useCallback(async () => {
         try {
@@ -162,11 +179,18 @@ function RenderCodeBlock(props: { content: string, language: string | null, firs
                 showsHorizontalScrollIndicator={false}
             >
                 <SimpleSyntaxHighlighter
-                    code={props.content}
+                    code={displayCode}
                     language={props.language}
                     selectable={props.selectable}
                 />
             </ScrollView>
+            {shouldCollapse && (
+                <Pressable style={style.codeExpandButton} onPress={toggleCollapsed}>
+                    <Text style={style.codeExpandButtonText}>
+                        {collapsed ? t('markdown.expandCode', { lines: lineCount }) : t('markdown.collapseCode')}
+                    </Text>
+                </Pressable>
+            )}
             <View
                 style={[style.copyButtonWrapper, isHovered && style.copyButtonWrapperVisible]}
                 {...(Platform.OS === 'web' ? ({ className: 'copy-button-wrapper' } as any) : {})}
@@ -434,6 +458,18 @@ const style = StyleSheet.create((theme) => ({
         color: theme.colors.text,
         fontSize: 14,
         lineHeight: 20,
+    },
+    codeExpandButton: {
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.divider,
+    },
+    codeExpandButtonText: {
+        ...Typography.default(),
+        color: theme.colors.textSecondary,
+        fontSize: 13,
+        lineHeight: 18,
     },
     horizontalRule: {
         height: 1,

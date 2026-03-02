@@ -813,6 +813,8 @@ export const zhHant: TranslationStructure = {
         codeCopied: '程式碼已複製',
         copyFailed: '複製失敗',
         mermaidRenderFailed: '渲染 mermaid 圖表失敗',
+        expandCode: ({ lines }: { lines: number }) => `展開 ${lines} 行`,
+        collapseCode: '收起',
     },
 
     artifacts: {

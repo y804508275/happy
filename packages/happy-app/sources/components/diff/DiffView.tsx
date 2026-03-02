@@ -1,9 +1,12 @@
-import React, { useMemo } from 'react';
-import { View, Text, ViewStyle } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { View, Text, Pressable, ViewStyle } from 'react-native';
 import { calculateUnifiedDiff, DiffToken } from '@/components/diff/calculateDiff';
 import { Typography } from '@/constants/Typography';
 import { useUnistyles } from 'react-native-unistyles';
+import { t } from '@/text';
 
+const DIFF_COLLAPSE_THRESHOLD = 15;
+const DIFF_PREVIEW_LINES = 5;
 
 interface DiffViewProps {
     oldText: string;
@@ -195,9 +198,43 @@ export const DiffView: React.FC<DiffViewProps> = ({
         return lines;
     };
 
+    const allLines = renderDiffContent();
+    const totalLines = allLines.length;
+    const shouldCollapse = totalLines > DIFF_COLLAPSE_THRESHOLD;
+    const [collapsed, setCollapsed] = useState(shouldCollapse);
+
+    const toggleCollapsed = useCallback(() => {
+        setCollapsed(prev => !prev);
+    }, []);
+
+    const displayLines = shouldCollapse && collapsed
+        ? allLines.slice(0, DIFF_PREVIEW_LINES)
+        : allLines;
+
     return (
         <View style={[containerStyle, { overflow: 'hidden' }]}>
-            {renderDiffContent()}
+            {displayLines}
+            {shouldCollapse && (
+                <Pressable
+                    onPress={toggleCollapsed}
+                    style={{
+                        alignItems: 'center',
+                        paddingVertical: 8,
+                        backgroundColor: theme.colors.surface,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.contextBg,
+                    }}
+                >
+                    <Text style={{
+                        ...Typography.default(),
+                        color: colors.hunkHeaderText,
+                        fontSize: 13,
+                        lineHeight: 18,
+                    }}>
+                        {collapsed ? t('markdown.expandCode', { lines: totalLines }) : t('markdown.collapseCode')}
+                    </Text>
+                </Pressable>
+            )}
         </View>
     );
 

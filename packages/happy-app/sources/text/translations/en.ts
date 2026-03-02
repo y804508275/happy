@@ -827,6 +827,8 @@ export const en: TranslationStructure = {
         codeCopied: 'Code copied',
         copyFailed: 'Failed to copy',
         mermaidRenderFailed: 'Failed to render mermaid diagram',
+        expandCode: ({ lines }: { lines: number }) => `Show ${lines} lines`,
+        collapseCode: 'Collapse',
     },
 
     artifacts: {
