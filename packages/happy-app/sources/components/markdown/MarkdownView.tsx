@@ -300,8 +300,8 @@ const style = StyleSheet.create((theme) => ({
 
     text: {
         ...Typography.default(),
-        fontSize: 16,
-        lineHeight: 24, // Reduced from 28 to 24
+        fontSize: 14,
+        lineHeight: 20,
         marginTop: 8,
         marginBottom: 8,
         color: theme.colors.text,
@@ -319,8 +319,8 @@ const style = StyleSheet.create((theme) => ({
     },
     code: {
         ...Typography.mono(),
-        fontSize: 16,
-        lineHeight: 21,  // Reduced from 24 to 21
+        fontSize: 14,
+        lineHeight: 19,
         backgroundColor: theme.colors.surfaceHighest,
         color: theme.colors.text,
     },
