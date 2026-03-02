@@ -5,6 +5,7 @@ import * as path from 'path';
 
 interface ChangelogEntry {
     version: number;
+    deployVersion: string;
     date: string;
     summary: string;
     changes: string[];
@@ -18,7 +19,7 @@ interface ChangelogData {
 
 function parseChangelog(): ChangelogData {
     const changelogPath = path.join(__dirname, '../../CHANGELOG.md');
-    
+
     if (!fs.existsSync(changelogPath)) {
         console.warn('CHANGELOG.md not found, creating empty changelog data');
         return { entries: [], latestVersion: 0 };
@@ -26,25 +27,26 @@ function parseChangelog(): ChangelogData {
 
     const content = fs.readFileSync(changelogPath, 'utf-8');
     const entries: ChangelogEntry[] = [];
-    
-    // Split by version headers (## Version X - Date)
-    const versionSections = content.split(/^## Version (\d+) - (.+)$/gm);
-    
+
+    // Split by version headers: ## Version N (DEPLOY_VERSION) - DATE
+    const versionSections = content.split(/^## Version (\d+) \(([^)]+)\) - (.+)$/gm);
+
     // Skip the first element (content before first version)
-    for (let i = 1; i < versionSections.length; i += 3) {
+    for (let i = 1; i < versionSections.length; i += 4) {
         const versionStr = versionSections[i];
-        const dateStr = versionSections[i + 1];
-        const changesContent = versionSections[i + 2];
-        
+        const deployVersion = versionSections[i + 1];
+        const dateStr = versionSections[i + 2];
+        const changesContent = versionSections[i + 3];
+
         const version = parseInt(versionStr, 10);
         if (isNaN(version)) continue;
-        
+
         // Extract summary and bullet points
         const changes: string[] = [];
         const lines = changesContent.trim().split('\n');
         let summary = '';
         let foundFirstBullet = false;
-        
+
         for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed.startsWith('- ')) {
@@ -55,13 +57,14 @@ function parseChangelog(): ChangelogData {
                 summary += (summary ? ' ' : '') + trimmed;
             }
         }
-        
+
         entries.push({
             version,
+            deployVersion: deployVersion.trim(),
             date: dateStr.trim(),
             summary: summary.trim(),
             changes,
-            rawMarkdown: `## Version ${version} - ${dateStr}\n${changesContent}`.trim()
+            rawMarkdown: `## Version ${version} (${deployVersion.trim()}) - ${dateStr}\n${changesContent}`.trim()
         });
     }
     

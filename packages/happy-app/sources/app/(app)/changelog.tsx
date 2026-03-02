@@ -119,7 +119,7 @@ export default function ChangelogScreen() {
                 {entries.map((entry) => (
                     <View key={entry.version} style={styles.entryContainer}>
                         <Text style={styles.versionHeader}>
-                            {t('changelog.version', { version: entry.version })}
+                            v{entry.deployVersion}
                         </Text>
                         <Text style={styles.dateText}>
                             {entry.date}

@@ -1,5 +1,6 @@
 export interface ChangelogEntry {
     version: number;
+    deployVersion: string;
     date: string;
     summary: string;
     changes: string[];
