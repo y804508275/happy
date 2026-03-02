@@ -156,6 +156,22 @@ export class PermissionHandler {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
+        // Handle ExitPlanMode specially - must always go through plan restart flow
+        // regardless of autoConfirm, bypassPermissions, or any other auto-allow path.
+        // Without this, auto-allow causes isAborted() to abort the session but
+        // PLAN_FAKE_RESTART is never injected, leaving the system waiting for user input.
+        if (toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') {
+            if (this.autoConfirm || this.permissionMode === 'bypassPermissions') {
+                logger.debug('ExitPlanMode auto-approved - injecting PLAN_FAKE_RESTART');
+                const fullMode: EnhancedMode = {
+                    ...this.currentMode,
+                    permissionMode: this.permissionMode === 'bypassPermissions' ? 'bypassPermissions' : 'default',
+                };
+                this.session.queue.unshift(PLAN_FAKE_RESTART, fullMode);
+                return { behavior: 'deny', message: PLAN_FAKE_REJECT };
+            }
+        }
+
         // Calculate descriptor
         const descriptor = getToolDescriptor(toolName);
 
