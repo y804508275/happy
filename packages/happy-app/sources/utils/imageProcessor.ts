@@ -12,50 +12,69 @@ export interface ProcessedImage {
 }
 
 const MAX_DIMENSION = 1024;
+const MIN_DIMENSION = 256;
+const DIMENSION_SCALE = 0.75; // shrink to 75% each round
 const MAX_SIZE_BYTES = 300 * 1024; // 300KB — keeps encrypted payload manageable for rn-encryption
 const INITIAL_QUALITY = 0.7;
 const MIN_QUALITY = 0.3;
+const QUALITY_STEP = 0.1;
 
 /**
  * Process a File object (from paste or file picker) into a format suitable for sending.
  * Resizes if needed and compresses to stay under size limits.
+ * Progressively reduces both quality and dimensions to guarantee the result fits.
  */
 export async function processImageFile(file: File): Promise<ProcessedImage> {
     const bitmap = await createImageBitmap(file);
-    const { width, height } = getResizedDimensions(bitmap.width, bitmap.height, MAX_DIMENSION);
-
-    const canvas = new OffscreenCanvas(width, height);
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(bitmap, 0, 0, width, height);
-    bitmap.close();
-
-    // Determine output format: keep PNG for transparency, otherwise JPEG
     const isPng = file.type === 'image/png';
-    const mediaType = isPng ? 'image/png' : 'image/jpeg';
 
-    let blob: Blob;
-    let quality = INITIAL_QUALITY;
+    let maxDim = MAX_DIMENSION;
+    let fallbackBlob: Blob | null = null;
+    let fallbackWidth = 0;
+    let fallbackHeight = 0;
 
-    if (isPng) {
-        blob = await canvas.convertToBlob({ type: 'image/png' });
-        // If PNG is too large, fall back to JPEG
-        if (blob.size > MAX_SIZE_BYTES) {
-            blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
-            while (blob.size > MAX_SIZE_BYTES && quality > MIN_QUALITY) {
-                quality -= 0.15;
-                blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+    while (maxDim >= MIN_DIMENSION) {
+        const { width, height } = getResizedDimensions(bitmap.width, bitmap.height, maxDim);
+
+        const canvas = new OffscreenCanvas(width, height);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0, width, height);
+
+        // For PNG input, try keeping PNG format first
+        if (isPng) {
+            const pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+            if (pngBlob.size <= MAX_SIZE_BYTES) {
+                bitmap.close();
+                return blobToProcessedImage(pngBlob, 'image/png', width, height);
             }
+        }
+
+        // Try JPEG with progressively lower quality
+        let quality = INITIAL_QUALITY;
+        let blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+
+        while (blob.size > MAX_SIZE_BYTES && quality > MIN_QUALITY) {
+            quality -= QUALITY_STEP;
+            blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: Math.max(quality, MIN_QUALITY) });
+        }
+
+        // Keep as fallback in case no size fits perfectly
+        fallbackBlob = blob;
+        fallbackWidth = width;
+        fallbackHeight = height;
+
+        if (blob.size <= MAX_SIZE_BYTES) {
+            bitmap.close();
             return blobToProcessedImage(blob, 'image/jpeg', width, height);
         }
-    } else {
-        blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
-        while (blob.size > MAX_SIZE_BYTES && quality > MIN_QUALITY) {
-            quality -= 0.15;
-            blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
-        }
+
+        // Still too large — shrink dimensions and retry
+        maxDim = Math.round(maxDim * DIMENSION_SCALE);
     }
 
-    return blobToProcessedImage(blob, mediaType, width, height);
+    // Fallback: return the smallest version we could produce
+    bitmap.close();
+    return blobToProcessedImage(fallbackBlob!, 'image/jpeg', fallbackWidth, fallbackHeight);
 }
 
 function getResizedDimensions(w: number, h: number, maxDim: number): { width: number; height: number } {
@@ -71,19 +90,18 @@ function getResizedDimensions(w: number, h: number, maxDim: number): { width: nu
 
 async function blobToProcessedImage(blob: Blob, mediaType: string, width: number, height: number): Promise<ProcessedImage> {
     const uri = URL.createObjectURL(blob);
-    const arrayBuffer = await blob.arrayBuffer();
-    const base64 = arrayBufferToBase64(arrayBuffer);
+    const base64 = await blobToBase64(blob);
     return { uri, base64, mediaType, width, height };
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    // Process in chunks to avoid stack overflow with large arrays
-    const CHUNK_SIZE = 8192;
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i += CHUNK_SIZE) {
-        const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.byteLength));
-        binary += String.fromCharCode(...chunk);
-    }
-    return btoa(binary);
+function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            resolve(dataUrl.split(',')[1]); // strip "data:...;base64," prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
