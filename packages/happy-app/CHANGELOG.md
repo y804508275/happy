@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 13 (2026.03.03.2) - 2026-03-03
+
+修复选项栏重复显示和宽度问题。
+
+- 修复 FixedOptionsBar 在宽屏上撑满全宽的问题，添加 maxWidth 约束与其他 bar 组件保持一致
+- 修复当 AskUserQuestion 和 markdown options 同时存在时选项重复显示的问题，AskUserQuestion 优先展示
+
+发布方式：OTA 部署生效。
+
 ## Version 12 (2026.03.03.1) - 2026-03-03
 
 自动确认功能升级为三态模式，支持更精细的权限控制。

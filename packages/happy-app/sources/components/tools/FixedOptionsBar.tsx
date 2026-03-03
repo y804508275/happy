@@ -5,6 +5,7 @@ import { useSessionMessages } from '@/sync/storage';
 import { parseMarkdown } from '@/components/markdown/parseMarkdown';
 import { sync } from '@/sync/sync';
 import { Metadata } from '@/sync/storageTypes';
+import { ToolCallMessage } from '@/sync/typesMessage';
 import { layout } from '@/components/layout';
 
 /**
@@ -23,15 +24,23 @@ export const FixedOptionsBar = React.memo((props: {
 
     // Find active options: scan from newest message, stop at first user message
     const activeOptions = React.useMemo(() => {
+        let hasPendingAskQuestion = false;
         for (const msg of messages) {
             if (msg.kind === 'user-text') {
-                // User already responded, options are no longer active
                 return null;
+            }
+            if (msg.kind === 'tool-call') {
+                const toolMsg = msg as ToolCallMessage;
+                if (toolMsg.tool?.name === 'AskUserQuestion' && toolMsg.tool.state === 'running') {
+                    hasPendingAskQuestion = true;
+                }
             }
             if (msg.kind === 'agent-text') {
                 const blocks = parseMarkdown(msg.text);
                 for (const block of blocks) {
                     if (block.type === 'options' && block.items.length > 0) {
+                        // Skip if AskUserQuestion is also pending (avoid duplicate options)
+                        if (hasPendingAskQuestion) return null;
                         return block.items;
                     }
                 }
