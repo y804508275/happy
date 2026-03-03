@@ -5,7 +5,8 @@
 
 import { apiSocket } from './apiSocket';
 import { sync } from './sync';
-import type { MachineMetadata } from './storageTypes';
+import { storage } from './storage';
+import type { MachineMetadata, AutoConfirmMode } from './storageTypes';
 
 // Strict type definitions for all operations
 
@@ -328,11 +329,13 @@ export async function machineUpdateMetadata(
 }
 
 /**
- * Toggle auto-confirm mode for a session
- * When enabled, all permission requests are automatically approved
+ * Set auto-confirm mode for a session
+ * - 'off': manual confirmation required
+ * - 'confirm': auto-confirm tool permissions only (AskUserQuestion stays manual)
+ * - 'all': auto-confirm everything + auto-answer questions
  */
-export async function sessionAutoConfirm(sessionId: string, enabled: boolean): Promise<void> {
-    await apiSocket.sessionRPC(sessionId, 'autoConfirm', { enabled });
+export async function sessionAutoConfirm(sessionId: string, mode: AutoConfirmMode): Promise<void> {
+    await apiSocket.sessionRPC(sessionId, 'autoConfirm', { enabled: mode !== 'off', mode });
 }
 
 /**
@@ -509,9 +512,29 @@ export async function sessionRipgrep(
 }
 
 /**
- * Kill the session process immediately
+ * Kill the session process immediately.
+ * Prefers stopping via the daemon's stopSession (which properly removes the process
+ * from tracking to prevent auto-respawn). Falls back to direct sessionRPC killSession.
  */
 export async function sessionKill(sessionId: string): Promise<SessionKillResponse> {
+    // Try daemon route first — this properly removes the session from tracking
+    // so the daemon won't auto-respawn it after it exits
+    const session = storage.getState().sessions[sessionId];
+    const machineId = session?.metadata?.machineId;
+    if (machineId) {
+        try {
+            await apiSocket.machineRPC<{ success: boolean }, { sessionId: string }>(
+                machineId,
+                'stop-session',
+                { sessionId }
+            );
+            return { success: true, message: 'Session stopped via daemon' };
+        } catch {
+            // Daemon route failed (e.g. daemon offline), fall through to direct RPC
+        }
+    }
+
+    // Fallback: send killSession directly to the CLI process
     try {
         const response = await apiSocket.sessionRPC<SessionKillResponse, {}>(
             sessionId,

@@ -277,6 +277,83 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
         }
     });
 
+    mcp.registerTool('save_md_reference', {
+        description: 'Save a markdown reference document for context injection. Use this when the user describes a rule, convention, or context that should be stored as an MD reference file (not a memory rule). MD references are selectable context files that users can attach to conversations.',
+        title: 'Save MD Reference',
+        inputSchema: {
+            content: z.string().describe('The markdown content of the reference document.'),
+            title: z.string().max(200).describe('A short, descriptive title for the reference.'),
+            scope: z.enum(['global', 'project']).default('project').describe('global = applies everywhere. project = applies only to the current project/directory.'),
+            description: z.string().max(500).optional().describe('Brief summary of the reference document.'),
+        },
+    }, async (args) => {
+        try {
+            const slug = slugify(args.title);
+            const meta: Record<string, unknown> = {
+                memoryType: 'memory',
+                alwaysApply: false,
+                scope: args.scope,
+            };
+            if (args.scope === 'project' && workingDirectory) {
+                const matchedProject = findProjectForPath(workingDirectory, currentProjects);
+                meta.projectPath = matchedProject?.path || workingDirectory;
+            }
+
+            const response = await axios.post(`${apiBase}/v1/shared-items`, {
+                type: 'context',
+                visibility: 'private',
+                name: args.title,
+                slug,
+                description: args.description || null,
+                content: args.content,
+                meta,
+            }, { headers: apiHeaders(), timeout: 10000 });
+
+            return {
+                content: [{ type: 'text', text: `MD reference saved: "${args.title}" (${args.scope} scope, id: ${response.data.id})` }],
+                isError: false,
+            };
+        } catch (error: any) {
+            if (error.response?.status === 409) {
+                const retrySlug = slugify(args.title).slice(0, 60) + '-' + Date.now().toString(36);
+                const meta: Record<string, unknown> = {
+                    memoryType: 'memory',
+                alwaysApply: false,
+                    scope: args.scope,
+                };
+                if (args.scope === 'project' && workingDirectory) {
+                    const matchedProject = findProjectForPath(workingDirectory, currentProjects);
+                    meta.projectPath = matchedProject?.path || workingDirectory;
+                }
+                try {
+                    const response = await axios.post(`${apiBase}/v1/shared-items`, {
+                        type: 'context',
+                        visibility: 'private',
+                        name: args.title,
+                        slug: retrySlug,
+                        description: args.description || null,
+                        content: args.content,
+                        meta,
+                    }, { headers: apiHeaders(), timeout: 10000 });
+                    return {
+                        content: [{ type: 'text', text: `MD reference saved: "${args.title}" (${args.scope} scope, id: ${response.data.id})` }],
+                        isError: false,
+                    };
+                } catch (retryError: any) {
+                    return {
+                        content: [{ type: 'text', text: `Failed to save MD reference: ${retryError.message || String(retryError)}` }],
+                        isError: true,
+                    };
+                }
+            }
+            return {
+                content: [{ type: 'text', text: `Failed to save MD reference: ${error.message || String(error)}` }],
+                isError: true,
+            };
+        }
+    });
+
+
     mcp.registerTool('notify_rule_applied', {
         description: 'Notify the user that a knowledge base rule was applied in your response. Call this BEFORE your response when a rule from the Knowledge Base influenced your behavior.',
         title: 'Notify Rule Applied',
@@ -365,7 +442,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
 
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title', 'list_projects', 'load_context', 'save_memory', 'delete_memory', 'notify_rule_applied'],
+        toolNames: ['change_title', 'list_projects', 'load_context', 'save_memory', 'save_md_reference', 'delete_memory', 'notify_rule_applied'],
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
             mcp.close();

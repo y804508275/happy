@@ -15,6 +15,7 @@ import { getToolName } from "./getToolName";
 import { EnhancedMode, PermissionMode } from "../loop";
 import { getToolDescriptor } from "./getToolDescriptor";
 import { delay } from "@/utils/time";
+import { AutoConfirmMode } from "@/api/types";
 
 interface PermissionResponse {
     id: string;
@@ -44,6 +45,7 @@ export class PermissionHandler {
     private permissionMode: PermissionMode = 'default';
     private currentMode: EnhancedMode = { permissionMode: 'default' };
     private autoConfirm: boolean = false;
+    private autoConfirmMode: AutoConfirmMode = 'off';
     private onPermissionRequestCallback?: (toolCallId: string) => void;
 
     constructor(session: Session) {
@@ -54,7 +56,8 @@ export class PermissionHandler {
         const currentState = this.session.client.getCurrentAgentState();
         if (currentState?.autoConfirm) {
             this.autoConfirm = true;
-            logger.debug('Restored autoConfirm=true from existing agent state');
+            this.autoConfirmMode = currentState.autoConfirmMode || 'all';
+            logger.debug(`Restored autoConfirm=true, mode=${this.autoConfirmMode} from existing agent state`);
         }
     }
     
@@ -187,7 +190,8 @@ export class PermissionHandler {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
-        if (this.autoConfirm) {
+        // Auto-confirm: always skip AskUserQuestion (app handles it)
+        if (this.autoConfirm && toolName !== 'AskUserQuestion') {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
@@ -420,19 +424,26 @@ export class PermissionHandler {
      */
     private setupClientHandler(): void {
         // Auto-confirm RPC handler
-        this.session.client.rpcHandlerManager.registerHandler<{ enabled: boolean }, void>('autoConfirm', async (message) => {
+        this.session.client.rpcHandlerManager.registerHandler<{ enabled: boolean, mode?: AutoConfirmMode }, void>('autoConfirm', async (message) => {
+            const mode: AutoConfirmMode = message.mode || (message.enabled ? 'all' : 'off');
             this.autoConfirm = message.enabled;
-            logger.debug(`Auto-confirm ${message.enabled ? 'enabled' : 'disabled'}`);
+            this.autoConfirmMode = mode;
+            logger.debug(`Auto-confirm ${message.enabled ? 'enabled' : 'disabled'}, mode=${mode}`);
 
             // Update agent state
             this.session.client.updateAgentState((currentState) => ({
                 ...currentState,
-                autoConfirm: message.enabled
+                autoConfirm: message.enabled,
+                autoConfirmMode: mode
             }));
 
-            // Auto-approve all pending requests when enabled
+            // Auto-approve pending requests when enabled
+            // Always skip AskUserQuestion (app handles it in all modes)
             if (message.enabled) {
                 for (const [id, pending] of this.pendingRequests.entries()) {
+                    if (pending.toolName === 'AskUserQuestion') {
+                        continue;
+                    }
                     this.pendingRequests.delete(id);
                     pending.resolve({ behavior: 'allow', updatedInput: (pending.input as Record<string, unknown>) || {} });
 

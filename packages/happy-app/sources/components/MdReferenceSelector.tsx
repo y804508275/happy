@@ -403,7 +403,7 @@ export const MdReferenceSelector = React.memo(({
                 </View>
             ) : allItems.length === 0 ? (
                 <View style={{ paddingVertical: 24, paddingHorizontal: 16, alignItems: 'center' }}>
-                    <Ionicons name="document-text-outline" size={28} color={theme.colors.textSecondary} />
+                    <Ionicons name="book-outline" size={28} color={theme.colors.textSecondary} />
                     <Text style={{
                         fontSize: 13,
                         color: theme.colors.textSecondary,

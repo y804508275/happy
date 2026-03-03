@@ -78,8 +78,8 @@ interface AgentInputProps {
     minHeight?: number;
     profileId?: string | null;
     onProfileClick?: () => void;
-    autoConfirm?: boolean;
-    onAutoConfirmChange?: (enabled: boolean) => void;
+    autoConfirmMode?: 'off' | 'confirm' | 'all';
+    onAutoConfirmModeChange?: (mode: 'off' | 'confirm' | 'all') => void;
     // Image support
     attachedImages?: Array<{ uri: string; mediaType: string }>;
     onImagePaste?: (files: File[]) => void;
@@ -90,10 +90,11 @@ interface AgentInputProps {
     onFilePaste?: (files: File[]) => void;
     onAttachmentPick?: () => void;
     onRemoveFile?: (index: number) => void;
-    // MD Reference support
-    selectedMdRefs?: Array<{ id: string; name: string }>;
+    // Rules reference support
+    selectedMdRefs?: Array<{ id: string; name: string; instruction?: string }>;
     onMdRefButtonPress?: () => void;
     onMdRefRemove?: (id: string) => void;
+    onMdRefInstructionChange?: (id: string, instruction: string) => void;
     mdRefSelectorVisible?: boolean;
     mdRefSelectorContent?: React.ReactNode;
 }
@@ -994,11 +995,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
                 {/* Box 2: Action Area (Input + Send) */}
                 <View style={styles.unifiedPanel}>
-                    {/* MD Reference chips */}
+                    {/* Rules reference chips */}
                     {props.selectedMdRefs && props.selectedMdRefs.length > 0 && props.onMdRefRemove && (
                         <MdReferenceChips
                             items={props.selectedMdRefs}
                             onRemove={props.onMdRefRemove}
+                            onInstructionChange={props.onMdRefInstructionChange}
                         />
                     )}
 
@@ -1218,7 +1220,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* MD Reference button */}
+                                {/* Rules reference button */}
                                 {props.onMdRefButtonPress && (
                                     <Pressable
                                         onPress={() => {
@@ -1239,7 +1241,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                         })}
                                     >
                                         <Ionicons
-                                            name="document-text-outline"
+                                            name="book-outline"
                                             size={16}
                                             color={theme.colors.button.secondary.tint}
                                         />
@@ -1292,42 +1294,59 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* Auto-Confirm toggle button */}
-                                {props.onAutoConfirmChange && (
-                                    <Pressable
-                                        onPress={() => {
-                                            hapticsLight();
-                                            props.onAutoConfirmChange?.(!props.autoConfirm);
-                                        }}
-                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
-                                        style={(p) => ({
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            borderRadius: Platform.select({ default: 16, android: 20 }),
-                                            paddingHorizontal: 10,
-                                            paddingVertical: 6,
-                                            justifyContent: 'center',
-                                            height: 32,
-                                            opacity: p.pressed ? 0.7 : 1,
-                                            gap: 6,
-                                            backgroundColor: props.autoConfirm ? theme.colors.radio.active + '20' : 'transparent',
-                                        })}
-                                    >
-                                        <Octicons
-                                            name={props.autoConfirm ? "check-circle-fill" : "check-circle"}
-                                            size={14}
-                                            color={props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint}
-                                        />
-                                        <Text style={{
-                                            fontSize: 13,
-                                            color: props.autoConfirm ? theme.colors.radio.active : theme.colors.button.secondary.tint,
-                                            fontWeight: '600',
-                                            ...Typography.default('semiBold'),
-                                        }}>
-                                            {t('agentInput.autoConfirm.title')}
-                                        </Text>
-                                    </Pressable>
-                                )}
+                                {/* Auto-Confirm toggle button (3-state: off → confirm → all → off) */}
+                                {props.onAutoConfirmModeChange && (() => {
+                                    const mode = props.autoConfirmMode || 'off';
+                                    const nextMode = mode === 'off' ? 'confirm' : mode === 'confirm' ? 'all' : 'off';
+                                    // Three visually distinct states:
+                                    //   off:     ○ Auto     (gray, no bg)
+                                    //   confirm: ✓ Auto✓    (colored, light bg)
+                                    //   all:     ⚡ Auto+    (colored, strong bg)
+                                    const iconName = mode === 'off' ? 'check-circle' : mode === 'confirm' ? 'check-circle-fill' : 'zap';
+                                    const label = mode === 'off'
+                                        ? t('agentInput.autoConfirm.confirm')
+                                        : mode === 'confirm'
+                                            ? t('agentInput.autoConfirm.confirmActive')
+                                            : t('agentInput.autoConfirm.all');
+                                    const isActive = mode !== 'off';
+                                    const color = isActive ? theme.colors.radio.active : theme.colors.button.secondary.tint;
+                                    const bgOpacity = mode === 'all' ? '35' : mode === 'confirm' ? '20' : '';
+                                    return (
+                                        <Pressable
+                                            onPress={() => {
+                                                hapticsLight();
+                                                props.onAutoConfirmModeChange?.(nextMode);
+                                            }}
+                                            hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                            style={(p) => ({
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                borderRadius: Platform.select({ default: 16, android: 20 }),
+                                                paddingHorizontal: 10,
+                                                paddingVertical: 6,
+                                                justifyContent: 'center',
+                                                height: 32,
+                                                opacity: p.pressed ? 0.7 : 1,
+                                                gap: 6,
+                                                backgroundColor: isActive ? theme.colors.radio.active + bgOpacity : 'transparent',
+                                            })}
+                                        >
+                                            <Octicons
+                                                name={iconName}
+                                                size={14}
+                                                color={color}
+                                            />
+                                            <Text style={{
+                                                fontSize: 13,
+                                                color,
+                                                fontWeight: '600',
+                                                ...Typography.default('semiBold'),
+                                            }}>
+                                                {label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })()}
 
                                 {/* Git Status Badge */}
                                 <GitStatusButton sessionId={props.sessionId} onPress={props.onFileViewerPress} />

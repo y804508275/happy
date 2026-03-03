@@ -5,16 +5,19 @@ import { useSessionMessages } from '@/sync/storage';
 import { parseMarkdown } from '@/components/markdown/parseMarkdown';
 import { sync } from '@/sync/sync';
 import { Metadata } from '@/sync/storageTypes';
+import { layout } from '@/components/layout';
 
 /**
  * Renders markdown <options> blocks in a fixed position above the input bar.
  * Supports keyboard navigation (up/down arrows + Enter) on web.
  * Only shows when the most recent messages contain options and the user
  * hasn't responded yet.
+ * In 'all' autoConfirmMode, auto-selects the first option after a brief delay.
  */
 export const FixedOptionsBar = React.memo((props: {
     sessionId: string;
     metadata: Metadata | null;
+    autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { messages } = useSessionMessages(props.sessionId);
 
@@ -46,14 +49,16 @@ export const FixedOptionsBar = React.memo((props: {
             <FixedOptionsContent
                 items={activeOptions}
                 sessionId={props.sessionId}
+                autoConfirmMode={props.autoConfirmMode}
             />
         </View>
     );
 });
 
-const FixedOptionsContent = React.memo(({ items, sessionId }: {
+const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode }: {
     items: string[];
     sessionId: string;
+    autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { theme } = useUnistyles();
     const [focusedIndex, setFocusedIndex] = React.useState(0);
@@ -69,6 +74,18 @@ const FixedOptionsContent = React.memo(({ items, sessionId }: {
 
     const handleSelectRef = React.useRef(handleSelect);
     handleSelectRef.current = handleSelect;
+
+    // Auto-select first option in 'all' mode after a brief delay
+    const autoTriggered = React.useRef(false);
+    React.useEffect(() => {
+        if (autoConfirmMode !== 'all' || autoTriggered.current || submitted) return;
+        autoTriggered.current = true;
+        setFocusedIndex(0);
+        const timer = setTimeout(() => {
+            handleSelectRef.current(0);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [autoConfirmMode, submitted]);
 
     // Keyboard navigation: up/down to focus, enter to confirm (web only)
     React.useEffect(() => {
@@ -101,6 +118,9 @@ const FixedOptionsContent = React.memo(({ items, sessionId }: {
 
     return (
         <View style={contentStyles.wrapper}>
+            {autoConfirmMode === 'all' && (
+                <Text style={[contentStyles.autoLabel, { color: theme.colors.radio.active }]}>Auto</Text>
+            )}
             {items.map((item, index) => (
                 <Pressable
                     key={index}
@@ -128,6 +148,9 @@ const barStyles = StyleSheet.create((theme) => ({
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: theme.colors.divider,
         backgroundColor: theme.colors.surface,
+        alignSelf: 'center',
+        width: '100%',
+        maxWidth: layout.maxWidth,
     },
 }));
 
@@ -136,6 +159,13 @@ const contentStyles = StyleSheet.create((theme) => ({
         paddingHorizontal: 16,
         paddingVertical: 8,
         gap: 4,
+    },
+    autoLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+        marginBottom: 2,
     },
     optionItem: {
         backgroundColor: theme.colors.surfaceHighest,

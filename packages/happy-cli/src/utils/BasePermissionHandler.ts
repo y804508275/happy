@@ -9,7 +9,7 @@
 
 import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
-import { AgentState } from "@/api/types";
+import { AgentState, AutoConfirmMode } from "@/api/types";
 
 /**
  * Permission response from the mobile app.
@@ -46,6 +46,7 @@ export interface PermissionResult {
 export abstract class BasePermissionHandler {
     protected pendingRequests = new Map<string, PendingRequest>();
     protected autoConfirm: boolean = false;
+    protected autoConfirmMode: AutoConfirmMode = 'off';
     protected session: ApiSessionClient;
     private isResetting = false;
 
@@ -62,7 +63,8 @@ export abstract class BasePermissionHandler {
         const currentState = this.session.getCurrentAgentState();
         if (currentState?.autoConfirm) {
             this.autoConfirm = true;
-            logger.debug(`${this.getLogPrefix()} Restored autoConfirm=true from existing agent state`);
+            this.autoConfirmMode = currentState.autoConfirmMode || 'all';
+            logger.debug(`${this.getLogPrefix()} Restored autoConfirm=true, mode=${this.autoConfirmMode} from existing agent state`);
         }
     }
 
@@ -82,24 +84,33 @@ export abstract class BasePermissionHandler {
      */
     protected setupRpcHandler(): void {
         // Auto-confirm RPC handler
-        this.session.rpcHandlerManager.registerHandler<{ enabled: boolean }, void>(
+        this.session.rpcHandlerManager.registerHandler<{ enabled: boolean, mode?: AutoConfirmMode }, void>(
             'autoConfirm',
             async (message) => {
+                const mode: AutoConfirmMode = message.mode || (message.enabled ? 'all' : 'off');
                 this.autoConfirm = message.enabled;
-                logger.debug(`${this.getLogPrefix()} Auto-confirm ${message.enabled ? 'enabled' : 'disabled'}`);
+                this.autoConfirmMode = mode;
+                logger.debug(`${this.getLogPrefix()} Auto-confirm ${message.enabled ? 'enabled' : 'disabled'}, mode=${mode}`);
 
                 // Update agent state
                 this.session.updateAgentState((currentState) => ({
                     ...currentState,
-                    autoConfirm: message.enabled
+                    autoConfirm: message.enabled,
+                    autoConfirmMode: mode
                 }));
 
-                // Auto-approve all pending requests when enabled
+                // Auto-approve pending requests when enabled
+                // In 'confirm' mode, skip AskUserQuestion (app handles it manually)
+                // In 'all' mode, skip AskUserQuestion too (app handles auto-answer)
                 if (message.enabled) {
                     const pendingSnapshot = Array.from(this.pendingRequests.entries());
-                    this.pendingRequests.clear();
 
                     for (const [id, pending] of pendingSnapshot) {
+                        if (pending.toolName === 'AskUserQuestion') {
+                            // Never auto-approve AskUserQuestion from CLI - app handles it
+                            continue;
+                        }
+                        this.pendingRequests.delete(id);
                         pending.resolve({ decision: 'approved' });
 
                         this.session.updateAgentState((currentState) => {

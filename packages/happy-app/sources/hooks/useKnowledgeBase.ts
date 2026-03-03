@@ -83,11 +83,13 @@ export function useKnowledgeBase(credentials: AuthCredentials | null, workingDir
 
             const memories = (result.items || []).filter((item) => {
                 const meta = item.meta;
-                if (!meta || meta.memoryType !== 'memory') return false;
-                return true;
+                if (!meta) return false;
+                if (meta.memoryType === 'memory') return true;
+                if (meta.memoryType === 'md-reference') return true;
+                return false;
             });
 
-            setGlobalItems(memories.filter((item) => item.meta?.scope === 'global'));
+            setGlobalItems(memories.filter((item) => !item.meta?.scope || item.meta?.scope === 'global'));
             setProjectItems(memories.filter((item) => item.meta?.scope === 'project'));
         } catch {
             // Silent failure - show empty state

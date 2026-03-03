@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 12 (2026.03.03.1) - 2026-03-03
+
+自动确认功能升级为三态模式，支持更精细的权限控制。
+
+- 自动确认从开/关两态改为三态循环：手动确认（Auto）→ 仅自动确认权限（Auto✓）→ 自动确认+自动回答（Auto+）
+- 「仅自动确认」模式：自动批准工具权限请求，但不自动回答 AskUserQuestion 和 options 选择
+- 「自动确认+回答」模式：额外自动选择 AskUserQuestion 第一项和 markdown options 第一项（300ms 延迟，带视觉反馈）
+- CLI 端所有模式均跳过 AskUserQuestion 自动批准，由 App 端统一处理
+- FixedOptionsBar 组件接入 SessionView，支持 autoConfirmMode 传递
+- 更新全部 11 种语言的翻译
+
+发布方式：需要 `npm run build`（happy-cli）重新编译后重启 daemon 生效；App 端需 OTA 部署或重新构建。
+
 ## Version 11 (2026.03.02.7) - 2026-03-02
 
 修复 auto-continue 在 AI 展示选项时不等待用户选择就自动继续的 bug。

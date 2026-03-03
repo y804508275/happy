@@ -447,7 +447,7 @@ class Sync {
         this.backgroundSendStartedAt = null;
     }
 
-    async sendMessage(sessionId: string, text: string, displayText?: string, images?: Array<{ base64: string; mediaType: string }>, mdReferences?: Array<{ name: string; content: string }>, files?: Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf' }>) {
+    async sendMessage(sessionId: string, text: string, displayText?: string, images?: Array<{ base64: string; mediaType: string }>, mdReferences?: Array<{ name: string; content: string; instruction?: string }>, files?: Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf' }>) {
 
         // Get encryption
         const encryption = this.encryption.getSessionEncryption(sessionId);
@@ -487,12 +487,16 @@ class Sync {
 
         const fallbackModel: string | null = null;
 
-        // Build appendSystemPrompt with optional MD references
+        // Build appendSystemPrompt with optional rules
         let finalSystemPrompt = systemPrompt;
         if (mdReferences && mdReferences.length > 0) {
-            finalSystemPrompt += '\n\n# Referenced Documents\nThe user has attached the following reference documents. Use them as context.\n';
+            finalSystemPrompt += '\n\n# Applied Rules — Action Required\nThe user has explicitly selected the following rules for this message. You MUST follow each rule precisely and execute the user\'s instruction for each rule.\n';
             for (const ref of mdReferences) {
-                finalSystemPrompt += `\n## ${ref.name}\n${ref.content}\n`;
+                finalSystemPrompt += `\n## ${ref.name}\n`;
+                if (ref.instruction) {
+                    finalSystemPrompt += `**User instruction:** ${ref.instruction}\n\n`;
+                }
+                finalSystemPrompt += `${ref.content}\n`;
             }
         }
 

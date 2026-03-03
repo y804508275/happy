@@ -42,6 +42,9 @@ import { isMachineOnline } from '@/utils/machineUtils';
 import { StatusDot } from '@/components/StatusDot';
 import { SearchableListSelector, SelectorConfig } from '@/components/SearchableListSelector';
 import { clearNewSessionDraft, loadNewSessionDraft, saveNewSessionDraft } from '@/sync/persistence';
+import { useMdReferences } from '@/hooks/useMdReferences';
+import { MdReferenceSelector } from '@/components/MdReferenceSelector';
+import { useAuth } from '@/auth/AuthContext';
 
 // Simple temporary state for passing selections back from picker screens
 let onMachineSelected: (machineId: string) => void = () => { };
@@ -414,13 +417,18 @@ function NewSessionWizard() {
         return tempSessionData?.prompt || prompt || persistedDraft?.input || '';
     });
     const [isCreating, setIsCreating] = React.useState(false);
-    const [autoConfirm, setAutoConfirm] = React.useState(false);
+    const [autoConfirmMode, setAutoConfirmMode] = React.useState<'off' | 'confirm' | 'all'>('off');
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
     // Image attachment state (web only)
     const [attachedImages, setAttachedImages] = React.useState<Array<{ uri: string; base64: string; mediaType: string }>>([]);
     // File attachment state (web only)
     const [attachedFiles, setAttachedFiles] = React.useState<Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf' }>>([]);
+
+    // MD References
+    const { credentials } = useAuth();
+    const mdRefs = useMdReferences(credentials, selectedPath);
+    const [showMdRefSelector, setShowMdRefSelector] = React.useState(false);
 
     const handleImagePaste = React.useCallback(async (files: File[]) => {
         const { processImageFile } = await import('@/utils/imageProcessor');
@@ -1131,27 +1139,29 @@ function NewSessionWizard() {
                     storage.getState().updateSessionModelMode(result.sessionId, modelMode.key);
                 }
 
-                // Set auto-confirm if enabled
-                if (autoConfirm) {
-                    await sessionAutoConfirm(result.sessionId, true);
+                // Set auto-confirm mode if not off
+                if (autoConfirmMode !== 'off') {
+                    await sessionAutoConfirm(result.sessionId, autoConfirmMode);
                 }
 
                 // Send initial message if provided (text or images)
                 // Wrapped in separate try/catch so a message send failure
                 // (e.g. encryption error with image data) doesn't prevent
                 // navigation to the already-created session
-                if (sessionPrompt.trim() || attachedImages.length > 0 || attachedFiles.length > 0) {
+                const mdRefContents = await mdRefs.getSelectedContents();
+                if (sessionPrompt.trim() || attachedImages.length > 0 || attachedFiles.length > 0 || mdRefContents.length > 0) {
                     const images = attachedImages.length > 0
                         ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
                     const files = attachedFiles.length > 0 ? attachedFiles : undefined;
                     try {
-                        await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images, undefined, files);
+                        await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images, mdRefContents.length > 0 ? mdRefContents : undefined, files);
                     } catch (sendError) {
                         console.error('Failed to send initial message', sendError);
                     }
                     setAttachedImages([]);
                     setAttachedFiles([]);
+                    mdRefs.clearSelection();
                 }
 
                 router.replace(`/session/${result.sessionId}`, {
@@ -1175,7 +1185,7 @@ function NewSessionWizard() {
             Modal.alert(t('common.error'), errorMessage);
             setIsCreating(false);
         }
-    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, autoConfirm, recentMachinePaths, profileMap, router, attachedImages]);
+    }, [selectedMachineId, selectedPath, sessionPrompt, sessionType, experimentsEnabled, agentType, selectedProfileId, permissionMode, modelMode, autoConfirmMode, recentMachinePaths, profileMap, router, attachedImages, attachedFiles]);
 
     const screenWidth = useWindowDimensions().width;
 
@@ -1274,8 +1284,8 @@ function NewSessionWizard() {
                                 onMachineClick={handleMachineClick}
                                 currentPath={selectedPath}
                                 onPathClick={handlePathClick}
-                                autoConfirm={autoConfirm}
-                                onAutoConfirmChange={setAutoConfirm}
+                                autoConfirmMode={autoConfirmMode}
+                                onAutoConfirmModeChange={setAutoConfirmMode}
                                 attachedImages={attachedImages}
                                 onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
                                 onAttachmentPick={Platform.OS === 'web' ? handleAttachmentPick : undefined}
@@ -1283,6 +1293,25 @@ function NewSessionWizard() {
                                 attachedFiles={attachedFiles}
                                 onFilePaste={Platform.OS === 'web' ? handleFilePaste : undefined}
                                 onRemoveFile={handleRemoveFile}
+                                // Rules reference props
+                                selectedMdRefs={mdRefs.getSelectedSummaries()}
+                                onMdRefButtonPress={() => setShowMdRefSelector(v => !v)}
+                                onMdRefRemove={mdRefs.removeSelection}
+                                onMdRefInstructionChange={mdRefs.setInstruction}
+                                mdRefSelectorVisible={showMdRefSelector}
+                                mdRefSelectorContent={showMdRefSelector ? (
+                                    <MdReferenceSelector
+                                        globalItems={mdRefs.globalItems}
+                                        projectItems={mdRefs.projectItems}
+                                        selectedIds={mdRefs.selectedIds}
+                                        loading={mdRefs.loading}
+                                        onToggle={mdRefs.toggleSelection}
+                                        onCreateItem={mdRefs.createItem}
+                                        onEditItem={mdRefs.updateItem}
+                                        onDeleteItem={mdRefs.deleteItem}
+                                        fetchItemContent={mdRefs.fetchItemContent}
+                                    />
+                                ) : undefined}
                             />
                         </View>
                     </View>
@@ -2052,8 +2081,8 @@ function NewSessionWizard() {
                             onPathClick={handleAgentInputPathClick}
                             profileId={selectedProfileId}
                             onProfileClick={handleAgentInputProfileClick}
-                            autoConfirm={autoConfirm}
-                            onAutoConfirmChange={setAutoConfirm}
+                            autoConfirmMode={autoConfirmMode}
+                            onAutoConfirmModeChange={setAutoConfirmMode}
                             attachedImages={attachedImages}
                             onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
                             onAttachmentPick={Platform.OS === 'web' ? handleAttachmentPick : undefined}
@@ -2061,6 +2090,25 @@ function NewSessionWizard() {
                             attachedFiles={attachedFiles}
                             onFilePaste={Platform.OS === 'web' ? handleFilePaste : undefined}
                             onRemoveFile={handleRemoveFile}
+                            // Rules reference props
+                            selectedMdRefs={mdRefs.getSelectedSummaries()}
+                            onMdRefButtonPress={() => setShowMdRefSelector(v => !v)}
+                            onMdRefRemove={mdRefs.removeSelection}
+                            onMdRefInstructionChange={mdRefs.setInstruction}
+                            mdRefSelectorVisible={showMdRefSelector}
+                            mdRefSelectorContent={showMdRefSelector ? (
+                                <MdReferenceSelector
+                                    globalItems={mdRefs.globalItems}
+                                    projectItems={mdRefs.projectItems}
+                                    selectedIds={mdRefs.selectedIds}
+                                    loading={mdRefs.loading}
+                                    onToggle={mdRefs.toggleSelection}
+                                    onCreateItem={mdRefs.createItem}
+                                    onEditItem={mdRefs.updateItem}
+                                    onDeleteItem={mdRefs.deleteItem}
+                                    fetchItemContent={mdRefs.fetchItemContent}
+                                />
+                            ) : undefined}
                         />
                     </View>
                 </View>

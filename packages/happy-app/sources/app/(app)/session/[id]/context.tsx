@@ -248,6 +248,18 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
         await updateItem(item.id, { meta: newMeta });
     }, [updateItem, workingDirectory]);
 
+    const handleToggleAlwaysApply = useCallback(async (item: SharedItemSummary) => {
+        const isAlways = item.meta?.alwaysApply !== false;
+        const confirmed = await Modal.confirm(
+            isAlways ? t('knowledgeBase.toggleToOnDemand') : t('knowledgeBase.toggleToAlwaysActive'),
+            isAlways
+                ? t('knowledgeBase.toggleToOnDemandMessage', { name: item.name })
+                : t('knowledgeBase.toggleToAlwaysActiveMessage', { name: item.name }),
+        );
+        if (!confirmed) return;
+        await updateItem(item.id, { meta: { ...item.meta, alwaysApply: !isAlways } });
+    }, [updateItem]);
+
     const handleDelete = useCallback((itemId: string, itemName: string) => {
         Modal.alert(
             t('knowledgeBase.deleteConfirm'),
@@ -299,9 +311,39 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
     }
 
     const renderActions = (item: SharedItemSummary) => {
-        const isGlobal = item.meta?.scope === 'global';
+        const isGlobal = !item.meta?.scope || item.meta?.scope === 'global';
+        const isAlways = item.meta?.alwaysApply !== false;
         return (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Pressable
+                    onPress={(e) => { e.stopPropagation(); handleToggleAlwaysApply(item); }}
+                    style={({ pressed }) => ({
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                        backgroundColor: isAlways ? theme.colors.textLink + '15' : theme.colors.divider,
+                        borderWidth: 1,
+                        borderColor: isAlways ? theme.colors.textLink + '40' : theme.colors.divider,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        opacity: pressed ? 0.7 : 1,
+                    })}
+                    hitSlop={4}
+                >
+                    <Ionicons
+                        name={isAlways ? 'flash' : 'hand-left-outline'}
+                        size={13}
+                        color={isAlways ? theme.colors.textLink : theme.colors.textSecondary}
+                    />
+                    <Text style={{
+                        fontSize: 11,
+                        color: isAlways ? theme.colors.textLink : theme.colors.textSecondary,
+                        ...Typography.default('medium'),
+                    }}>
+                        {isAlways ? t('knowledgeBase.alwaysActive') : t('knowledgeBase.onDemand')}
+                    </Text>
+                </Pressable>
                 <Pressable
                     onPress={(e) => { e.stopPropagation(); handleEdit(item.id); }}
                     style={({ pressed }) => ({
@@ -378,8 +420,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                     <ItemGroup title={t('knowledgeBase.globalContext')}>
                         {globalItems.map((item) => {
                             const tags = (item.meta?.tags as string[]) || [];
-                            const isAlways = item.meta?.alwaysApply !== false;
-                            const parts: string[] = [isAlways ? 'Always active' : 'On-demand'];
+                            const parts: string[] = [];
                             if (item.description) parts.push(item.description);
                             if (tags.length > 0) parts.push(`Tags: ${tags.join(', ')}`);
                             const subtitle = parts.join(' | ') || undefined;
@@ -404,9 +445,8 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                     <ItemGroup title={t('knowledgeBase.projectContext')}>
                         {projectItems.map((item) => {
                             const tags = (item.meta?.tags as string[]) || [];
-                            const isAlways = item.meta?.alwaysApply !== false;
                             const projectName = item.meta?.projectPath?.split('/').filter(Boolean).pop() || '';
-                            const parts: string[] = [isAlways ? 'Always active' : 'On-demand'];
+                            const parts: string[] = [];
                             if (projectName) parts.push(projectName);
                             if (item.description) parts.push(item.description);
                             if (tags.length > 0) parts.push(`Tags: ${tags.join(', ')}`);

@@ -1,6 +1,7 @@
 import { AgentContentView } from '@/components/AgentContentView';
 import { AgentInput } from '@/components/AgentInput';
 import { FixedAskUserQuestionBar } from '@/components/tools/FixedAskUserQuestionBar';
+import { FixedOptionsBar } from '@/components/tools/FixedOptionsBar';
 import { InlineOptionsProvider } from '@/hooks/useInlineOptions';
 import { FixedPermissionBar } from '@/components/tools/FixedPermissionBar';
 import { MdReferenceSelector } from '@/components/MdReferenceSelector';
@@ -316,10 +317,10 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, [machineId, cliVersion, acknowledgedCliVersions]);
 
-    // Auto-confirm state from agent state
-    const autoConfirm = session.agentState?.autoConfirm === true;
-    const handleAutoConfirmChange = React.useCallback((enabled: boolean) => {
-        sessionAutoConfirm(sessionId, enabled);
+    // Auto-confirm mode from agent state (backwards compatible with boolean)
+    const autoConfirmMode = (session.agentState?.autoConfirmMode || (session.agentState?.autoConfirm ? 'all' : 'off')) as 'off' | 'confirm' | 'all';
+    const handleAutoConfirmModeChange = React.useCallback((mode: 'off' | 'confirm' | 'all') => {
+        sessionAutoConfirm(sessionId, mode);
     }, [sessionId]);
 
     // Function to update permission mode
@@ -410,7 +411,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     const input = (
         <>
-        <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} />
+        <FixedOptionsBar sessionId={sessionId} metadata={session.metadata} autoConfirmMode={autoConfirmMode} />
+        <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} autoConfirmMode={autoConfirmMode} />
         <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} />
         <AgentInput
             placeholder={t('session.inputPlaceholder')}
@@ -431,12 +433,12 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 isPulsing: sessionStatus.isPulsing
             }}
             onSend={async () => {
-                if (message.trim() || attachedImages.length > 0 || attachedFiles.length > 0) {
+                const mdRefContents = await mdRefs.getSelectedContents();
+                if (message.trim() || attachedImages.length > 0 || attachedFiles.length > 0 || mdRefContents.length > 0) {
                     const images = attachedImages.length > 0
                         ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
                     const files = attachedFiles.length > 0 ? attachedFiles : undefined;
-                    const mdRefContents = await mdRefs.getSelectedContents();
                     setMessage('');
                     setAttachedImages([]);
                     setAttachedFiles([]);
@@ -459,8 +461,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             onRemoveFile={handleRemoveFile}
             onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => !v) : undefined}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
-            autoConfirm={autoConfirm}
-            onAutoConfirmChange={handleAutoConfirmChange}
+            autoConfirmMode={autoConfirmMode}
+            onAutoConfirmModeChange={handleAutoConfirmModeChange}
             // Autocomplete configuration
             autocompletePrefixes={['@', '/']}
             autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}
@@ -478,10 +480,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                 contextSize: session.latestUsage.contextSize
             } : undefined}
             alwaysShowContextSize={alwaysShowContextSize}
-            // MD Reference props
+            // Rules reference props
             selectedMdRefs={mdRefs.getSelectedSummaries()}
             onMdRefButtonPress={() => setShowMdRefSelector(v => !v)}
             onMdRefRemove={mdRefs.removeSelection}
+            onMdRefInstructionChange={mdRefs.setInstruction}
             mdRefSelectorVisible={showMdRefSelector}
             mdRefSelectorContent={showMdRefSelector ? (
                 <MdReferenceSelector

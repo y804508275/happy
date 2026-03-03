@@ -4,10 +4,13 @@ import type { SharedItemSummary, SharedItemFull } from '@/sync/sharedItemTypes';
 import { getServerUrl } from '@/sync/serverConfig';
 
 /**
- * Hook to fetch and manage MD reference files for quick context injection.
+ * Hook to fetch and manage on-demand rules for active context injection.
  *
- * Uses SharedItems with meta.memoryType === 'md-reference' to distinguish
- * from regular knowledge base memories (meta.memoryType === 'memory').
+ * Loads SharedItems with meta.memoryType === 'memory' and meta.alwaysApply === false,
+ * which represent rules the user can actively select per-message.
+ * (alwaysApply === true rules are already passively injected via system prompt.)
+ *
+ * Also supports legacy meta.memoryType === 'md-reference' items for backward compatibility.
  */
 
 async function fetchMdItems(credentials: AuthCredentials, params: Record<string, string>): Promise<{ items: SharedItemSummary[] }> {
@@ -87,6 +90,7 @@ export function useMdReferences(credentials: AuthCredentials | null, workingDire
     const [loading, setLoading] = React.useState(true);
     const [contentCache, setContentCache] = React.useState<Record<string, SharedItemFull>>({});
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+    const [instructions, setInstructions] = React.useState<Record<string, string>>({});
 
     const fetchItems = React.useCallback(async () => {
         if (!credentials) {
@@ -101,14 +105,17 @@ export function useMdReferences(credentials: AuthCredentials | null, workingDire
                 limit: '100',
             });
 
-            const mdRefs = (result.items || []).filter((item) => {
+            // Include all rules (memory type) and legacy md-references
+            const selectableItems = (result.items || []).filter((item) => {
                 const meta = item.meta;
-                if (!meta || meta.memoryType !== 'md-reference') return false;
-                return true;
+                if (!meta) return false;
+                if (meta.memoryType === 'md-reference') return true;
+                if (meta.memoryType === 'memory') return true;
+                return false;
             });
 
-            setGlobalItems(mdRefs.filter((item) => item.meta?.scope === 'global'));
-            setProjectItems(mdRefs.filter((item) => item.meta?.scope === 'project'));
+            setGlobalItems(selectableItems.filter((item) => !item.meta?.scope || item.meta?.scope === 'global'));
+            setProjectItems(selectableItems.filter((item) => item.meta?.scope === 'project'));
         } catch {
             // Silent failure - show empty state
         } finally {
@@ -153,31 +160,59 @@ export function useMdReferences(credentials: AuthCredentials | null, workingDire
             next.delete(itemId);
             return next;
         });
+        setInstructions((prev) => {
+            const next = { ...prev };
+            delete next[itemId];
+            return next;
+        });
     }, []);
 
     const clearSelection = React.useCallback(() => {
         setSelectedIds(new Set());
+        setInstructions({});
+    }, []);
+
+    const setInstruction = React.useCallback((itemId: string, instruction: string) => {
+        setInstructions((prev) => {
+            if (!instruction.trim()) {
+                const next = { ...prev };
+                delete next[itemId];
+                return next;
+            }
+            return { ...prev, [itemId]: instruction };
+        });
     }, []);
 
     const getSelectedContents = React.useCallback(
-        async (): Promise<Array<{ name: string; content: string }>> => {
+        async (): Promise<Array<{ name: string; content: string; instruction?: string }>> => {
             if (!credentials || selectedIds.size === 0) return [];
-            const results: Array<{ name: string; content: string }> = [];
+            const results: Array<{ name: string; content: string; instruction?: string }> = [];
             for (const id of selectedIds) {
                 const full = await fetchItemContent(id);
                 if (full) {
-                    results.push({ name: full.name, content: full.content });
+                    const instruction = instructions[id];
+                    results.push({
+                        name: full.name,
+                        content: full.content,
+                        ...(instruction ? { instruction } : {}),
+                    });
                 }
             }
             return results;
         },
-        [credentials, selectedIds, fetchItemContent],
+        [credentials, selectedIds, fetchItemContent, instructions],
     );
 
-    const getSelectedSummaries = React.useCallback((): Array<{ id: string; name: string }> => {
+    const getSelectedSummaries = React.useCallback((): Array<{ id: string; name: string; instruction?: string }> => {
         const allItems = [...globalItems, ...projectItems];
-        return allItems.filter((item) => selectedIds.has(item.id)).map((item) => ({ id: item.id, name: item.name }));
-    }, [globalItems, projectItems, selectedIds]);
+        return allItems
+            .filter((item) => selectedIds.has(item.id))
+            .map((item) => ({
+                id: item.id,
+                name: item.name,
+                ...(instructions[item.id] ? { instruction: instructions[item.id] } : {}),
+            }));
+    }, [globalItems, projectItems, selectedIds, instructions]);
 
     const createItem = React.useCallback(
         async (data: { name: string; description?: string; content: string; scope: 'global' | 'project' }) => {
@@ -188,7 +223,8 @@ export function useMdReferences(credentials: AuthCredentials | null, workingDire
                     description: data.description,
                     content: data.content,
                     meta: {
-                        memoryType: 'md-reference',
+                        memoryType: 'memory',
+                        alwaysApply: false,
                         scope: data.scope,
                         ...(data.scope === 'project' && workingDirectory ? { projectPath: workingDirectory } : {}),
                     },
@@ -244,9 +280,11 @@ export function useMdReferences(credentials: AuthCredentials | null, workingDire
         projectItems,
         loading,
         selectedIds,
+        instructions,
         toggleSelection,
         removeSelection,
         clearSelection,
+        setInstruction,
         getSelectedContents,
         getSelectedSummaries,
         fetchItemContent,

@@ -46,9 +46,13 @@ export const MetadataSchema = z.object({
 
 export type Metadata = z.infer<typeof MetadataSchema>;
 
+export const AutoConfirmModeSchema = z.enum(['off', 'confirm', 'all']);
+export type AutoConfirmMode = z.infer<typeof AutoConfirmModeSchema>;
+
 export const AgentStateSchema = z.object({
     controlledByUser: z.boolean().nullish(),
     autoConfirm: z.boolean().nullish(),
+    autoConfirmMode: AutoConfirmModeSchema.nullish(),
     requests: z.record(z.string(), z.object({
         tool: z.string(),
         arguments: z.any(),

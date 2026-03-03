@@ -27,10 +27,12 @@ interface Question {
  * Renders pending AskUserQuestion options in a fixed position above the input bar.
  * Supports keyboard navigation (up/down/Enter) on web.
  * For single-select questions, selecting an option auto-submits the answer.
+ * In 'all' autoConfirmMode, auto-selects the first option after a brief delay.
  */
 export const FixedAskUserQuestionBar = React.memo((props: {
     sessionId: string;
     metadata: Metadata | null;
+    autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { messages } = useSessionMessages(props.sessionId);
 
@@ -56,14 +58,16 @@ export const FixedAskUserQuestionBar = React.memo((props: {
             <FixedQuestionContent
                 tool={pendingQuestion.tool}
                 sessionId={props.sessionId}
+                autoConfirmMode={props.autoConfirmMode}
             />
         </View>
     );
 });
 
-const FixedQuestionContent = React.memo(({ tool, sessionId }: {
+const FixedQuestionContent = React.memo(({ tool, sessionId, autoConfirmMode }: {
     tool: ToolCall;
     sessionId: string;
+    autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { theme } = useUnistyles();
     const [focusedIndex, setFocusedIndex] = React.useState(0);
@@ -118,6 +122,19 @@ const FixedQuestionContent = React.memo(({ tool, sessionId }: {
     const handleSelectRef = React.useRef(handleSelect);
     handleSelectRef.current = handleSelect;
 
+    // Auto-select first option in 'all' mode after a brief delay
+    const autoTriggered = React.useRef(false);
+    React.useEffect(() => {
+        if (autoConfirmMode !== 'all' || autoTriggered.current || isSubmitting) return;
+        autoTriggered.current = true;
+        // Highlight first option immediately, then submit after delay
+        setFocusedIndex(0);
+        const timer = setTimeout(() => {
+            handleSelectRef.current(0);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [autoConfirmMode, isSubmitting]);
+
     // Register keyboard handler with InlineOptionsProvider (replaces window listener)
     const { setExternalHandler } = useInlineOptions();
     React.useEffect(() => {
@@ -150,7 +167,12 @@ const FixedQuestionContent = React.memo(({ tool, sessionId }: {
 
     return (
         <View style={contentStyles.wrapper}>
-            <Text style={contentStyles.questionText}>{question.question}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={contentStyles.questionText}>{question.question}</Text>
+                {autoConfirmMode === 'all' && (
+                    <Text style={[contentStyles.autoLabel, { color: theme.colors.radio.active }]}>Auto</Text>
+                )}
+            </View>
             <View style={contentStyles.optionsContainer}>
                 {options.map((option, index) => (
                     <TouchableOpacity
@@ -206,6 +228,13 @@ const contentStyles = StyleSheet.create((theme) => ({
         fontSize: 15,
         fontWeight: '500',
         color: theme.colors.text,
+        flex: 1,
+    },
+    autoLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
     },
     optionsContainer: {
         gap: 4,

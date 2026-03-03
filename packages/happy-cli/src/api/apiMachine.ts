@@ -164,6 +164,19 @@ export class ApiMachineClient {
             return { message: 'Daemon stop request acknowledged, starting shutdown sequence...' };
         });
 
+        // Register stop session handler (used by frontend archive/kill)
+        this.rpcHandlerManager.registerHandler('stop-session', (params: any) => {
+            const { sessionId } = params || {};
+            logger.debug(`[API MACHINE] Stop session request for: ${sessionId}`);
+
+            if (!sessionId) {
+                throw new Error('Session ID is required');
+            }
+
+            const stopped = stopSession(sessionId);
+            return { success: stopped };
+        });
+
         // Register reactivate session handler
         this.rpcHandlerManager.registerHandler('reactivate-session', async (params: any) => {
             const { happySessionId, directory, claudeSessionId, agent } = params || {};

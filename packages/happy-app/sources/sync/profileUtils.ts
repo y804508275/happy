@@ -212,6 +212,43 @@ export AZURE_OPENAI_API_KEY="YOUR_AZURE_API_KEY"
 export AZURE_OPENAI_API_VERSION="2024-02-15-preview"
 export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-5-codex"`,
             };
+        case 'ccr':
+            return {
+                setupGuideUrl: 'https://github.com/musistudio/claude-code-router',
+                description: 'Claude Code Router - 使用 Claude Code CLI 界面，路由到其他模型后端（DeepSeek、Gemini、Ollama 等）',
+                environmentVariables: [
+                    {
+                        name: 'CCR_BASE_URL',
+                        expectedValue: 'http://localhost:3456',
+                        description: 'CCR 代理服务地址（默认 localhost:3456）',
+                        isSecret: false,
+                    },
+                    {
+                        name: 'CCR_AUTH_TOKEN',
+                        expectedValue: '',
+                        description: 'CCR 认证 token（CCR 自身管理后端 API Key，此 token 用于代理认证，可留空）',
+                        isSecret: true,
+                    },
+                    {
+                        name: 'CCR_API_TIMEOUT_MS',
+                        expectedValue: '120000',
+                        description: 'API 超时时间（毫秒，默认 2 分钟）',
+                        isSecret: false,
+                    },
+                ],
+                shellConfigExample: `# 1. 安装 Claude Code Router:
+npm install -g @musistudio/claude-code-router
+
+# 2. 配置 CCR (~/.claude-code-router/config.json)
+# 参考: https://github.com/musistudio/claude-code-router
+
+# 3. 设置环境变量（daemon 启动前）:
+export CCR_BASE_URL="http://localhost:3456"
+export CCR_AUTH_TOKEN=""  # CCR 本身通常不需要认证
+
+# 4. 启动 CCR 代理（需要在 daemon 启动前运行）:
+ccr start`,
+            };
         default:
             return null;
     }
@@ -339,6 +376,27 @@ export const getBuiltInProfile = (id: string): AIBackendProfile | null => {
                 updatedAt: Date.now(),
                 version: '1.0.0',
             };
+        case 'ccr':
+            // Claude Code Router: 代理 Claude Code 请求到其他模型后端
+            // 在服务器上启动 CCR 代理后，通过 ANTHROPIC_BASE_URL 路由请求
+            // CCR 自身在 config.json 中管理后端模型的 API Key
+            // Launch daemon with: CCR_BASE_URL=http://localhost:3456
+            return {
+                id: 'ccr',
+                name: 'Claude Code Router',
+                anthropicConfig: {},
+                environmentVariables: [
+                    { name: 'ANTHROPIC_BASE_URL', value: '${CCR_BASE_URL:-http://localhost:3456}' },
+                    { name: 'ANTHROPIC_AUTH_TOKEN', value: '${CCR_AUTH_TOKEN}' },
+                    { name: 'API_TIMEOUT_MS', value: '${CCR_API_TIMEOUT_MS:-120000}' },
+                ],
+                defaultPermissionMode: 'default',
+                compatibility: { claude: true, codex: false, gemini: false },
+                isBuiltIn: true,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                version: '1.0.0',
+            };
         default:
             return null;
     }
@@ -372,6 +430,11 @@ export const DEFAULT_PROFILES = [
     {
         id: 'azure-openai',
         name: 'Azure OpenAI',
+        isBuiltIn: true,
+    },
+    {
+        id: 'ccr',
+        name: 'Claude Code Router',
         isBuiltIn: true,
     }
 ];

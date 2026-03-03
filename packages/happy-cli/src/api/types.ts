@@ -306,9 +306,12 @@ export type Metadata = {
   dangerouslySkipPermissions?: boolean | null
 };
 
+export type AutoConfirmMode = 'off' | 'confirm' | 'all';
+
 export type AgentState = {
   controlledByUser?: boolean | null | undefined
   autoConfirm?: boolean
+  autoConfirmMode?: AutoConfirmMode
   requests?: {
     [id: string]: {
       tool: string,

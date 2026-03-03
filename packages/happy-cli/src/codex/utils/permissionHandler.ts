@@ -40,7 +40,8 @@ export class CodexPermissionHandler extends BasePermissionHandler {
         toolName: string,
         input: unknown
     ): Promise<PermissionResult> {
-        if (this.autoConfirm) {
+        // Auto-confirm: always skip AskUserQuestion (app handles it)
+        if (this.autoConfirm && toolName !== 'AskUserQuestion') {
             logger.debug(`${this.getLogPrefix()} Auto-confirming tool ${toolName} (${toolCallId})`);
             return { decision: 'approved' };
         }

@@ -112,6 +112,17 @@ async function main() {
     }
   );
 
+  registerForwardTool('save_md_reference',
+    'Save a markdown reference document for context injection. MD references are selectable context files that users can attach to conversations.',
+    'Save MD Reference',
+    {
+      content: z.string().describe('The markdown content of the reference document.'),
+      title: z.string().max(200).describe('A short, descriptive title for the reference.'),
+      scope: z.enum(['global', 'project']).default('project').describe('global or project scope.'),
+      description: z.string().max(500).optional().describe('Brief summary of the reference document.'),
+    }
+  );
+
   registerForwardTool('delete_memory',
     'Delete a memory by ID.',
     'Delete Memory',
