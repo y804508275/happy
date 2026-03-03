@@ -1,6 +1,28 @@
 {
   "entries": [
     {
+      "version": 11,
+      "deployVersion": "2026.03.02.7",
+      "date": "2026-03-02",
+      "summary": "修复 auto-continue 在 AI 展示选项时不等待用户选择就自动继续的 bug。",
+      "changes": [
+        "当 assistant 消息包含 `<options>` 时，跳过 `error_max_turns` 自动继续，等待用户选择",
+        "用户手动发送消息后重置 options 标记"
+      ],
+      "rawMarkdown": "## Version 11 (2026.03.02.7) - 2026-03-02\n\n\n修复 auto-continue 在 AI 展示选项时不等待用户选择就自动继续的 bug。\n\n- 当 assistant 消息包含 `<options>` 时，跳过 `error_max_turns` 自动继续，等待用户选择\n- 用户手动发送消息后重置 options 标记\n\n发布方式：需要 `npm run build`（happy-cli）重新编译后重启 daemon 生效。"
+    },
+    {
+      "version": 10,
+      "deployVersion": "2026.03.02.6",
+      "date": "2026-03-02",
+      "summary": "支持通过 daemon control server 接口恢复 Claude 对话上下文。",
+      "changes": [
+        "`/spawn-session` 接口新增 `resumeClaudeSessionId` 参数，支持会话恢复时传递 Claude 对话 ID",
+        "配合 daemon auto-respawn 机制，确保外部 kill CLI 进程后自动恢复时保留完整对话上下文"
+      ],
+      "rawMarkdown": "## Version 10 (2026.03.02.6) - 2026-03-02\n\n\n支持通过 daemon control server 接口恢复 Claude 对话上下文。\n\n- `/spawn-session` 接口新增 `resumeClaudeSessionId` 参数，支持会话恢复时传递 Claude 对话 ID\n- 配合 daemon auto-respawn 机制，确保外部 kill CLI 进程后自动恢复时保留完整对话上下文\n\n发布方式：需要 `npm run build`（happy-cli）重新编译后重启 daemon 生效。"
+    },
+    {
       "version": 9,
       "deployVersion": "2026.03.02.5",
       "date": "2026-03-02",
@@ -123,5 +145,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 9
+  "latestVersion": 11
 }

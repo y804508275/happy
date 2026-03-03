@@ -1,5 +1,5 @@
 import { EnhancedMode } from "./loop";
-import { query, type QueryOptions, type SDKMessage, type SDKSystemMessage, type SDKResultMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
+import { query, type QueryOptions, type SDKMessage, type SDKSystemMessage, type SDKResultMessage, type SDKAssistantMessage, AbortError, SDKUserMessage } from '@/claude/sdk'
 import { mapToClaudeMode } from "./utils/permissionMode";
 import { claudeCheckSession } from "./utils/claudeCheckSession";
 import { join, resolve } from 'node:path';
@@ -148,6 +148,9 @@ export async function claudeRemote(opts: {
     let autoResumeCount = 0;
     const MAX_AUTO_RESUMES = 5;
 
+    // Track if the last assistant message contains <options> (waiting for user selection)
+    let lastAssistantHasOptions = false;
+
     // Track thinking state
     let thinking = false;
     const updateThinking = (newThinking: boolean) => {
@@ -186,6 +189,19 @@ export async function claudeRemote(opts: {
             // Handle messages
             opts.onMessage(message);
 
+            // Track if assistant message contains <options> (user needs to select before continuing)
+            if (message.type === 'assistant') {
+                const assistantMsg = message as SDKAssistantMessage;
+                const textContent = assistantMsg.message?.content
+                    ?.filter((c: { type: string }) => c.type === 'text')
+                    .map((c: { text?: string }) => c.text || '')
+                    .join('');
+                lastAssistantHasOptions = textContent.includes('<options>');
+                if (lastAssistantHasOptions) {
+                    logger.debug('[claudeRemote] Assistant message contains <options>, will wait for user selection');
+                }
+            }
+
             // Handle special system messages
             if (message.type === 'system' && message.subtype === 'init') {
                 // Start thinking when session initializes
@@ -220,7 +236,8 @@ export async function claudeRemote(opts: {
                 }
 
                 // Auto-continue on error_max_turns (up to MAX_AUTO_RESUMES times)
-                if (resultMsg.subtype === 'error_max_turns' && autoResumeCount < MAX_AUTO_RESUMES) {
+                // But NOT if the assistant presented <options> — wait for user selection instead
+                if (resultMsg.subtype === 'error_max_turns' && autoResumeCount < MAX_AUTO_RESUMES && !lastAssistantHasOptions) {
                     autoResumeCount++;
                     logger.debug(`[claudeRemote] Max turns reached, auto-resuming (${autoResumeCount}/${MAX_AUTO_RESUMES})`);
                     if (opts.onCompletionEvent) {
@@ -236,6 +253,7 @@ export async function claudeRemote(opts: {
                         }
                     }
                     autoResumeCount = 0; // Reset counter when user sends a manual message
+                    lastAssistantHasOptions = false; // Reset options flag
                     opts.onReady();
 
                     const next = await opts.nextMessage();

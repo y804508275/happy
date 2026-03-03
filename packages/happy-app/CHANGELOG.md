@@ -1,5 +1,23 @@
 # Changelog
 
+## Version 11 (2026.03.02.7) - 2026-03-02
+
+修复 auto-continue 在 AI 展示选项时不等待用户选择就自动继续的 bug。
+
+- 当 assistant 消息包含 `<options>` 时，跳过 `error_max_turns` 自动继续，等待用户选择
+- 用户手动发送消息后重置 options 标记
+
+发布方式：需要 `npm run build`（happy-cli）重新编译后重启 daemon 生效。
+
+## Version 10 (2026.03.02.6) - 2026-03-02
+
+支持通过 daemon control server 接口恢复 Claude 对话上下文。
+
+- `/spawn-session` 接口新增 `resumeClaudeSessionId` 参数，支持会话恢复时传递 Claude 对话 ID
+- 配合 daemon auto-respawn 机制，确保外部 kill CLI 进程后自动恢复时保留完整对话上下文
+
+发布方式：需要 `npm run build`（happy-cli）重新编译后重启 daemon 生效。
+
 ## Version 9 (2026.03.02.5) - 2026-03-02
 
 修复会话断开后无法重新激活的问题，提升休眠唤醒后的会话恢复可靠性。
