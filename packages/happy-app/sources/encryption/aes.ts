@@ -31,7 +31,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
 
 async function webImportAESKey(keyBase64: string, usage: KeyUsage[]): Promise<CryptoKey> {
     const keyBytes = base64ToUint8Array(keyBase64);
-    return globalThis.crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, usage);
+    return globalThis.crypto.subtle.importKey('raw', keyBytes as any, { name: 'AES-GCM' }, false, usage);
 }
 
 async function webEncryptAESGCMString(data: string, keyBase64: string): Promise<string> {

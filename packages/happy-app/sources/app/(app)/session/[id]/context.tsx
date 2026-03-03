@@ -60,7 +60,7 @@ function EditRuleModal({ item, onClose, onSave }: {
                     fontSize: 13,
                     color: theme.colors.textSecondary,
                     marginBottom: 6,
-                    ...Typography.default('medium'),
+                    ...Typography.default('semiBold'),
                 }}>
                     Title
                 </Text>
@@ -88,7 +88,7 @@ function EditRuleModal({ item, onClose, onSave }: {
                     color: theme.colors.textSecondary,
                     marginBottom: 6,
                     marginTop: 12,
-                    ...Typography.default('medium'),
+                    ...Typography.default('semiBold'),
                 }}>
                     Content
                 </Text>
@@ -339,7 +339,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                     <Text style={{
                         fontSize: 11,
                         color: isAlways ? theme.colors.textLink : theme.colors.textSecondary,
-                        ...Typography.default('medium'),
+                        ...Typography.default('semiBold'),
                     }}>
                         {isAlways ? t('knowledgeBase.alwaysActive') : t('knowledgeBase.onDemand')}
                     </Text>

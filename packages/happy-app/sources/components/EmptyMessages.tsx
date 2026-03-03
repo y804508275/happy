@@ -151,7 +151,7 @@ export function EmptyMessages({ session, onProjectSelect }: EmptyMessagesProps) 
 
     const machineId = session.metadata?.machineId ?? null;
     const homeDir = session.metadata?.homeDir ?? null;
-    const projectScan = useProjectScanning(machineId, homeDir);
+    const projectScan = useProjectScanning(machineId, homeDir as any);
 
     return (
         <View style={styles.container}>
