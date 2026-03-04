@@ -30,6 +30,10 @@ export function getServerUrl(): string {
     if (_runtimeOrigin && _runtimeOrigin !== 'null' && !_runtimeOrigin.includes('localhost')) {
         return _runtimeOrigin;
     }
+    // Standalone local server: web app served from localhost:3005
+    if (_runtimeOrigin && _runtimeOrigin.includes('localhost:3005')) {
+        return _runtimeOrigin;
+    }
     // Tauri standalone: connect to local server
     try {
         if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {

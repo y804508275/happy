@@ -317,9 +317,18 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, [machineId, cliVersion, acknowledgedCliVersions]);
 
-    // Auto-confirm mode from agent state (backwards compatible with boolean)
-    const autoConfirmMode = (session.agentState?.autoConfirmMode || (session.agentState?.autoConfirm ? 'all' : 'off')) as 'off' | 'confirm' | 'all';
+    // Auto-confirm mode: optimistic local state for instant UI feedback
+    const serverAutoConfirmMode = (session.agentState?.autoConfirmMode || (session.agentState?.autoConfirm ? 'all' : 'off')) as 'off' | 'confirm' | 'all';
+    const [localAutoConfirmMode, setLocalAutoConfirmMode] = React.useState<'off' | 'confirm' | 'all' | null>(null);
+    const autoConfirmMode = localAutoConfirmMode ?? serverAutoConfirmMode;
+    // Sync local state when server state catches up
+    React.useEffect(() => {
+        if (localAutoConfirmMode !== null && serverAutoConfirmMode === localAutoConfirmMode) {
+            setLocalAutoConfirmMode(null);
+        }
+    }, [serverAutoConfirmMode, localAutoConfirmMode]);
     const handleAutoConfirmModeChange = React.useCallback((mode: 'off' | 'confirm' | 'all') => {
+        setLocalAutoConfirmMode(mode);
         sessionAutoConfirm(sessionId, mode);
     }, [sessionId]);
 

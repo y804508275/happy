@@ -23,11 +23,18 @@ export const FixedOptionsBar = React.memo((props: {
     const { messages } = useSessionMessages(props.sessionId);
 
     // Find active options: scan from newest message, stop at first user message
-    const activeOptions = React.useMemo(() => {
+    // Also track whether the user has ever sent a message in this session
+    const { activeOptions, hasAnyUserMessage } = React.useMemo(() => {
         let hasPendingAskQuestion = false;
+        let foundOptions: string[] | null = null;
+        let hasAnyUserMessage = false;
         for (const msg of messages) {
             if (msg.kind === 'user-text') {
-                return null;
+                hasAnyUserMessage = true;
+                // If we already found options, the user message is older — keep the options
+                if (foundOptions) break;
+                // User message is newer than any options — no active options
+                return { activeOptions: null, hasAnyUserMessage: true };
             }
             if (msg.kind === 'tool-call') {
                 const toolMsg = msg as ToolCallMessage;
@@ -35,18 +42,25 @@ export const FixedOptionsBar = React.memo((props: {
                     hasPendingAskQuestion = true;
                 }
             }
-            if (msg.kind === 'agent-text') {
+            if (!foundOptions && msg.kind === 'agent-text') {
                 const blocks = parseMarkdown(msg.text);
                 for (const block of blocks) {
                     if (block.type === 'options' && block.items.length > 0) {
                         // Skip if AskUserQuestion is also pending (avoid duplicate options)
-                        if (hasPendingAskQuestion) return null;
-                        return block.items;
+                        if (hasPendingAskQuestion) return { activeOptions: null, hasAnyUserMessage };
+                        foundOptions = block.items;
+                        break;
                     }
                 }
             }
         }
-        return null;
+        // If we found options, continue scanning determined hasAnyUserMessage
+        if (foundOptions) {
+            // If we broke out of the loop after finding a user message, hasAnyUserMessage is already true
+            // If we exhausted all messages without finding a user message, it stays false
+            return { activeOptions: foundOptions, hasAnyUserMessage };
+        }
+        return { activeOptions: null, hasAnyUserMessage };
     }, [messages]);
 
     if (!activeOptions) {
@@ -59,15 +73,17 @@ export const FixedOptionsBar = React.memo((props: {
                 items={activeOptions}
                 sessionId={props.sessionId}
                 autoConfirmMode={props.autoConfirmMode}
+                hasAnyUserMessage={hasAnyUserMessage}
             />
         </View>
     );
 });
 
-const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode }: {
+const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode, hasAnyUserMessage }: {
     items: string[];
     sessionId: string;
     autoConfirmMode?: 'off' | 'confirm' | 'all';
+    hasAnyUserMessage: boolean;
 }) => {
     const { theme } = useUnistyles();
     const [focusedIndex, setFocusedIndex] = React.useState(0);
@@ -85,16 +101,17 @@ const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode }: {
     handleSelectRef.current = handleSelect;
 
     // Auto-select first option in 'all' mode after a brief delay
+    // But NOT if user hasn't sent any message yet (initial greeting — let user choose)
     const autoTriggered = React.useRef(false);
     React.useEffect(() => {
-        if (autoConfirmMode !== 'all' || autoTriggered.current || submitted) return;
+        if (autoConfirmMode !== 'all' || autoTriggered.current || submitted || !hasAnyUserMessage) return;
         autoTriggered.current = true;
         setFocusedIndex(0);
         const timer = setTimeout(() => {
             handleSelectRef.current(0);
         }, 300);
         return () => clearTimeout(timer);
-    }, [autoConfirmMode, submitted]);
+    }, [autoConfirmMode, submitted, hasAnyUserMessage]);
 
     // Keyboard navigation: up/down to focus, enter to confirm (web only)
     React.useEffect(() => {

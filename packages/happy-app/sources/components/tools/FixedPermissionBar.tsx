@@ -19,11 +19,13 @@ export const FixedPermissionBar = React.memo((props: {
     const { messages } = useSessionMessages(props.sessionId);
 
     // Find the most recent tool call with a pending permission
+    // Skip AskUserQuestion — it's handled by FixedAskUserQuestionBar which
+    // approves the permission and sends the answer in one step.
     const pendingTool = React.useMemo(() => {
         for (const msg of messages) {
             if (msg.kind === 'tool-call') {
                 const toolMsg = msg as ToolCallMessage;
-                if (toolMsg.tool?.permission?.status === 'pending') {
+                if (toolMsg.tool?.permission?.status === 'pending' && toolMsg.tool?.name !== 'AskUserQuestion') {
                     return toolMsg;
                 }
             }

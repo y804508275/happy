@@ -46,9 +46,22 @@ export async function startApi() {
         allowedHeaders: '*',
         methods: ['GET', 'POST', 'DELETE']
     });
-    app.get('/', function (request, reply) {
-        reply.send('Welcome to Happy Server!');
-    });
+
+    // Serve static web app files in standalone/local mode
+    const staticDir = process.env.HAPPY_STATIC_DIR;
+    if (staticDir && fs.existsSync(staticDir)) {
+        log(`Serving static files from ${staticDir}`);
+        await app.register(import('@fastify/static'), {
+            root: path.resolve(staticDir),
+            prefix: '/',
+            decorateReply: false,
+            wildcard: false,
+        });
+    } else {
+        app.get('/', function (request, reply) {
+            reply.send('Welcome to Happy Server!');
+        });
+    }
 
     // Create typed provider
     app.setValidatorCompiler(validatorCompiler);
@@ -100,7 +113,20 @@ export async function startApi() {
     sharedItemRoutes(typed);
     sessionSharedItemRoutes(typed);
 
-    // Start HTTP 
+    // SPA fallback for static web app (must be after all API routes)
+    if (staticDir && fs.existsSync(staticDir)) {
+        app.setNotFoundHandler((req, reply) => {
+            // API routes return 404 JSON
+            if (req.url.startsWith('/v1/')) {
+                reply.code(404).send({ error: 'Not Found' });
+            } else {
+                // SPA: serve index.html for all other routes
+                reply.sendFile('index.html', path.resolve(staticDir));
+            }
+        });
+    }
+
+    // Start HTTP
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;
     await app.listen({ port, host: '0.0.0.0' });
     onShutdown('api', async () => {

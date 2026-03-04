@@ -19,10 +19,35 @@ crypto.subtle.importKey = function (format: any, keyData: any, algorithm: any, e
 
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { createPGlite } from "./storage/pgliteLoader";
 
 const dataDir = process.env.DATA_DIR || "./data";
 const pgliteDir = process.env.PGLITE_DIR || path.join(dataDir, "pglite");
+
+/**
+ * Ensure HANDY_MASTER_SECRET is set.
+ * In local/standalone mode, auto-generate and persist it if missing.
+ */
+function ensureMasterSecret(): void {
+    if (process.env.HANDY_MASTER_SECRET) return;
+
+    const localDir = path.join(os.homedir(), ".happy", "local-server");
+    const secretFile = path.join(localDir, "master.secret");
+
+    if (fs.existsSync(secretFile)) {
+        process.env.HANDY_MASTER_SECRET = fs.readFileSync(secretFile, "utf-8").trim();
+        console.log("Loaded master secret from", secretFile);
+        return;
+    }
+
+    // Generate and persist a new secret
+    const secret = crypto.randomUUID() + "-" + crypto.randomUUID();
+    fs.mkdirSync(localDir, { recursive: true });
+    fs.writeFileSync(secretFile, secret, { mode: 0o600 });
+    process.env.HANDY_MASTER_SECRET = secret;
+    console.log("Generated new master secret at", secretFile);
+}
 
 async function migrate() {
     console.log(`Migrating database in ${pgliteDir}...`);
@@ -107,10 +132,16 @@ async function migrate() {
 }
 
 async function serve() {
+    // Ensure master secret exists (auto-generate for local mode)
+    ensureMasterSecret();
+
     // Set PGLITE_DIR so db.ts picks it up
     if (!process.env.DATABASE_URL) {
         process.env.PGLITE_DIR = process.env.PGLITE_DIR || pgliteDir;
     }
+
+    // Auto-migrate before starting server
+    await migrate();
 
     // Import and run the main server
     await import("./main");

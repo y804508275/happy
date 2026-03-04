@@ -451,5 +451,51 @@ Authorization: Bearer <token>
 5. **RPC Pattern**: Machine-scoped RPC methods prefixed with machineId (like sessions)
 
 
+# Daemon 本地开发排障记录
 
+## 症状
+
+- 新会话创建失败：`Failed to start session. Make sure the daemon is running on the target machine.`
+- 老会话无反应，无法 reactivate
+
+## 三层问题
+
+### 第一层：401 认证失败 → Daemon 退出
+
+Daemon 默认连接远程服务器 `https://api.cluster-fluster.com`（`configuration.ts` 中的默认值），但本地 token 是 `localhost:3005` 生成的，`HANDY_MASTER_SECRET` 不同 → 401 → daemon 立即退出。
+
+**修复：** `HAPPY_SERVER_URL=http://localhost:3005`
+
+### 第二层：PATH 被清理 → 找不到 Claude Code
+
+`getCleanEnv()` 从 PATH 中移除所有以 `cwd` 开头的路径。当 cwd 为 `/Users/colinyu` 时，`~/.local/bin`（Claude Code 安装位置）被移除。
+
+**修复：** `HAPPY_CLAUDE_PATH=/Users/colinyu/.local/bin/claude`
+
+### 第三层（根因）：CLAUDECODE 环境变量阻止嵌套启动
+
+在 Claude Code 终端中启动 daemon，daemon 继承 `CLAUDECODE=1`，子进程 Claude Code 检测到后拒绝启动：`Error: Claude Code cannot be launched inside another Claude Code session.` 该 Error 被 `JSON.stringify` 序列化为 `{}`（Error 属性不可枚举），日志中只看到 `launch error {}`。
+
+**修复：** 启动前 unset 该变量。
+
+## 正确的本地 Daemon 启动命令
+
+```bash
+(unset CLAUDECODE; unset CLAUDE_CODE_ENTRYPOINT; HAPPY_SERVER_URL=http://localhost:3005 happy daemon start)
+```
+
+## 排查要点
+
+| 检查项 | 命令 |
+|--------|------|
+| Daemon 是否存活 | `ps -p $(cat ~/.happy/daemon.state.json \| python3 -c "import json,sys; print(json.load(sys.stdin)['pid'])")` |
+| Daemon 日志 | `cat ~/.happy/daemon.state.json` 查看 `daemonLogPath` |
+| 会话进程日志 | `ls -lt ~/.happy/logs/ \| head` |
+| Daemon 环境变量 | `ps eww -p <PID> \| tr ' ' '\n' \| grep <VAR>` |
+
+## 教训
+
+1. **`launch error {}` 不是"没有错误"** — 是 Error 对象序列化为空 JSON。开 `DEBUG=1` 重启看 stderr。
+2. **在 Claude Code 会话中启动 daemon 会污染环境** — `CLAUDECODE=1` 会被继承，阻止子进程启动新 Claude Code。
+3. **多层问题互相遮挡** — 每层修复后才暴露下一层，现象一样（`launch error {}`），容易误判。
 

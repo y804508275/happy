@@ -1,6 +1,28 @@
 {
   "entries": [
     {
+      "version": 14,
+      "deployVersion": "2026.03.03.3",
+      "date": "2026-03-03",
+      "summary": "修复 autoConfirmMode=all 时新 session 初始问候自动选择选项的 bug。",
+      "changes": [
+        "当用户在 session 中从未发过消息时（初始问候），即使 autoConfirmMode 为 all 也不自动选择第一个选项",
+        "确保用户可以手动选择初始选项后，后续选项才会自动选择"
+      ],
+      "rawMarkdown": "## Version 14 (2026.03.03.3) - 2026-03-03\n\n\n修复 autoConfirmMode=all 时新 session 初始问候自动选择选项的 bug。\n\n- 当用户在 session 中从未发过消息时（初始问候），即使 autoConfirmMode 为 all 也不自动选择第一个选项\n- 确保用户可以手动选择初始选项后，后续选项才会自动选择\n\n发布方式：OTA 部署生效。"
+    },
+    {
+      "version": 13,
+      "deployVersion": "2026.03.03.2",
+      "date": "2026-03-03",
+      "summary": "修复选项栏重复显示和宽度问题。",
+      "changes": [
+        "修复 FixedOptionsBar 在宽屏上撑满全宽的问题，添加 maxWidth 约束与其他 bar 组件保持一致",
+        "修复当 AskUserQuestion 和 markdown options 同时存在时选项重复显示的问题，AskUserQuestion 优先展示"
+      ],
+      "rawMarkdown": "## Version 13 (2026.03.03.2) - 2026-03-03\n\n\n修复选项栏重复显示和宽度问题。\n\n- 修复 FixedOptionsBar 在宽屏上撑满全宽的问题，添加 maxWidth 约束与其他 bar 组件保持一致\n- 修复当 AskUserQuestion 和 markdown options 同时存在时选项重复显示的问题，AskUserQuestion 优先展示\n\n发布方式：OTA 部署生效。"
+    },
+    {
       "version": 12,
       "deployVersion": "2026.03.03.1",
       "date": "2026-03-03",
@@ -160,5 +182,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 12
+  "latestVersion": 14
 }
