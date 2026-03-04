@@ -404,6 +404,9 @@ export const zhHans: TranslationStructure = {
         toggleToAlwaysActive: '切换为始终生效',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `"${name}" 将自动注入到每条消息中。`,
+        newButton: '新建规则',
+        createTitle: '新建规则',
+        editTitle: '编辑规则',
     },
 
     mdReference: {

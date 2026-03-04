@@ -434,6 +434,9 @@ export const ja: TranslationStructure = {
         toggleToAlwaysActive: '常時有効に切り替え',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `「${name}」はすべてのメッセージに自動注入されます。`,
+        newButton: '新規ルール',
+        createTitle: '新規ルール',
+        editTitle: 'ルールを編集',
     },
 
     mdReference: {

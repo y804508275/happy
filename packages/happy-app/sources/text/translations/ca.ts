@@ -402,6 +402,9 @@ export const ca: TranslationStructure = {
         toggleToAlwaysActive: 'Canviar a sempre actiu',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `"${name}" s'injectarà automàticament a cada missatge.`,
+        newButton: 'Nova regla',
+        createTitle: 'Nova regla',
+        editTitle: 'Edita regla',
     },
 
     mdReference: {

@@ -51,6 +51,22 @@ async function updateKBItem(
     return await response.json();
 }
 
+async function createKBItem(
+    credentials: AuthCredentials,
+    data: { type: string; visibility: string; name: string; content: string; meta?: any },
+): Promise<SharedItemFull> {
+    const response = await fetch(`${getServerUrl()}/v1/shared-items`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${credentials.token}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error(`Failed: ${response.status}`);
+    return await response.json();
+}
+
 async function deleteKBItem(credentials: AuthCredentials, id: string): Promise<void> {
     const response = await fetch(`${getServerUrl()}/v1/shared-items/${id}`, {
         method: 'DELETE',
@@ -136,6 +152,30 @@ export function useKnowledgeBase(credentials: AuthCredentials | null, workingDir
         [credentials],
     );
 
+    const createItem = React.useCallback(
+        async (data: { name: string; content: string; scope: 'global' | 'project' }) => {
+            if (!credentials) return;
+            try {
+                await createKBItem(credentials, {
+                    type: 'context',
+                    visibility: 'private',
+                    name: data.name,
+                    content: data.content,
+                    meta: {
+                        memoryType: 'memory',
+                        scope: data.scope,
+                        alwaysApply: true,
+                        ...(data.scope === 'project' ? { projectPath: workingDirectory } : {}),
+                    },
+                });
+                await fetchItems();
+            } catch {
+                // Error handled silently
+            }
+        },
+        [credentials, workingDirectory, fetchItems],
+    );
+
     const updateItem = React.useCallback(
         async (itemId: string, data: { name?: string; content?: string; expectedContentVersion?: number; meta?: any }) => {
             if (!credentials) return;
@@ -156,5 +196,5 @@ export function useKnowledgeBase(credentials: AuthCredentials | null, workingDir
         [credentials, fetchItems],
     );
 
-    return { globalItems, projectItems, loading, fetchItemContent, deleteItem, updateItem, refresh: fetchItems };
+    return { globalItems, projectItems, loading, fetchItemContent, createItem, deleteItem, updateItem, refresh: fetchItems };
 }

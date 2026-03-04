@@ -375,6 +375,9 @@ export const ru: TranslationStructure = {
         toggleToAlwaysActive: 'Переключить на «Всегда активно»',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `"${name}" будет автоматически внедряться в каждое сообщение.`,
+        newButton: 'Новое правило',
+        createTitle: 'Новое правило',
+        editTitle: 'Редактировать правило',
     },
 
     mdReference: {

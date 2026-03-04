@@ -17,18 +17,21 @@ import type { SharedItemFull, SharedItemSummary } from '@/sync/sharedItemTypes';
 
 // ── Edit Modal Component ────────────────────────────────────────────
 
-function EditRuleModal({ item, onClose, onSave }: {
-    item: SharedItemFull;
+function EditRuleModal({ item, defaultScope, onClose, onSave }: {
+    item?: SharedItemFull;
+    defaultScope?: 'global' | 'project';
     onClose: () => void;
-    onSave: (name: string, content: string) => void;
+    onSave: (name: string, content: string, scope: 'global' | 'project') => void;
 }) {
     const { theme } = useUnistyles();
-    const [name, setName] = useState(item.name);
-    const [content, setContent] = useState(item.content || '');
+    const [name, setName] = useState(item?.name || '');
+    const [content, setContent] = useState(item?.content || '');
+    const [scope, setScope] = useState<'global' | 'project'>(item?.meta?.scope || defaultScope || 'global');
+    const isCreate = !item;
 
     const handleSave = () => {
-        if (!name.trim()) return;
-        onSave(name.trim(), content.trim());
+        if (!name.trim() || !content.trim()) return;
+        onSave(name.trim(), content.trim(), scope);
         onClose();
     };
 
@@ -36,7 +39,7 @@ function EditRuleModal({ item, onClose, onSave }: {
         <View style={{
             backgroundColor: theme.colors.surface,
             borderRadius: 14,
-            width: 400,
+            width: 440,
             maxWidth: '90%',
             overflow: 'hidden',
             shadowColor: theme.colors.shadow.color,
@@ -53,16 +56,16 @@ function EditRuleModal({ item, onClose, onSave }: {
                     marginBottom: 16,
                     ...Typography.default('semiBold'),
                 }}>
-                    Edit Rule
+                    {isCreate ? t('knowledgeBase.createTitle') : t('knowledgeBase.editTitle')}
                 </Text>
 
                 <Text style={{
                     fontSize: 13,
                     color: theme.colors.textSecondary,
                     marginBottom: 6,
-                    ...Typography.default('semiBold'),
+                    ...Typography.default(),
                 }}>
-                    Title
+                    {t('mdReference.nameLabel')}
                 </Text>
                 <TextInput
                     style={{
@@ -78,19 +81,77 @@ function EditRuleModal({ item, onClose, onSave }: {
                     }}
                     value={name}
                     onChangeText={setName}
-                    placeholder="Rule title"
+                    placeholder={t('mdReference.namePlaceholder')}
                     placeholderTextColor={theme.colors.input.placeholder}
                     autoFocus={Platform.OS === 'web'}
                 />
+
+                {isCreate && (
+                    <>
+                        <Text style={{
+                            fontSize: 13,
+                            color: theme.colors.textSecondary,
+                            marginBottom: 6,
+                            marginTop: 12,
+                            ...Typography.default(),
+                        }}>
+                            {t('mdReference.scopeLabel')}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <Pressable
+                                onPress={() => setScope('global')}
+                                style={({ pressed }) => ({
+                                    flex: 1,
+                                    paddingVertical: 8,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: scope === 'global' ? theme.colors.textLink : theme.colors.divider,
+                                    backgroundColor: scope === 'global' ? theme.colors.textLink + '15' : 'transparent',
+                                    alignItems: 'center' as const,
+                                    opacity: pressed ? 0.7 : 1,
+                                })}
+                            >
+                                <Text style={{
+                                    fontSize: 13,
+                                    color: scope === 'global' ? theme.colors.textLink : theme.colors.textSecondary,
+                                    ...Typography.default(),
+                                }}>
+                                    {t('mdReference.scopeGlobal')}
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={() => setScope('project')}
+                                style={({ pressed }) => ({
+                                    flex: 1,
+                                    paddingVertical: 8,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: scope === 'project' ? theme.colors.textLink : theme.colors.divider,
+                                    backgroundColor: scope === 'project' ? theme.colors.textLink + '15' : 'transparent',
+                                    alignItems: 'center' as const,
+                                    opacity: pressed ? 0.7 : 1,
+                                })}
+                            >
+                                <Text style={{
+                                    fontSize: 13,
+                                    color: scope === 'project' ? theme.colors.textLink : theme.colors.textSecondary,
+                                    ...Typography.default(),
+                                }}>
+                                    {t('mdReference.scopeProject')}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </>
+                )}
 
                 <Text style={{
                     fontSize: 13,
                     color: theme.colors.textSecondary,
                     marginBottom: 6,
                     marginTop: 12,
-                    ...Typography.default('semiBold'),
+                    ...Typography.default(),
                 }}>
-                    Content
+                    {t('mdReference.contentLabel')}
                 </Text>
                 <TextInput
                     style={{
@@ -109,7 +170,7 @@ function EditRuleModal({ item, onClose, onSave }: {
                     }}
                     value={content}
                     onChangeText={setContent}
-                    placeholder="Rule content"
+                    placeholder={t('mdReference.contentPlaceholder')}
                     placeholderTextColor={theme.colors.input.placeholder}
                     multiline
                 />
@@ -135,7 +196,7 @@ function EditRuleModal({ item, onClose, onSave }: {
                         color: theme.colors.textLink,
                         ...Typography.default(),
                     }}>
-                        Cancel
+                        {t('common.cancel')}
                     </Text>
                 </Pressable>
                 <View style={{ width: 1, backgroundColor: theme.colors.divider }} />
@@ -146,15 +207,17 @@ function EditRuleModal({ item, onClose, onSave }: {
                         alignItems: 'center' as const,
                         justifyContent: 'center' as const,
                         backgroundColor: pressed ? theme.colors.divider : 'transparent',
+                        opacity: (!name.trim() || !content.trim()) ? 0.4 : 1,
                     })}
                     onPress={handleSave}
+                    disabled={!name.trim() || !content.trim()}
                 >
                     <Text style={{
                         fontSize: 17,
                         color: theme.colors.textLink,
                         ...Typography.default('semiBold'),
                     }}>
-                        Save
+                        {t('common.save')}
                     </Text>
                 </Pressable>
             </View>
@@ -170,7 +233,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
     const { credentials } = useAuth();
     const workingDirectory = session?.metadata?.path || '';
 
-    const { globalItems, projectItems, loading, deleteItem, updateItem, fetchItemContent } =
+    const { globalItems, projectItems, loading, createItem, deleteItem, updateItem, fetchItemContent } =
         useKnowledgeBase(credentials, workingDirectory);
 
     // Track expanded item content by ID
@@ -200,6 +263,18 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
         }
     }, [expanded, fetchItemContent]);
 
+    const handleCreate = useCallback((defaultScope?: 'global' | 'project') => {
+        Modal.show({
+            component: EditRuleModal,
+            props: {
+                defaultScope,
+                onSave: (name: string, content: string, scope: 'global' | 'project') => {
+                    createItem({ name, content, scope });
+                },
+            },
+        });
+    }, [createItem]);
+
     const handleEdit = useCallback(async (itemId: string) => {
         // Fetch full content first
         const full = await fetchItemContent(itemId);
@@ -209,7 +284,7 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
             component: EditRuleModal,
             props: {
                 item: full,
-                onSave: (name: string, content: string) => {
+                onSave: (name: string, content: string, _scope: 'global' | 'project') => {
                     updateItem(itemId, {
                         name,
                         content,
@@ -306,6 +381,29 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
                 }}>
                     {t('knowledgeBase.emptyDescription')}
                 </Text>
+                <Pressable
+                    onPress={() => handleCreate()}
+                    style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        marginTop: 20,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: theme.colors.textLink,
+                        opacity: pressed ? 0.7 : 1,
+                    })}
+                >
+                    <Ionicons name="add" size={18} color="#fff" />
+                    <Text style={{
+                        fontSize: 15,
+                        color: '#fff',
+                        ...Typography.default('semiBold'),
+                    }}>
+                        {t('knowledgeBase.newButton')}
+                    </Text>
+                </Pressable>
             </View>
         );
     }
@@ -416,6 +514,33 @@ function KnowledgeBaseContent({ sessionId }: { sessionId: string }) {
     return (
         <ItemList>
             <View style={{ maxWidth: layout.maxWidth, alignSelf: 'center', width: '100%' }}>
+                <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'flex-end',
+                    paddingHorizontal: 16,
+                    paddingTop: 12,
+                    paddingBottom: 4,
+                }}>
+                    <Pressable
+                        onPress={() => handleCreate()}
+                        hitSlop={8}
+                        style={({ pressed }) => ({
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            opacity: pressed ? 0.6 : 1,
+                        })}
+                    >
+                        <Ionicons name="add" size={18} color={theme.colors.textLink} />
+                        <Text style={{
+                            fontSize: 14,
+                            color: theme.colors.textLink,
+                            ...Typography.default(),
+                        }}>
+                            {t('knowledgeBase.newButton')}
+                        </Text>
+                    </Pressable>
+                </View>
                 {globalItems.length > 0 && (
                     <ItemGroup title={t('knowledgeBase.globalContext')}>
                         {globalItems.map((item) => {

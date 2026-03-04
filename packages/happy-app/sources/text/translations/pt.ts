@@ -402,6 +402,9 @@ export const pt: TranslationStructure = {
         toggleToAlwaysActive: 'Mudar para sempre ativo',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `"${name}" será injetado automaticamente em cada mensagem.`,
+        newButton: 'Nova regra',
+        createTitle: 'Nova regra',
+        editTitle: 'Editar regra',
     },
 
     mdReference: {

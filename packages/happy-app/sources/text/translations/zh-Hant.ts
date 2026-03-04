@@ -403,6 +403,9 @@ export const zhHant: TranslationStructure = {
         toggleToAlwaysActive: '切換為始終生效',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `「${name}」將自動注入到每條訊息中。`,
+        newButton: '新增規則',
+        createTitle: '新增規則',
+        editTitle: '編輯規則',
     },
 
     mdReference: {

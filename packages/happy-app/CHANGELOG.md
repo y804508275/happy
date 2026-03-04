@@ -1,5 +1,27 @@
 # Changelog
 
+## Version 15 (2026.03.03.4) - 2026-03-03
+
+在 Knowledge Base 规则页面新增"新建规则"功能。
+
+- 在规则列表页面顶部添加 "+ New Rule" 按钮，支持直接创建新规则
+- 创建弹窗支持填写标题、内容，并选择作用域（Global / Project）
+- 空状态页面也提供创建入口按钮
+- EditRuleModal 组件扩展为同时支持创建和编辑双模式
+- useKnowledgeBase hook 新增 createItem 方法
+- 更新全部 11 种语言的翻译
+
+发布方式：OTA 部署生效。
+
+## Version 14 (2026.03.03.3) - 2026-03-03
+
+修复 autoConfirmMode=all 时新 session 初始问候自动选择选项的 bug。
+
+- 当用户在 session 中从未发过消息时（初始问候），即使 autoConfirmMode 为 all 也不自动选择第一个选项
+- 确保用户可以手动选择初始选项后，后续选项才会自动选择
+
+发布方式：OTA 部署生效。
+
 ## Version 13 (2026.03.03.2) - 2026-03-03
 
 修复选项栏重复显示和宽度问题。

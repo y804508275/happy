@@ -431,6 +431,9 @@ export const it: TranslationStructure = {
         toggleToAlwaysActive: 'Passa a sempre attivo',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `"${name}" verrà iniettato automaticamente in ogni messaggio.`,
+        newButton: 'Nuova regola',
+        createTitle: 'Nuova regola',
+        editTitle: 'Modifica regola',
     },
 
     mdReference: {

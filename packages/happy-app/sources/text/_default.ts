@@ -402,6 +402,9 @@ export const en = {
         toggleToAlwaysActive: 'Switch to Always Active',
         toggleToAlwaysActiveMessage: ({ name }: { name: string }) =>
             `"${name}" will be automatically injected into every message.`,
+        newButton: 'New Rule',
+        createTitle: 'New Rule',
+        editTitle: 'Edit Rule',
     },
 
     mdReference: {
