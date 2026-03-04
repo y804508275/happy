@@ -1,6 +1,33 @@
 {
   "entries": [
     {
+      "version": 16,
+      "deployVersion": "2026.03.03.5",
+      "date": "2026-03-03",
+      "summary": "修复自动模式（Auto✓/Auto+）不生效的 bug。",
+      "changes": [
+        "修复「自动」(confirm) 模式下 markdown 选项（如\"是/否\"）不自动选择的问题：confirm 模式现在会自动选择 markdown 选项",
+        "修复「自动+」(all) 模式下选项不自动选择的问题：hasAnyUserMessage 扫描逻辑在找到选项后提前返回，导致始终为 false",
+        "FixedPermissionBar 排除 AskUserQuestion，避免与 FixedAskUserQuestionBar 显示重复的权限按钮"
+      ],
+      "rawMarkdown": "## Version 16 (2026.03.03.5) - 2026-03-03\n\n\n修复自动模式（Auto✓/Auto+）不生效的 bug。\n\n- 修复「自动」(confirm) 模式下 markdown 选项（如\"是/否\"）不自动选择的问题：confirm 模式现在会自动选择 markdown 选项\n- 修复「自动+」(all) 模式下选项不自动选择的问题：hasAnyUserMessage 扫描逻辑在找到选项后提前返回，导致始终为 false\n- FixedPermissionBar 排除 AskUserQuestion，避免与 FixedAskUserQuestionBar 显示重复的权限按钮\n\n发布方式：OTA 部署生效。"
+    },
+    {
+      "version": 15,
+      "deployVersion": "2026.03.03.4",
+      "date": "2026-03-03",
+      "summary": "在 Knowledge Base 规则页面新增\"新建规则\"功能。",
+      "changes": [
+        "在规则列表页面顶部添加 \"+ New Rule\" 按钮，支持直接创建新规则",
+        "创建弹窗支持填写标题、内容，并选择作用域（Global / Project）",
+        "空状态页面也提供创建入口按钮",
+        "EditRuleModal 组件扩展为同时支持创建和编辑双模式",
+        "useKnowledgeBase hook 新增 createItem 方法",
+        "更新全部 11 种语言的翻译"
+      ],
+      "rawMarkdown": "## Version 15 (2026.03.03.4) - 2026-03-03\n\n\n在 Knowledge Base 规则页面新增\"新建规则\"功能。\n\n- 在规则列表页面顶部添加 \"+ New Rule\" 按钮，支持直接创建新规则\n- 创建弹窗支持填写标题、内容，并选择作用域（Global / Project）\n- 空状态页面也提供创建入口按钮\n- EditRuleModal 组件扩展为同时支持创建和编辑双模式\n- useKnowledgeBase hook 新增 createItem 方法\n- 更新全部 11 种语言的翻译\n\n发布方式：OTA 部署生效。"
+    },
+    {
       "version": 14,
       "deployVersion": "2026.03.03.3",
       "date": "2026-03-03",
@@ -182,5 +209,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 14
+  "latestVersion": 16
 }

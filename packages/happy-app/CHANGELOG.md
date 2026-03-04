@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 16 (2026.03.03.5) - 2026-03-03
+
+修复自动模式（Auto✓/Auto+）不生效的 bug。
+
+- 修复「自动」(confirm) 模式下 markdown 选项（如"是/否"）不自动选择的问题：confirm 模式现在会自动选择 markdown 选项
+- 修复「自动+」(all) 模式下选项不自动选择的问题：hasAnyUserMessage 扫描逻辑在找到选项后提前返回，导致始终为 false
+- FixedPermissionBar 排除 AskUserQuestion，避免与 FixedAskUserQuestionBar 显示重复的权限按钮
+
+发布方式：OTA 部署生效。
+
 ## Version 15 (2026.03.03.4) - 2026-03-03
 
 在 Knowledge Base 规则页面新增"新建规则"功能。

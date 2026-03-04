@@ -100,18 +100,21 @@ const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode, has
     const handleSelectRef = React.useRef(handleSelect);
     handleSelectRef.current = handleSelect;
 
-    // Auto-select first option in 'all' mode after a brief delay
+    // Auto-select first option in 'confirm' or 'all' mode after a brief delay
+    // 'confirm' mode: auto-approve permissions + auto-select options
+    // 'all' mode: above + auto-answer AskUserQuestion
     // But NOT if user hasn't sent any message yet (initial greeting — let user choose)
+    const isAutoMode = autoConfirmMode === 'confirm' || autoConfirmMode === 'all';
     const autoTriggered = React.useRef(false);
     React.useEffect(() => {
-        if (autoConfirmMode !== 'all' || autoTriggered.current || submitted || !hasAnyUserMessage) return;
+        if (!isAutoMode || autoTriggered.current || submitted || !hasAnyUserMessage) return;
         autoTriggered.current = true;
         setFocusedIndex(0);
         const timer = setTimeout(() => {
             handleSelectRef.current(0);
         }, 300);
         return () => clearTimeout(timer);
-    }, [autoConfirmMode, submitted, hasAnyUserMessage]);
+    }, [isAutoMode, submitted, hasAnyUserMessage]);
 
     // Keyboard navigation: up/down to focus, enter to confirm (web only)
     React.useEffect(() => {
@@ -144,7 +147,7 @@ const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode, has
 
     return (
         <View style={contentStyles.wrapper}>
-            {autoConfirmMode === 'all' && (
+            {isAutoMode && (
                 <Text style={[contentStyles.autoLabel, { color: theme.colors.radio.active }]}>Auto</Text>
             )}
             {items.map((item, index) => (
