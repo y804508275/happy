@@ -143,9 +143,15 @@ class ApiSocket {
         });
 
         if (result.ok) {
-            return await machineEncryption.decryptRaw(result.result) as R;
+            const decrypted = await machineEncryption.decryptRaw(result.result) as any;
+            // RpcHandlerManager catches handler errors and returns encrypted { error: '...' }
+            // which the server wraps as { ok: true }. Detect and re-throw these.
+            if (decrypted && typeof decrypted === 'object' && 'error' in decrypted && Object.keys(decrypted).length === 1) {
+                throw new Error(decrypted.error || 'RPC handler error');
+            }
+            return decrypted as R;
         }
-        throw new Error('RPC call failed');
+        throw new Error(result.error || 'RPC call failed');
     }
 
     send(event: string, data: any) {

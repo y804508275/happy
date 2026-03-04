@@ -74,6 +74,7 @@ export interface ReactivateSessionOptions {
     directory: string;
     claudeSessionId?: string;
     agent?: 'claude' | 'codex' | 'gemini';
+    dataKey?: string; // base64-encoded data encryption key from the app
 }
 
 type MachineRpcHandlers = {
@@ -166,14 +167,14 @@ export class ApiMachineClient {
 
         // Register reactivate session handler
         this.rpcHandlerManager.registerHandler('reactivate-session', async (params: any) => {
-            const { happySessionId, directory, claudeSessionId, agent } = params || {};
+            const { happySessionId, directory, claudeSessionId, agent, dataKey } = params || {};
             logger.debug(`[API MACHINE] Reactivating session with params: ${JSON.stringify(params)}`);
 
             if (!happySessionId) {
                 throw new Error('Happy session ID is required');
             }
 
-            const result = await reactivateSession({ happySessionId, directory, claudeSessionId, agent });
+            const result = await reactivateSession({ happySessionId, directory, claudeSessionId, agent, dataKey });
 
             switch (result.type) {
                 case 'success':

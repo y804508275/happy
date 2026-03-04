@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 17 (2026.03.03.6) - 2026-03-03
+
+修复跨机器 session 恢复失败的问题，改善 RPC 错误透传。
+
+- 修复 session reactivation 在切换机器后失败的问题：当 session 创建在旧机器上时，reactivation RPC 会发送到已离线的旧机器导致超时。现在优先尝试活跃机器，跳过离线机器避免 15s 超时
+- 修复 machineRPC 错误信息丢失：服务端返回的错误信息（如 "RPC method not available"）现在会正确透传到客户端
+- 修复 daemon 端 RPC handler 错误被静默吞掉的问题：RpcHandlerManager 捕获的错误会被加密后以 `{ ok: true }` 返回，客户端现在能检测并重新抛出这些错误
+- 新增 dataKey 传递：app 将 session 的数据加密密钥传给 daemon，支持在没有 session info 文件的情况下恢复 session（跨机器场景）
+
+发布方式：OTA 部署生效（app 端），daemon 需要更新 CLI。
+
 ## Version 16 (2026.03.03.5) - 2026-03-03
 
 修复自动模式（Auto✓/Auto+）不生效的 bug。

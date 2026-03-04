@@ -669,9 +669,10 @@ export async function startDaemon(): Promise<void> {
       directory: string;
       claudeSessionId?: string;
       agent?: 'claude' | 'codex' | 'gemini';
+      dataKey?: string; // base64-encoded data encryption key from the app
     }): Promise<SpawnSessionResult> => {
-      const { happySessionId, directory, claudeSessionId, agent } = options;
-      logger.debug(`[DAEMON RUN] Reactivating session ${happySessionId}, dir=${directory}, claude=${claudeSessionId}`);
+      const { happySessionId, directory, claudeSessionId, agent, dataKey } = options;
+      logger.debug(`[DAEMON RUN] Reactivating session ${happySessionId}, dir=${directory}, claude=${claudeSessionId}, hasDataKey=${!!dataKey}`);
 
       // Check if there's already a running process for this session
       for (const [, session] of pidToTrackedSession) {
@@ -685,38 +686,70 @@ export async function startDaemon(): Promise<void> {
       const sessionsDir = join(configuration.happyHomeDir, 'sessions');
       const sessionInfoPath = join(sessionsDir, `${happySessionId}.json`);
 
-      if (!existsSync(sessionInfoPath)) {
-        logger.debug(`[DAEMON RUN] No session info file for ${happySessionId}, cannot reactivate`);
-        return { type: 'error', errorMessage: 'Session info file not found, cannot reactivate' };
-      }
-
       try {
-        const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
-
-        // Create restart file with encryption info (reuses existing pattern)
-        const restartFilePath = join(sessionsDir, `restart-${happySessionId}.json`);
-        const { writeFileSync: writeSync } = await import('fs');
-        writeSync(restartFilePath, JSON.stringify({
-          sessionId: sessionInfo.sessionId,
-          encryptionKey: sessionInfo.encryptionKey,
-          encryptionVariant: sessionInfo.encryptionVariant,
-        }), { mode: 0o600 });
-
         // Brief delay to let any old socket disconnect propagate
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Use the effective claudeSessionId (from RPC params or session info file)
-        const effectiveClaudeSessionId = claudeSessionId || sessionInfo.claudeSessionId;
+        if (existsSync(sessionInfoPath)) {
+          // Session info file exists - reconnect to the same Happy session
+          const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
 
-        const result = await spawnSession({
-          directory: directory || sessionInfo.directory,
-          resumeClaudeSessionId: effectiveClaudeSessionId,
-          restartFilePath,
-          agent: agent || sessionInfo.agent || 'claude',
-        });
+          // Create restart file with encryption info (reuses existing pattern)
+          const restartFilePath = join(sessionsDir, `restart-${happySessionId}.json`);
+          const { writeFileSync: writeSync } = await import('fs');
+          writeSync(restartFilePath, JSON.stringify({
+            sessionId: sessionInfo.sessionId,
+            encryptionKey: sessionInfo.encryptionKey,
+            encryptionVariant: sessionInfo.encryptionVariant,
+          }), { mode: 0o600 });
 
-        logger.debug(`[DAEMON RUN] Reactivation spawn result: ${JSON.stringify(result)}`);
-        return result;
+          // Use the effective claudeSessionId (from RPC params or session info file)
+          const effectiveClaudeSessionId = claudeSessionId || sessionInfo.claudeSessionId;
+
+          const result = await spawnSession({
+            directory: directory || sessionInfo.directory,
+            resumeClaudeSessionId: effectiveClaudeSessionId,
+            restartFilePath,
+            agent: agent || sessionInfo.agent || 'claude',
+          });
+
+          logger.debug(`[DAEMON RUN] Reactivation spawn result: ${JSON.stringify(result)}`);
+          return result;
+        } else if (dataKey) {
+          // No session info file, but app provided the data encryption key
+          // Create a restart file so the CLI reconnects to the SAME session
+          logger.debug(`[DAEMON RUN] No session info file for ${happySessionId}, but have dataKey - creating restart file`);
+
+          const restartFilePath = join(sessionsDir, `restart-${happySessionId}.json`);
+          const { writeFileSync: writeSync } = await import('fs');
+          writeSync(restartFilePath, JSON.stringify({
+            sessionId: happySessionId,
+            encryptionKey: dataKey,
+            encryptionVariant: 'dataKey',
+          }), { mode: 0o600 });
+
+          const result = await spawnSession({
+            directory,
+            resumeClaudeSessionId: claudeSessionId,
+            restartFilePath,
+            agent: agent || 'claude',
+          });
+
+          logger.debug(`[DAEMON RUN] Reactivation (with dataKey) spawn result: ${JSON.stringify(result)}`);
+          return result;
+        } else {
+          // No session info file and no data key - cannot reconnect to old session
+          logger.debug(`[DAEMON RUN] No session info file and no dataKey for ${happySessionId}, spawning new session`);
+
+          const result = await spawnSession({
+            directory,
+            resumeClaudeSessionId: claudeSessionId,
+            agent: agent || 'claude',
+          });
+
+          logger.debug(`[DAEMON RUN] Reactivation (new session) spawn result: ${JSON.stringify(result)}`);
+          return result;
+        }
       } catch (error) {
         logger.debug(`[DAEMON RUN] Failed to reactivate session ${happySessionId}:`, error);
         return {

@@ -605,32 +605,80 @@ class Sync {
 
         let succeeded = false;
         try {
-            const machineId = session.metadata!.machineId!;
+            const originalMachineId = session.metadata!.machineId!;
+
+            // Build ordered list of machine IDs to try.
+            // If the original machine is currently active, try it first.
+            // Otherwise, skip it and try active machines directly (avoids 15s server timeout for offline daemon).
+            const allMachines = Object.values(storage.getState().machines);
+            const originalIsActive = allMachines.some(m => m.id === originalMachineId && m.active);
+            const machineIdsToTry: string[] = [];
+            if (originalIsActive) {
+                machineIdsToTry.push(originalMachineId);
+            }
+            for (const machine of allMachines) {
+                if (machine.id !== originalMachineId && machine.active) {
+                    machineIdsToTry.push(machine.id);
+                }
+            }
+            // Fallback: if no active machines found, still try the original
+            if (machineIdsToTry.length === 0) {
+                machineIdsToTry.push(originalMachineId);
+            }
+
+            // Get the session's data encryption key so the daemon can construct a restart file
+            // This allows the new CLI to reconnect to the same session (same encryption key + session ID)
+            const dataKey = this.encryption.getSessionDataKey(sessionId);
+            let dataKeyBase64: string | undefined;
+            if (dataKey) {
+                dataKeyBase64 = encodeBase64(dataKey, 'base64');
+            }
+
             const params = {
                 happySessionId: sessionId,
                 directory: session.metadata!.path,
                 claudeSessionId: session.metadata!.claudeSessionId,
                 agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini') || undefined,
+                dataKey: dataKeyBase64,
             };
 
-            // Retry up to 3 times with increasing delays
-            // After sleep/wake, the daemon may need time to reconnect its socket
-            const delays = [0, 3_000, 8_000];
-            for (let attempt = 0; attempt < delays.length; attempt++) {
-                if (attempt > 0) {
-                    await new Promise(resolve => setTimeout(resolve, delays[attempt]));
-                }
+            log.log(`Session reactivation: trying machines [${machineIdsToTry.join(', ')}] for session ${sessionId}`);
+
+            // Try each machine — single attempt per machine, move to next quickly on failure
+            // The server already waits up to 15s for daemon reconnection per RPC call
+            for (const machineId of machineIdsToTry) {
                 try {
                     const result = await apiSocket.machineRPC(machineId, 'reactivate-session', params);
-                    log.log(`Session reactivation result (attempt ${attempt + 1}): ${JSON.stringify(result)}`);
+                    log.log(`Session reactivation succeeded on machine ${machineId}: ${JSON.stringify(result)}`);
                     succeeded = true;
                     break;
                 } catch (error) {
-                    log.log(`Session reactivation attempt ${attempt + 1} failed: ${error}`);
-                    if (attempt === delays.length - 1) {
-                        console.warn('Failed to reactivate session after all attempts:', error);
-                    }
+                    log.log(`Session reactivation on machine ${machineId} failed: ${error}`);
                 }
+            }
+
+            // If all machines failed on first try, retry with the active machines only
+            if (!succeeded) {
+                const activeMachineIds = machineIdsToTry.filter(id => id !== originalMachineId);
+                for (const machineId of activeMachineIds) {
+                    const retryDelays = [3_000, 8_000];
+                    for (const delay of retryDelays) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        try {
+                            const result = await apiSocket.machineRPC(machineId, 'reactivate-session', params);
+                            log.log(`Session reactivation succeeded on machine ${machineId} (retry): ${JSON.stringify(result)}`);
+                            succeeded = true;
+                            break;
+                        } catch (error) {
+                            log.log(`Session reactivation retry on machine ${machineId} failed: ${error}`);
+                        }
+                    }
+                    if (succeeded) break;
+                }
+            }
+
+            if (!succeeded) {
+                console.warn(`Failed to reactivate session ${sessionId} on all machines: [${machineIdsToTry.join(', ')}]`);
             }
         } catch (error) {
             console.warn('Failed to reactivate session:', error);

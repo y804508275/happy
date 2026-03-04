@@ -33,6 +33,7 @@ export class Encryption {
 
     // Session and machine encryption management
     private sessionEncryptions = new Map<string, SessionEncryption>();
+    private sessionDataKeys = new Map<string, Uint8Array | null>();
     private machineEncryptions = new Map<string, MachineEncryption>();
     private cache: EncryptionCache;
 
@@ -80,6 +81,7 @@ export class Encryption {
                 this.cache
             );
             this.sessionEncryptions.set(sessionId, sessionEnc);
+            this.sessionDataKeys.set(sessionId, dataKey);
         }
     }
 
@@ -92,10 +94,18 @@ export class Encryption {
     }
 
     /**
+     * Get the raw data encryption key for a session (for reactivation)
+     */
+    getSessionDataKey(sessionId: string): Uint8Array | null | undefined {
+        return this.sessionDataKeys.get(sessionId);
+    }
+
+    /**
      * Remove session encryption from memory when session is deleted
      */
     removeSessionEncryption(sessionId: string): void {
         this.sessionEncryptions.delete(sessionId);
+        this.sessionDataKeys.delete(sessionId);
         // Also clear any cached data for this session
         this.cache.clearSessionCache(sessionId);
     }
