@@ -951,7 +951,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 )}
 
                 {/* Connection status, context warning, and permission mode */}
-                {(props.connectionStatus || contextWarning || displayPermissionMode || props.modelMode || (props.autoConfirmMode && props.autoConfirmMode !== 'off')) && (
+                {(props.connectionStatus || contextWarning || props.modelMode || (props.autoConfirmMode && props.autoConfirmMode !== 'off')) && (
                     <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -1062,31 +1062,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             alignItems: 'flex-end',
                             minWidth: 150, // Fixed minimum width to prevent layout shift
                         }}>
-                            {displayPermissionMode && (
-                                <Text style={{
-                                    fontSize: 11,
-                                    color: isSandboxedYoloMode ? '#4169E1' :
-                                        permissionModeKey === 'acceptEdits' ? theme.colors.permission.acceptEdits :
-                                            permissionModeKey === 'bypassPermissions' ? theme.colors.permission.bypass :
-                                                permissionModeKey === 'plan' ? theme.colors.permission.plan :
-                                                    permissionModeKey === 'read-only' ? theme.colors.permission.readOnly :
-                                                        permissionModeKey === 'safe-yolo' ? theme.colors.permission.safeYolo :
-                                                            permissionModeKey === 'yolo' ? theme.colors.permission.yolo :
-                                                                theme.colors.textSecondary, // Use secondary text color for default
-                                    ...Typography.default()
-                                }}>
-                                    {withSandboxSuffix(displayPermissionMode.name, permissionModeKey)}
-                                </Text>
-                            )}
-                            {props.modelMode && (
-                                <Text style={{
-                                    fontSize: 11,
-                                    color: theme.colors.textSecondary,
-                                    ...Typography.default()
-                                }}>
-                                    {props.modelMode.name}
-                                </Text>
-                            )}
                             {props.autoConfirmMode && props.autoConfirmMode !== 'off' && (
                                 <Text style={{
                                     fontSize: 11,
@@ -1096,6 +1071,15 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     {props.autoConfirmMode === 'confirm'
                                         ? t('agentInput.autoConfirm.descConfirm')
                                         : t('agentInput.autoConfirm.descAll')}
+                                </Text>
+                            )}
+                            {props.modelMode && (
+                                <Text style={{
+                                    fontSize: 11,
+                                    color: theme.colors.textSecondary,
+                                    ...Typography.default()
+                                }}>
+                                    {props.modelMode.name}
                                 </Text>
                             )}
 
