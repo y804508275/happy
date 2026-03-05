@@ -7,7 +7,7 @@ import { Item } from '@/components/Item';
 import { ItemGroup } from '@/components/ItemGroup';
 import { ItemList } from '@/components/ItemList';
 import { Avatar } from '@/components/Avatar';
-import { useSession, useIsDataReady } from '@/sync/storage';
+import { useSession, useIsDataReady, storage } from '@/sync/storage';
 import { getSessionName, useSessionStatus, formatOSPlatform, formatPathRelativeToHome, getSessionAvatarId } from '@/utils/sessionUtils';
 import * as Clipboard from 'expo-clipboard';
 import { Modal } from '@/modal';
@@ -153,6 +153,8 @@ function SessionInfoContent({ session }: { session: Session }) {
     // Use HappyAction for archiving - it handles errors automatically
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
+        // Optimistic update: always mark session as inactive regardless of kill result
+        storage.getState().applySessions([{ ...session, active: false }]);
         if (!result.success) {
             throw new HappyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
         }

@@ -557,11 +557,6 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
                 'stop-session',
                 { sessionId }
             );
-            // Optimistic update: immediately mark session as inactive
-            // instead of waiting for WebSocket notification
-            if (session) {
-                storage.getState().applySessions([{ ...session, active: false }]);
-            }
             return { success: true, message: 'Session stopped via daemon' };
         } catch {
             // Daemon route failed (e.g. daemon offline), fall through to direct RPC
@@ -575,10 +570,6 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
             'killSession',
             {}
         );
-        // Optimistic update: immediately mark session as inactive
-        if (response.success && session) {
-            storage.getState().applySessions([{ ...session, active: false }]);
-        }
         return response;
     } catch (error) {
         return {

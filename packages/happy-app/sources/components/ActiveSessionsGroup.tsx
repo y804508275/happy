@@ -396,6 +396,10 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
         const result = await sessionKill(session.id);
+        // Optimistic update: always mark session as inactive regardless of kill result.
+        // The user's intent is to archive (remove from active list), and the process
+        // may already be dead even if the RPC failed (e.g. connection dropped after kill).
+        storage.getState().applySessions([{ ...session, active: false }]);
         if (!result.success) {
             throw new HappyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
         }
