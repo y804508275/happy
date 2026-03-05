@@ -17,6 +17,7 @@ import { TextInputState, MultiTextInputHandle } from './MultiTextInput';
 import { applySuggestion } from './autocomplete/applySuggestion';
 import { GitStatusBadge, useHasMeaningfulGitStatus } from './GitStatusBadge';
 import { MdReferenceChips } from './MdReferenceChips';
+import { FileIcon } from './FileIcon';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useSetting } from '@/sync/storage';
 import { hackMode, hackModes } from '@/sync/modeHacks';
@@ -67,7 +68,7 @@ interface AgentInputProps {
     alwaysShowContextSize?: boolean;
     onPreviewPress?: () => void;
     onFileViewerPress?: () => void;
-    agentType?: 'claude' | 'codex' | 'gemini' | 'droid';
+    agentType?: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
     onAgentClick?: () => void;
     machineName?: string | null;
     onMachineClick?: () => void;
@@ -80,9 +81,9 @@ interface AgentInputProps {
     onProfileClick?: () => void;
     autoConfirmMode?: 'off' | 'confirm' | 'all';
     onAutoConfirmModeChange?: (mode: 'off' | 'confirm' | 'all') => void;
-    onSwitchAgent?: (agent: 'claude' | 'codex' | 'gemini' | 'droid') => void;
+    onSwitchAgent?: (agent: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode') => void;
     isSwitchingAgent?: boolean;
-    agentAvailability?: { claude: boolean | null; codex: boolean | null; gemini: boolean | null; droid: boolean | null };
+    agentAvailability?: { claude: boolean | null; codex: boolean | null; gemini: boolean | null; droid: boolean | null; opencode: boolean | null };
     // Message queue (send while AI is thinking)
     onQueueMessage?: () => void;
     queueSize?: number;
@@ -464,11 +465,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // Agent switcher dropdown state
     const [showAgentSwitcher, setShowAgentSwitcher] = React.useState(false);
     const currentFlavor = props.agentType || props.metadata?.flavor || 'claude';
-    const allAgents: { key: 'claude' | 'codex' | 'gemini' | 'droid'; label: string; icon: any; tintable?: boolean }[] = React.useMemo(() => [
+    const allAgents: { key: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode'; label: string; icon: any; tintable?: boolean }[] = React.useMemo(() => [
         { key: 'claude', label: 'Claude Code', icon: require('@/assets/images/icon-claude.png') },
         { key: 'droid', label: 'Droid', icon: require('@/assets/images/icon-factory.png') },
         { key: 'codex', label: 'Codex', icon: require('@/assets/images/icon-gpt.png'), tintable: true },
         { key: 'gemini', label: 'Gemini', icon: require('@/assets/images/icon-gemini.png') },
+        { key: 'opencode', label: 'OpenCode', icon: require('@/assets/images/icon-opencode.png') },
     ], []);
     const currentAgent = allAgents.find(a => a.key === currentFlavor) || allAgents[0];
 
@@ -1224,44 +1226,61 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                         </View>
                     )}
 
-                    {/* File preview chips */}
+                    {/* File preview cards */}
                     {props.attachedFiles && props.attachedFiles.length > 0 && (
                         <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 10, gap: 8, flexWrap: 'wrap' }}>
                             {props.attachedFiles.map((file, index) => (
                                 <View key={`file-${index}`} style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    backgroundColor: theme.colors.input.background,
-                                    borderRadius: 8,
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 6,
-                                    gap: 6,
-                                    borderWidth: 1,
-                                    borderColor: theme.colors.divider,
+                                    backgroundColor: theme.colors.surfacePressed,
+                                    borderRadius: 10,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 10,
+                                    gap: 10,
+                                    minWidth: 180,
+                                    maxWidth: 260,
                                 }}>
                                     {file.loading ? (
-                                        <ActivityIndicator size={14} color={theme.colors.textSecondary} />
+                                        <View style={{
+                                            width: 32,
+                                            height: 32,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}>
+                                            <ActivityIndicator size={20} color={theme.colors.textSecondary} />
+                                        </View>
                                     ) : (
-                                        <Ionicons
-                                            name={file.mediaType === 'application/pdf' ? 'document-text-outline' : 'document-outline'}
-                                            size={14}
-                                            color={theme.colors.textSecondary}
-                                        />
+                                        <FileIcon fileName={file.name} size={32} />
                                     )}
-                                    <Text style={{
-                                        fontSize: 12,
-                                        color: file.loading ? theme.colors.textSecondary : theme.colors.text,
-                                        maxWidth: 150,
-                                        ...Typography.default(),
-                                    }} numberOfLines={1}>
-                                        {file.name}
-                                    </Text>
+                                    <View style={{ flex: 1, gap: 2 }}>
+                                        <Text style={{
+                                            fontSize: 13,
+                                            color: file.loading ? theme.colors.textSecondary : theme.colors.text,
+                                            fontWeight: '600',
+                                            ...Typography.default('semiBold'),
+                                        }} numberOfLines={2}>
+                                            {file.name}
+                                        </Text>
+                                        <Text style={{
+                                            fontSize: 11,
+                                            color: theme.colors.textSecondary,
+                                            ...Typography.default(),
+                                        }} numberOfLines={1}>
+                                            {file.mediaType === 'application/pdf' ? 'PDF' :
+                                             file.mediaType.startsWith('text/') ? file.mediaType.replace('text/', '').toUpperCase() :
+                                             file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                                        </Text>
+                                    </View>
                                     {!file.loading && (
                                         <Pressable
                                             onPress={() => props.onRemoveFile?.(index)}
-                                            hitSlop={4}
+                                            hitSlop={6}
+                                            style={{
+                                                padding: 2,
+                                            }}
                                         >
-                                            <Ionicons name="close-circle" size={14} color={theme.colors.textSecondary} />
+                                            <Ionicons name="close-circle" size={18} color={theme.colors.textSecondary} />
                                         </Pressable>
                                     )}
                                 </View>
@@ -1414,7 +1433,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             {props.isSwitchingAgent ? t('session.switchingAgent') :
                                              props.metadata.flavor === 'droid' ? 'Droid' :
                                              props.metadata.flavor === 'codex' ? 'Codex' :
-                                             props.metadata.flavor === 'gemini' ? 'Gemini' : 'Claude Code'}
+                                             props.metadata.flavor === 'gemini' ? 'Gemini' :
+                                             props.metadata.flavor === 'opencode' ? 'OpenCode' : 'Claude Code'}
                                         </Text>
                                         {props.onSwitchAgent && !props.isSwitchingAgent && (
                                             <Ionicons name="chevron-up" size={12} color={theme.colors.button.secondary.tint} />

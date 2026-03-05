@@ -2,6 +2,7 @@ import * as React from "react";
 import { View, Text, Image as RNImage } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { FileIcon } from './FileIcon';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
@@ -111,25 +112,29 @@ function UserTextBlock(props: {
           </View>
         )}
         {props.message.files && props.message.files.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: props.message.text ? 8 : 0 }}>
+          <View style={{ flexDirection: 'column', gap: 6, marginBottom: props.message.text ? 8 : 0 }}>
             {props.message.files.map((file, i) => (
               <View key={i} style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                borderRadius: 6,
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                gap: 4,
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                gap: 10,
+                minWidth: 180,
               }}>
-                <Ionicons
-                  name={file.mediaType === 'application/pdf' ? 'document-text-outline' : 'document-outline'}
-                  size={13}
-                  color="rgba(255,255,255,0.7)"
-                />
-                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }} numberOfLines={1}>
-                  {file.name}
-                </Text>
+                <FileIcon fileName={file.name} size={28} />
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: '600' }} numberOfLines={2}>
+                    {file.name}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }} numberOfLines={1}>
+                    {file.mediaType === 'application/pdf' ? 'PDF' :
+                     file.mediaType.startsWith('text/') ? file.mediaType.replace('text/', '').toUpperCase() :
+                     file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                  </Text>
+                </View>
               </View>
             ))}
           </View>
