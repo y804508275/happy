@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 22 (2026.03.04.5) - 2026-03-04
+
+修复切换 Agent 时新 Agent 识别到旧会话历史消息的 bug。
+
+- 修复 switchSessionAgent 调用 stopSession 导致 session info 文件被删除的问题
+- 切换 Agent 时保留 session info 文件，让旧进程在 SIGTERM 时写入 lastSeq
+- Daemon 创建 restart 文件时包含正确的 seq，新 Agent 进程只接收切换后的新消息
+- 同时修复 Claude 和 Droid 的 restart 路径，使用 restartData.seq 而非硬编码 0
+
+发布方式：CLI 构建 + 重启 Daemon 生效。
+
 ## Version 21 (2026.03.04.4) - 2026-03-04
 
 修复 Droid 连续多问题选项只显示第一个问题的 bug。
