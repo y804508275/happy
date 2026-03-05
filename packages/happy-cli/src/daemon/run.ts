@@ -723,13 +723,16 @@ export async function startDaemon(): Promise<void> {
           const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
 
           // Create restart file with encryption info (reuses existing pattern)
+          // Include lastSeq so the new process skips already-processed messages
           const restartFilePath = join(sessionsDir, `restart-${happySessionId}.json`);
           const { writeFileSync: writeSync } = await import('fs');
           writeSync(restartFilePath, JSON.stringify({
             sessionId: sessionInfo.sessionId,
             encryptionKey: sessionInfo.encryptionKey,
             encryptionVariant: sessionInfo.encryptionVariant,
+            seq: sessionInfo.lastSeq || 0,
           }), { mode: 0o600 });
+          logger.debug(`[DAEMON RUN] Restart file created with seq=${sessionInfo.lastSeq || 0}`);
 
           // Use the effective claudeSessionId (from RPC params or session info file)
           const effectiveClaudeSessionId = claudeSessionId || sessionInfo.claudeSessionId;
@@ -797,16 +800,32 @@ export async function startDaemon(): Promise<void> {
       const { happySessionId, directory, newAgent, dataKey } = options;
       logger.debug(`[DAEMON RUN] Switching session ${happySessionId} to agent: ${newAgent}`);
 
-      // Stop existing process for this session
+      // Kill existing process but DON'T delete session info file.
+      // The process SIGTERM handler writes lastSeq to the session info file,
+      // which is needed to avoid replaying old messages when the new agent starts.
       for (const [pid, session] of pidToTrackedSession) {
         if (session.happySessionId === happySessionId) {
-          logger.debug(`[DAEMON RUN] Stopping existing process PID ${pid} for agent switch`);
-          stopSession(happySessionId);
+          logger.debug(`[DAEMON RUN] Killing existing process PID ${pid} for agent switch`);
+          if (session.startedBy === 'daemon' && session.childProcess) {
+            try {
+              session.childProcess.kill('SIGTERM');
+            } catch (error) {
+              logger.debug(`[DAEMON RUN] Failed to kill session PID ${pid}:`, error);
+            }
+          } else {
+            try {
+              process.kill(pid, 'SIGTERM');
+            } catch (error) {
+              logger.debug(`[DAEMON RUN] Failed to kill external session PID ${pid}:`, error);
+            }
+          }
+          pidToTrackedSession.delete(pid);
+          persistSessions();
           break;
         }
       }
 
-      // Wait for the old process to die and socket to disconnect
+      // Wait for the old process to die and write lastSeq to session info file
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Update session info file with the new agent type
