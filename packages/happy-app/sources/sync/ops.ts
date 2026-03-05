@@ -139,7 +139,7 @@ export interface SpawnSessionOptions {
     directory: string;
     approvedNewDirectoryCreation?: boolean;
     token?: string;
-    agent?: 'codex' | 'claude' | 'gemini';
+    agent?: 'codex' | 'claude' | 'gemini' | 'droid';
     // Environment variables from AI backend profile
     // Accepts any environment variables - daemon will pass them to the agent process
     // Common variables include:
@@ -147,6 +147,7 @@ export interface SpawnSessionOptions {
     // - OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_API_TIMEOUT_MS
     // - AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT_NAME
     // - TOGETHER_API_KEY, TOGETHER_MODEL
+    // - FACTORY_API_KEY
     // - TMUX_SESSION_NAME, TMUX_TMPDIR, TMUX_UPDATE_ENVIRONMENT
     // - API_TIMEOUT_MS, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
     // - Custom variables (DEEPSEEK_*, Z_AI_*, etc.)
@@ -168,7 +169,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             directory: string
             approvedNewDirectoryCreation?: boolean,
             token?: string,
-            agent?: 'codex' | 'claude' | 'gemini',
+            agent?: 'codex' | 'claude' | 'gemini' | 'droid',
             environmentVariables?: Record<string, string>;
         }>(
             machineId,
@@ -195,7 +196,7 @@ export async function machineReactivateSession(options: {
     happySessionId: string;
     directory: string;
     claudeSessionId?: string;
-    agent?: 'codex' | 'claude' | 'gemini';
+    agent?: 'codex' | 'claude' | 'gemini' | 'droid';
 }): Promise<SpawnSessionResult> {
     const { machineId, ...params } = options;
     try {
@@ -209,6 +210,34 @@ export async function machineReactivateSession(options: {
         return {
             type: 'error',
             errorMessage: error instanceof Error ? error.message : 'Failed to reactivate session'
+        };
+    }
+}
+
+/**
+ * Switch the agent type for an existing session.
+ * Stops the current CLI process and spawns a new one with the new agent type,
+ * reconnecting to the same Happy session so the UI thread is seamless.
+ */
+export async function machineSwitchSessionAgent(options: {
+    machineId: string;
+    happySessionId: string;
+    directory: string;
+    newAgent: 'claude' | 'codex' | 'gemini' | 'droid';
+    dataKey?: string;
+}): Promise<SpawnSessionResult> {
+    const { machineId, ...params } = options;
+    try {
+        const result = await apiSocket.machineRPC<SpawnSessionResult, typeof params>(
+            machineId,
+            'switch-session-agent',
+            params
+        );
+        return result;
+    } catch (error) {
+        return {
+            type: 'error',
+            errorMessage: error instanceof Error ? error.message : 'Failed to switch session agent'
         };
     }
 }
@@ -528,6 +557,11 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
                 'stop-session',
                 { sessionId }
             );
+            // Optimistic update: immediately mark session as inactive
+            // instead of waiting for WebSocket notification
+            if (session) {
+                storage.getState().applySessions([{ ...session, active: false }]);
+            }
             return { success: true, message: 'Session stopped via daemon' };
         } catch {
             // Daemon route failed (e.g. daemon offline), fall through to direct RPC
@@ -541,6 +575,10 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
             'killSession',
             {}
         );
+        // Optimistic update: immediately mark session as inactive
+        if (response.success && session) {
+            storage.getState().applySessions([{ ...session, active: false }]);
+        }
         return response;
     } catch (error) {
         return {
@@ -600,6 +638,9 @@ export async function sessionDelete(sessionId: string): Promise<{ success: boole
 
         if (response.ok) {
             const result = await response.json();
+            // Optimistic update: immediately remove from local state
+            // instead of waiting for WebSocket notification
+            storage.getState().deleteSession(sessionId);
             return { success: true };
         } else {
             const error = await response.text();

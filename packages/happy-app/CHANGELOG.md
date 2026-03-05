@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 18 (2026.03.04.1) - 2026-03-04
+
+修复归档和删除会话后 UI 不更新的问题。
+
+- 修复删除会话后列表不刷新：sessionDelete 成功后立即从本地状态移除 session，不再依赖 WebSocket 通知
+- 修复归档会话后仍显示在 Active 列表：sessionKill 成功后立即将 session 标记为 inactive
+
+发布方式：OTA 部署生效。
+
 ## Version 17 (2026.03.03.6) - 2026-03-03
 
 修复跨机器 session 恢复失败的问题，改善 RPC 错误透传。
