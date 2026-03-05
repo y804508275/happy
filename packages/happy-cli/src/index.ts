@@ -186,6 +186,51 @@ import { formatSecretKeyForBackup } from './utils/backupKey'
   } else if (subcommand === 'bye') {
     console.log('Bye!');
     process.exit(0);
+  } else if (subcommand === 'droid') {
+    // Handle droid command (Factory Droid CLI)
+    try {
+      const { runDroid } = await import('@/droid/runDroid');
+
+      let startedBy: 'daemon' | 'terminal' | undefined = undefined;
+      let startingMode: 'local' | 'remote' | undefined = undefined;
+      let model: string | undefined = undefined;
+      let resumeDroidSessionId: string | undefined = undefined;
+      const droidArgs = args.slice(1);
+
+      for (let i = 0; i < droidArgs.length; i++) {
+        if (droidArgs[i] === '--started-by') {
+          startedBy = droidArgs[++i] as 'daemon' | 'terminal';
+        } else if (droidArgs[i] === '--happy-starting-mode') {
+          startingMode = droidArgs[++i] as 'local' | 'remote';
+        } else if (droidArgs[i] === '--model' || droidArgs[i] === '-m') {
+          model = droidArgs[++i];
+        } else if (droidArgs[i] === '--resume') {
+          resumeDroidSessionId = droidArgs[++i];
+        }
+      }
+
+      const { credentials } = await authAndSetupMachineIfNeeded();
+
+      // Auto-start daemon
+      if (!(await isDaemonRunningCurrentlyInstalledHappyVersion())) {
+        const daemonProcess = spawnHappyCLI(['daemon', 'start-sync'], {
+          detached: true,
+          stdio: 'ignore',
+          env: process.env
+        });
+        daemonProcess.unref();
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      await runDroid(credentials, { startedBy, startingMode, model, resumeDroidSessionId });
+    } catch (error) {
+      console.error(chalk.red('Error:'), error instanceof Error ? error.message : 'Unknown error')
+      if (process.env.DEBUG) {
+        console.error(error)
+      }
+      process.exit(1)
+    }
+    return;
   } else if (subcommand === 'codex') {
     // Handle codex command
     try {
@@ -736,6 +781,7 @@ ${chalk.bold('Usage:')}
   happy [options]         Start Claude with mobile control
   happy setup             One-click setup (auth + daemon + recovery key)
   happy auth              Manage authentication
+  happy droid             Start Factory Droid mode
   happy codex             Start Codex mode
   happy gemini            Start Gemini mode (ACP)
   happy acp               Start a generic ACP-compatible agent

@@ -54,7 +54,6 @@ export async function startApi() {
         await app.register(import('@fastify/static'), {
             root: path.resolve(staticDir),
             prefix: '/',
-            decorateReply: false,
             wildcard: false,
         });
     } else {
@@ -113,18 +112,7 @@ export async function startApi() {
     sharedItemRoutes(typed);
     sessionSharedItemRoutes(typed);
 
-    // SPA fallback for static web app (must be after all API routes)
-    if (staticDir && fs.existsSync(staticDir)) {
-        app.setNotFoundHandler((req, reply) => {
-            // API routes return 404 JSON
-            if (req.url.startsWith('/v1/')) {
-                reply.code(404).send({ error: 'Not Found' });
-            } else {
-                // SPA: serve index.html for all other routes
-                reply.sendFile('index.html', path.resolve(staticDir));
-            }
-        });
-    }
+
 
     // Start HTTP
     const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3005;

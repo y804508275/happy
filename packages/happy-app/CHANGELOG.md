@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 19 (2026.03.04.2) - 2026-03-04
+
+新增 Droid agent 集成、会话内切换 agent、auto-confirm 模式优化及多项 bug 修复。
+
+- 新增 Droid agent 类型：支持 Factory Droid 作为第四个 AI agent（贯穿 app、CLI、daemon）
+- 新增会话内切换 agent：在已有会话中点击 agent 名称可切换到不同 AI agent，对话历史自动传递
+- 优化 auto-confirm 模式：confirm 模式不再自动批准工具权限（仅 all 模式才会），修复权限误批准问题
+- 修复 stale pending requests：CLI 重启时自动清理上一个进程遗留的过期权限请求
+- 修复 session badge：只对 online 会话显示 action badge，避免已断开会话显示误导性提示
+- 修复 SPA fallback：将路由 fallback 移到 error handler，解决 fastify 注册顺序冲突
+- 修复 save_memory 错误信息：API 失败时显示详细错误原因
+- 修复 todos 类型检查：使用 Array.isArray 防止非数组值导致崩溃
+
+发布方式：OTA 部署生效（app 端），daemon 和 CLI 需要更新 happy-cli。
+
 ## Version 18 (2026.03.04.1) - 2026-03-04
 
 修复归档和删除会话后 UI 不更新的问题。

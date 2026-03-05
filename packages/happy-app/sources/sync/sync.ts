@@ -81,6 +81,7 @@ class Sync {
     private machineDataKeys = new Map<string, Uint8Array>(); // Store machine data encryption keys internally
     private artifactDataKeys = new Map<string, Uint8Array>(); // Store artifact data encryption keys internally
     private reactivatingSessionIds = new Set<string>(); // Dedup reactivation attempts
+    private pendingAgentSwitchHistory = new Map<string, string>(); // sessionId -> conversation summary for handoff
     private settingsSync: InvalidateSync;
     private profileSync: InvalidateSync;
     private purchasesSync: InvalidateSync;
@@ -500,6 +501,13 @@ class Sync {
             }
         }
 
+        // Inject conversation history if this is the first message after an agent switch
+        const pendingHistory = this.pendingAgentSwitchHistory.get(sessionId);
+        if (pendingHistory) {
+            finalSystemPrompt = pendingHistory + '\n\n' + finalSystemPrompt;
+            this.pendingAgentSwitchHistory.delete(sessionId);
+        }
+
         // Prepend text file contents to message text
         let actualText = text;
         const textFiles = files?.filter(f => f.kind === 'text') || [];
@@ -638,7 +646,7 @@ class Sync {
                 happySessionId: sessionId,
                 directory: session.metadata!.path,
                 claudeSessionId: session.metadata!.claudeSessionId,
-                agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini') || undefined,
+                agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini' | 'droid') || undefined,
                 dataKey: dataKeyBase64,
             };
 
@@ -690,6 +698,80 @@ class Sync {
                 this.reactivatingSessionIds.delete(sessionId);
             }, guardMs);
         }
+    }
+
+    /**
+     * Switch the agent type for an existing session.
+     * Builds a conversation summary for context handoff, stops the old agent,
+     * and spawns a new one that reconnects to the same Happy session.
+     */
+    switchSessionAgent = async (sessionId: string, newAgent: 'claude' | 'codex' | 'gemini' | 'droid'): Promise<{ success: boolean; error?: string }> => {
+        const session = storage.getState().sessions[sessionId];
+        if (!session || !session.metadata?.machineId || !session.metadata?.path) {
+            return { success: false, error: 'Session not found or missing metadata' };
+        }
+
+        // Build conversation summary from stored messages for context handoff
+        const summary = this.buildConversationSummary(sessionId);
+        if (summary) {
+            this.pendingAgentSwitchHistory.set(sessionId, summary);
+        }
+
+        const machineId = session.metadata.machineId;
+        const dataKey = this.encryption.getSessionDataKey(sessionId);
+        let dataKeyBase64: string | undefined;
+        if (dataKey) {
+            dataKeyBase64 = encodeBase64(dataKey, 'base64');
+        }
+
+        try {
+            const result = await apiSocket.machineRPC(machineId, 'switch-session-agent', {
+                happySessionId: sessionId,
+                directory: session.metadata.path,
+                newAgent,
+                dataKey: dataKeyBase64,
+            });
+            log.log(`Session agent switch succeeded: ${JSON.stringify(result)}`);
+            return { success: true };
+        } catch (error) {
+            log.log(`Session agent switch failed: ${error}`);
+            this.pendingAgentSwitchHistory.delete(sessionId);
+            return { success: false, error: error instanceof Error ? error.message : 'Failed to switch agent' };
+        }
+    }
+
+    private buildConversationSummary(sessionId: string): string | null {
+        const sessionMessages = storage.getState().sessionMessages[sessionId];
+        if (!sessionMessages?.messages || sessionMessages.messages.length === 0) {
+            return null;
+        }
+
+        const messages = sessionMessages.messages;
+        // Take the last 30 messages to keep context reasonable
+        const recentMessages = messages.slice(-30);
+
+        const lines: string[] = [];
+        for (const msg of recentMessages) {
+            if (msg.kind === 'user-text') {
+                const text = msg.displayText || msg.text;
+                if (text.trim()) {
+                    lines.push(`User: ${text.trim()}`);
+                }
+            } else if (msg.kind === 'agent-text' && !msg.isThinking) {
+                if (msg.text.trim()) {
+                    // Truncate very long agent responses
+                    const truncated = msg.text.length > 500 ? msg.text.slice(0, 500) + '...' : msg.text;
+                    lines.push(`Assistant: ${truncated.trim()}`);
+                }
+            } else if (msg.kind === 'tool-call') {
+                const status = msg.tool.state === 'completed' ? 'completed' : msg.tool.state;
+                lines.push(`[Tool: ${msg.tool.name} - ${status}]`);
+            }
+        }
+
+        if (lines.length === 0) return null;
+
+        return `<conversation_history>\nThe following is the conversation history from this session. A different AI agent handled the previous messages. Continue naturally from where it left off.\n\n${lines.join('\n')}\n</conversation_history>`;
     }
 
     applySettings = (delta: Partial<Settings>) => {

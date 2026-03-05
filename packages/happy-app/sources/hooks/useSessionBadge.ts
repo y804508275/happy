@@ -15,7 +15,9 @@ export function useSessionBadge(session: Session): SessionBadgeType {
         && Object.keys(session.agentState.requests).length > 0;
     const isUnread = useSessionIsUnread(session.id);
 
-    if (hasRequests) return 'action';
+    // Only show action badge if session is online — stale requests from dead
+    // sessions shouldn't prompt the user to act.
+    if (hasRequests && session.presence === 'online') return 'action';
     if (isUnread) return 'info';
     return null;
 }
@@ -29,7 +31,8 @@ export function useSessionsBadgeCount(): number {
         let count = 0;
         for (const session of Object.values(state.sessions)) {
             const hasRequests = session.agentState?.requests
-                && Object.keys(session.agentState.requests).length > 0;
+                && Object.keys(session.agentState.requests).length > 0
+                && session.presence === 'online';
             if (hasRequests || state.unreadSessions[session.id]) count++;
         }
         return count;

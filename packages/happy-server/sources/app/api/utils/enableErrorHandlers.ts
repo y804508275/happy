@@ -1,6 +1,8 @@
 import { log } from "@/utils/log";
 import { Fastify } from "../types";
 import { FastifyError } from "fastify";
+import * as path from "path";
+import * as fs from "fs";
 
 export function enableErrorHandlers(app: Fastify) {
     // Global error handler
@@ -43,8 +45,20 @@ export function enableErrorHandlers(app: Fastify) {
         }
     });
 
-    // Catch-all route for debugging 404s
+    // Catch-all route for debugging 404s + SPA fallback
+    const staticDir = process.env.HAPPY_STATIC_DIR;
     app.setNotFoundHandler((request, reply) => {
+        // API routes always return 404 JSON
+        if (request.url.startsWith('/v1/') || request.url.startsWith('/socket.io')) {
+            log({ module: '404-handler' }, `404 - Method: ${request.method}, Path: ${request.url}`);
+            reply.code(404).send({ error: 'Not found', path: request.url, method: request.method });
+            return;
+        }
+        // SPA fallback: serve index.html for non-API routes
+        if (staticDir && fs.existsSync(staticDir)) {
+            reply.sendFile('index.html', path.resolve(staticDir));
+            return;
+        }
         log({ module: '404-handler' }, `404 - Method: ${request.method}, Path: ${request.url}, Headers: ${JSON.stringify(request.headers)}`);
         reply.code(404).send({ error: 'Not found', path: request.url, method: request.method });
     });

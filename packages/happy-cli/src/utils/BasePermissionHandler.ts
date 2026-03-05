@@ -66,6 +66,26 @@ export abstract class BasePermissionHandler {
             this.autoConfirmMode = currentState.autoConfirmMode || 'all';
             logger.debug(`${this.getLogPrefix()} Restored autoConfirm=true, mode=${this.autoConfirmMode} from existing agent state`);
         }
+
+        // Clear stale pending requests from a previous CLI process (e.g. after crash + resume).
+        // The new process has an empty pendingRequests map, so these can never be fulfilled.
+        if (currentState?.requests && Object.keys(currentState.requests).length > 0) {
+            logger.debug(`${this.getLogPrefix()} Clearing ${Object.keys(currentState.requests).length} stale pending request(s) from previous session`);
+            this.session.updateAgentState((state) => {
+                const staleRequests = state.requests || {};
+                if (Object.keys(staleRequests).length === 0) return state;
+                const completedRequests = { ...state.completedRequests };
+                for (const [id, request] of Object.entries(staleRequests)) {
+                    completedRequests[id] = {
+                        ...request,
+                        completedAt: Date.now(),
+                        status: 'canceled',
+                        reason: 'Session restarted'
+                    };
+                }
+                return { ...state, requests: {}, completedRequests };
+            });
+        }
     }
 
     /**
@@ -99,10 +119,9 @@ export abstract class BasePermissionHandler {
                     autoConfirmMode: mode
                 }));
 
-                // Auto-approve pending requests when enabled
-                // In 'confirm' mode, skip AskUserQuestion (app handles it manually)
-                // In 'all' mode, skip AskUserQuestion too (app handles auto-answer)
-                if (message.enabled) {
+                // Auto-approve pending requests only in 'all' mode
+                // 'confirm' mode doesn't auto-approve tool permissions
+                if (mode === 'all') {
                     const pendingSnapshot = Array.from(this.pendingRequests.entries());
 
                     for (const [id, pending] of pendingSnapshot) {

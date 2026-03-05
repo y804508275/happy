@@ -32,6 +32,7 @@ interface Question {
 export const FixedAskUserQuestionBar = React.memo((props: {
     sessionId: string;
     metadata: Metadata | null;
+    isConnected: boolean;
     autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { messages } = useSessionMessages(props.sessionId);
@@ -49,7 +50,7 @@ export const FixedAskUserQuestionBar = React.memo((props: {
         return null;
     }, [messages]);
 
-    if (!pendingQuestion) {
+    if (!props.isConnected || !pendingQuestion) {
         return null;
     }
 

@@ -306,6 +306,12 @@ export const zhHant: TranslationStructure = {
 
     session: {
         inputPlaceholder: '輸入訊息...',
+        switchAgent: '切換 Agent',
+        switchAgentTitle: '切換 Agent',
+        switchAgentDescription: '切換到不同的 AI Agent 繼續本次對話，對話歷史會自動傳遞。',
+        switchingAgent: '正在切換...',
+        switchAgentSuccess: ({ agent }: { agent: string }) => `已切換到 ${agent}`,
+        switchAgentFailed: '切換失敗',
     },
 
     commandPalette: {

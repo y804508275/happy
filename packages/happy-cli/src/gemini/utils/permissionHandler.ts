@@ -102,8 +102,8 @@ export class GeminiPermissionHandler extends BasePermissionHandler {
         toolName: string,
         input: unknown
     ): Promise<PermissionResult> {
-        // Auto-confirm: always skip AskUserQuestion (app handles it)
-        if (this.autoConfirm && toolName !== 'AskUserQuestion') {
+        // Auto-confirm in 'all' mode only (confirm mode doesn't auto-approve tool permissions)
+        if (this.autoConfirm && this.autoConfirmMode === 'all' && toolName !== 'AskUserQuestion') {
             logger.debug(`${this.getLogPrefix()} Auto-confirming tool ${toolName} (${toolCallId})`);
             return { decision: 'approved' };
         }

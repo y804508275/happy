@@ -225,7 +225,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                 visibility: 'private',
                 name: args.title,
                 slug,
-                description: args.description || args.tags?.join(', ') || null,
+                description: args.description || args.tags?.join(', ') || undefined,
                 content: args.content,
                 meta,
             }, { headers: apiHeaders(), timeout: 10000 });
@@ -255,7 +255,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                         visibility: 'private',
                         name: args.title,
                         slug: retrySlug,
-                        description: args.description || args.tags?.join(', ') || null,
+                        description: args.description || args.tags?.join(', ') || undefined,
                         content: args.content,
                         meta,
                     }, { headers: apiHeaders(), timeout: 10000 });
@@ -270,8 +270,10 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                     };
                 }
             }
+            const detail = error.response?.data ? ` (detail: ${JSON.stringify(error.response.data)})` : '';
+            logger.debug(`[happyMCP] save_memory failed: status=${error.response?.status} data=${JSON.stringify(error.response?.data)} url=${apiBase}/v1/shared-items`);
             return {
-                content: [{ type: 'text', text: `Failed to save memory: ${error.message || String(error)}` }],
+                content: [{ type: 'text', text: `Failed to save memory: ${error.message || String(error)}${detail}` }],
                 isError: true,
             };
         }
@@ -304,7 +306,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                 visibility: 'private',
                 name: args.title,
                 slug,
-                description: args.description || null,
+                description: args.description || undefined,
                 content: args.content,
                 meta,
             }, { headers: apiHeaders(), timeout: 10000 });
@@ -331,7 +333,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
                         visibility: 'private',
                         name: args.title,
                         slug: retrySlug,
-                        description: args.description || null,
+                        description: args.description || undefined,
                         content: args.content,
                         meta,
                     }, { headers: apiHeaders(), timeout: 10000 });

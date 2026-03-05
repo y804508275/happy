@@ -100,11 +100,9 @@ const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode, has
     const handleSelectRef = React.useRef(handleSelect);
     handleSelectRef.current = handleSelect;
 
-    // Auto-select first option in 'confirm' or 'all' mode after a brief delay
-    // 'confirm' mode: auto-approve permissions + auto-select options
-    // 'all' mode: above + auto-answer AskUserQuestion
+    // Only auto-select options in 'all' mode (confirm mode only auto-approves permissions)
     // But NOT if user hasn't sent any message yet (initial greeting — let user choose)
-    const isAutoMode = autoConfirmMode === 'confirm' || autoConfirmMode === 'all';
+    const isAutoMode = autoConfirmMode === 'all';
     const autoTriggered = React.useRef(false);
     React.useEffect(() => {
         if (!isAutoMode || autoTriggered.current || submitted || !hasAnyUserMessage) return;

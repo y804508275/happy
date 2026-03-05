@@ -33,6 +33,7 @@ import { Session } from '@/sync/storageTypes';
 import { sync } from '@/sync/sync';
 import { t } from '@/text';
 import { tracking, trackMessageSent } from '@/track';
+import type { NewSessionAgentType } from '@/sync/persistence';
 import { isRunningOnMac } from '@/utils/platform';
 import { useDeviceType, useHeaderHeight, useIsLandscape, useIsTablet } from '@/utils/responsive';
 import { formatPathRelativeToHome, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
@@ -341,6 +342,33 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         storage.getState().updateSessionModelMode(sessionId, mode.key);
     }, [sessionId]);
 
+    // Handle switching agent type for the current session
+    const agentLabels: Record<string, string> = React.useMemo(() => ({
+        claude: 'Claude Code',
+        droid: 'Droid',
+        codex: 'Codex',
+        gemini: 'Gemini',
+    }), []);
+
+    const handleSwitchAgent = React.useCallback(async (agent: 'claude' | 'codex' | 'gemini' | 'droid') => {
+        const label = agentLabels[agent] || agent;
+        const confirmed = await Modal.confirm(
+            t('session.switchAgent'),
+            t('session.switchAgentDescription'),
+            { confirmText: label },
+        );
+        if (!confirmed) return;
+
+        Modal.alert(t('session.switchAgent'), t('session.switchingAgent'));
+        const result = await sync.switchSessionAgent(sessionId, agent);
+        if (result.success) {
+            storage.getState().updateSessionFlavor(sessionId, agent);
+            Modal.alert(t('session.switchAgent'), t('session.switchAgentSuccess', { agent: label }));
+        } else {
+            Modal.alert(t('common.error'), result.error || t('session.switchAgentFailed'));
+        }
+    }, [sessionId, agentLabels]);
+
     // Memoize header-dependent styles to prevent re-renders
     const headerDependentStyles = React.useMemo(() => ({
         contentContainer: {
@@ -421,8 +449,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const input = (
         <>
         <FixedOptionsBar sessionId={sessionId} metadata={session.metadata} autoConfirmMode={autoConfirmMode} />
-        <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} autoConfirmMode={autoConfirmMode} />
-        <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} />
+        <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} isConnected={session.presence === 'online'} autoConfirmMode={autoConfirmMode} />
+        <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} isConnected={session.presence === 'online'} autoConfirmMode={autoConfirmMode} />
         <AgentInput
             placeholder={t('session.inputPlaceholder')}
             value={message}
@@ -472,6 +500,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
             autoConfirmMode={autoConfirmMode}
             onAutoConfirmModeChange={handleAutoConfirmModeChange}
+            onSwitchAgent={session.metadata?.machineId ? handleSwitchAgent : undefined}
             // Autocomplete configuration
             autocompletePrefixes={['@', '/']}
             autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}

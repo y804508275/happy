@@ -513,7 +513,7 @@ interface NewSessionWizardProps {
     onComplete: (config: {
         sessionType: 'simple' | 'worktree';
         profileId: string | null;
-        agentType: 'claude' | 'codex';
+        agentType: 'claude' | 'codex' | 'droid';
         permissionMode: PermissionModeKey;
         modelMode: ModelModeKey;
         machineId: string;
@@ -542,8 +542,8 @@ export function NewSessionWizard({ onComplete, onCancel, initialPrompt = '' }: N
     // Wizard state
     const [currentStep, setCurrentStep] = useState<WizardStep>('profile');
     const [sessionType, setSessionType] = useState<'simple' | 'worktree'>('simple');
-    const [agentType, setAgentType] = useState<'claude' | 'codex'>(() => {
-        if (lastUsedAgent === 'claude' || lastUsedAgent === 'codex') {
+    const [agentType, setAgentType] = useState<'claude' | 'codex' | 'droid'>(() => {
+        if (lastUsedAgent === 'claude' || lastUsedAgent === 'codex' || lastUsedAgent === 'droid') {
             return lastUsedAgent;
         }
         return 'claude';
@@ -888,7 +888,7 @@ export function NewSessionWizard({ onComplete, onCancel, initialPrompt = '' }: N
         onComplete({
             sessionType,
             profileId: profile.id,
-            agentType: agentType || (profile.compatibility.claude ? 'claude' : 'codex'),
+            agentType: agentType || (profile.compatibility.claude ? 'claude' : 'codex') as 'claude' | 'codex' | 'droid',
             permissionMode,
             modelMode,
             machineId: selectedMachineId,
@@ -1553,6 +1553,27 @@ export function NewSessionWizard({ onComplete, onCancel, initialPrompt = '' }: N
                                 )}
                             </View>
                             {agentType === 'codex' && (
+                                <Ionicons name="checkmark-circle" size={24} color={theme.colors.button.primary.background} />
+                            )}
+                        </Pressable>
+
+                        <Pressable
+                            style={[
+                                styles.agentOption,
+                                agentType === 'droid' ? styles.agentOptionSelected : styles.agentOptionUnselected,
+                            ]}
+                            onPress={() => setAgentType('droid')}
+                        >
+                            <View style={styles.agentIcon}>
+                                <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>D</Text>
+                            </View>
+                            <View style={styles.agentInfo}>
+                                <Text style={styles.agentName}>Droid</Text>
+                                <Text style={styles.agentDescription}>
+                                    Factory's AI coding agent, multi-model support
+                                </Text>
+                            </View>
+                            {agentType === 'droid' && (
                                 <Ionicons name="checkmark-circle" size={24} color={theme.colors.button.primary.background} />
                             )}
                         </Pressable>

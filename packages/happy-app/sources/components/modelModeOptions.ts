@@ -93,12 +93,33 @@ export function getGeminiModelModes(): ModelMode[] {
     return GEMINI_MODEL_FALLBACKS;
 }
 
+export function getDroidPermissionModes(translate: Translate): PermissionMode[] {
+    return [
+        { key: 'default', name: 'Default (Read-only)', description: null },
+        { key: 'low', name: 'Low', description: 'Safe file operations' },
+        { key: 'medium', name: 'Medium', description: 'Development operations' },
+        { key: 'high', name: 'High', description: 'Production operations' },
+    ];
+}
+
+export function getDroidModelModes(): ModelMode[] {
+    return [
+        { key: 'claude-opus-4-6', name: 'Claude Opus 4.6', description: 'Default' },
+        { key: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', description: 'Fast and capable' },
+        { key: 'gpt-5.1-codex', name: 'GPT-5.1-Codex', description: 'OpenAI Codex' },
+        { key: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Google Gemini' },
+    ];
+}
+
 export function getHardcodedPermissionModes(flavor: AgentFlavor, translate: Translate): PermissionMode[] {
     if (flavor === 'codex') {
         return getCodexPermissionModes(translate);
     }
     if (flavor === 'gemini') {
         return getGeminiPermissionModes(translate);
+    }
+    if (flavor === 'droid') {
+        return getDroidPermissionModes(translate);
     }
     return getClaudePermissionModes(translate);
 }
@@ -109,6 +130,9 @@ export function getHardcodedModelModes(flavor: AgentFlavor, translate: Translate
     }
     if (flavor === 'gemini') {
         return getGeminiModelModes();
+    }
+    if (flavor === 'droid') {
+        return getDroidModelModes();
     }
     return getClaudeModelModes();
 }
@@ -130,7 +154,7 @@ export function getAvailablePermissionModes(
     metadata: Metadata | null | undefined,
     translate: Translate,
 ): PermissionMode[] {
-    if (flavor === 'claude' || flavor === 'codex') {
+    if (flavor === 'claude' || flavor === 'codex' || flavor === 'droid') {
         return hackModes(getHardcodedPermissionModes(flavor, translate));
     }
 
@@ -168,6 +192,9 @@ export function getDefaultModelKey(flavor: AgentFlavor): string {
     }
     if (flavor === 'gemini') {
         return 'gemini-2.5-pro';
+    }
+    if (flavor === 'droid') {
+        return 'claude-opus-4-6';
     }
     return 'default';
 }

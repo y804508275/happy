@@ -6,15 +6,21 @@ import { ToolCallMessage } from '@/sync/typesMessage';
 import { PermissionFooter } from './PermissionFooter';
 import { Metadata } from '@/sync/storageTypes';
 import { layout } from '@/components/layout';
+import { sessionAllow } from '@/sync/ops';
 
 /**
  * Renders pending permission buttons in a fixed position above the input bar.
  * This prevents mis-clicks caused by FlatList layout shifts on web, where
  * react-native-web does not support maintainVisibleContentPosition.
+ *
+ * In 'confirm' or 'all' autoConfirmMode, auto-approves pending permissions
+ * from the App side (backup for CLI-side auto-confirm to avoid UI flicker).
  */
 export const FixedPermissionBar = React.memo((props: {
     sessionId: string;
     metadata: Metadata | null;
+    isConnected: boolean;
+    autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { messages } = useSessionMessages(props.sessionId);
 
@@ -33,7 +39,23 @@ export const FixedPermissionBar = React.memo((props: {
         return null;
     }, [messages]);
 
-    if (!pendingTool) {
+    // Auto-approve permissions from App side in confirm/all mode
+    const autoApprovedRef = React.useRef<Set<string>>(new Set());
+    React.useEffect(() => {
+        if (!pendingTool || !props.isConnected) return;
+        if (props.autoConfirmMode !== 'all') return;
+        const permId = pendingTool.tool.permission!.id;
+        if (autoApprovedRef.current.has(permId)) return;
+        autoApprovedRef.current.add(permId);
+        sessionAllow(props.sessionId, permId);
+    }, [pendingTool, props.isConnected, props.autoConfirmMode, props.sessionId]);
+
+    // Hide when session is disconnected, no pending permission,
+    // or in auto-confirm mode (permissions get auto-approved above)
+    if (!props.isConnected || !pendingTool) {
+        return null;
+    }
+    if (props.autoConfirmMode === 'all') {
         return null;
     }
 

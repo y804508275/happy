@@ -67,7 +67,7 @@ interface AgentInputProps {
     alwaysShowContextSize?: boolean;
     onPreviewPress?: () => void;
     onFileViewerPress?: () => void;
-    agentType?: 'claude' | 'codex' | 'gemini';
+    agentType?: 'claude' | 'codex' | 'gemini' | 'droid';
     onAgentClick?: () => void;
     machineName?: string | null;
     onMachineClick?: () => void;
@@ -80,6 +80,7 @@ interface AgentInputProps {
     onProfileClick?: () => void;
     autoConfirmMode?: 'off' | 'confirm' | 'all';
     onAutoConfirmModeChange?: (mode: 'off' | 'confirm' | 'all') => void;
+    onSwitchAgent?: (agent: 'claude' | 'codex' | 'gemini' | 'droid') => void;
     // Image support
     attachedImages?: Array<{ uri: string; mediaType: string }>;
     onImagePaste?: (files: File[]) => void;
@@ -324,7 +325,9 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     const hasText = props.value.trim().length > 0;
     const hasImages = (props.attachedImages?.length ?? 0) > 0;
     const hasFiles = (props.attachedFiles?.length ?? 0) > 0;
+    const hasMdRefs = (props.selectedMdRefs?.length ?? 0) > 0;
     const hasContent = hasText || hasImages || hasFiles;
+    const hasSendableContent = hasContent || hasMdRefs;
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -448,6 +451,16 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
     // Settings modal state
     const [showSettings, setShowSettings] = React.useState(false);
+
+    // Agent switcher dropdown state
+    const [showAgentSwitcher, setShowAgentSwitcher] = React.useState(false);
+    const currentFlavor = props.metadata?.flavor || 'claude';
+    const allAgents: { key: 'claude' | 'codex' | 'gemini' | 'droid'; label: string }[] = React.useMemo(() => [
+        { key: 'claude', label: 'Claude Code' },
+        { key: 'droid', label: 'Droid' },
+        { key: 'codex', label: 'Codex' },
+        { key: 'gemini', label: 'Gemini' },
+    ], []);
 
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
@@ -771,6 +784,76 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                     </>
                 )}
 
+                {/* Agent switcher dropdown overlay */}
+                {showAgentSwitcher && props.onSwitchAgent && (
+                    <>
+                        <TouchableWithoutFeedback onPress={() => setShowAgentSwitcher(false)}>
+                            <View style={styles.overlayBackdrop} />
+                        </TouchableWithoutFeedback>
+                        <View style={[
+                            styles.settingsOverlay,
+                            { paddingHorizontal: screenWidth > 700 ? 0 : 8 }
+                        ]}>
+                            <FloatingOverlay maxHeight={300} keyboardShouldPersistTaps="always">
+                                <View style={styles.overlaySection}>
+                                    <Text style={styles.overlaySectionTitle}>
+                                        {t('session.switchAgentTitle')}
+                                    </Text>
+                                    {allAgents.map((agent) => {
+                                        const isSelected = currentFlavor === agent.key;
+                                        return (
+                                            <Pressable
+                                                key={agent.key}
+                                                onPress={() => {
+                                                    if (!isSelected) {
+                                                        hapticsLight();
+                                                        setShowAgentSwitcher(false);
+                                                        props.onSwitchAgent?.(agent.key);
+                                                    }
+                                                }}
+                                                style={({ pressed }) => ({
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    paddingHorizontal: 16,
+                                                    paddingVertical: 8,
+                                                    backgroundColor: pressed && !isSelected ? theme.colors.surfacePressed : 'transparent',
+                                                })}
+                                            >
+                                                <View style={{
+                                                    width: 16,
+                                                    height: 16,
+                                                    borderRadius: 8,
+                                                    borderWidth: 2,
+                                                    borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginRight: 12,
+                                                }}>
+                                                    {isSelected && (
+                                                        <View style={{
+                                                            width: 6,
+                                                            height: 6,
+                                                            borderRadius: 3,
+                                                            backgroundColor: theme.colors.radio.dot,
+                                                        }} />
+                                                    )}
+                                                </View>
+                                                <Text style={{
+                                                    fontSize: 14,
+                                                    color: isSelected ? theme.colors.radio.active : theme.colors.text,
+                                                    ...Typography.default(),
+                                                }}>
+                                                    {agent.label}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </FloatingOverlay>
+                        </View>
+                    </>
+                )}
+
                 {/* Connection status, context warning, and permission mode */}
                 {(props.connectionStatus || contextWarning || displayPermissionMode || props.modelMode) && (
                     <View style={{
@@ -908,6 +991,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     {props.modelMode.name}
                                 </Text>
                             )}
+                            
                         </View>
                     </View>
                 )}
@@ -1157,7 +1241,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* Agent selector button */}
+                                {/* Agent selector button (new session wizard) */}
                                 {props.agentType && props.onAgentClick && (
                                     <Pressable
                                         onPress={() => {
@@ -1188,8 +1272,52 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             fontWeight: '600',
                                             ...Typography.default('semiBold'),
                                         }}>
-                                            {props.agentType === 'claude' ? t('agentInput.agent.claude') : props.agentType === 'codex' ? t('agentInput.agent.codex') : t('agentInput.agent.gemini')}
+                                            {props.agentType === 'claude' ? t('agentInput.agent.claude') : props.agentType === 'codex' ? t('agentInput.agent.codex') : props.agentType === 'droid' ? 'Droid' : t('agentInput.agent.gemini')}
                                         </Text>
+                                    </Pressable>
+                                )}
+
+                                {/* Current agent indicator (existing session) */}
+                                {!props.agentType && props.metadata?.flavor && (
+                                    <Pressable
+                                        onPress={() => {
+                                            hapticsLight();
+                                            if (props.onSwitchAgent) {
+                                                setShowAgentSwitcher(prev => !prev);
+                                            }
+                                        }}
+                                        disabled={!props.onSwitchAgent}
+                                        hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                        style={(p) => ({
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            borderRadius: Platform.select({ default: 16, android: 20 }),
+                                            paddingHorizontal: 10,
+                                            paddingVertical: 6,
+                                            justifyContent: 'center',
+                                            height: 32,
+                                            opacity: p.pressed && props.onSwitchAgent ? 0.7 : 1,
+                                            gap: 6,
+                                        })}
+                                    >
+                                        <Octicons
+                                            name="cpu"
+                                            size={14}
+                                            color={theme.colors.button.secondary.tint}
+                                        />
+                                        <Text style={{
+                                            fontSize: 13,
+                                            color: theme.colors.button.secondary.tint,
+                                            fontWeight: '600',
+                                            ...Typography.default('semiBold'),
+                                        }}>
+                                            {props.metadata.flavor === 'droid' ? 'Droid' :
+                                             props.metadata.flavor === 'codex' ? 'Codex' :
+                                             props.metadata.flavor === 'gemini' ? 'Gemini' : 'Claude Code'}
+                                        </Text>
+                                        {props.onSwitchAgent && (
+                                            <Ionicons name="chevron-up" size={12} color={theme.colors.button.secondary.tint} />
+                                        )}
                                     </Pressable>
                                 )}
 

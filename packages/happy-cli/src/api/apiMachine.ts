@@ -73,8 +73,15 @@ export interface ReactivateSessionOptions {
     happySessionId: string;
     directory: string;
     claudeSessionId?: string;
-    agent?: 'claude' | 'codex' | 'gemini';
+    agent?: 'claude' | 'codex' | 'gemini' | 'droid';
     dataKey?: string; // base64-encoded data encryption key from the app
+}
+
+export interface SwitchSessionAgentOptions {
+    happySessionId: string;
+    directory: string;
+    newAgent: 'claude' | 'codex' | 'gemini' | 'droid';
+    dataKey?: string;
 }
 
 type MachineRpcHandlers = {
@@ -82,6 +89,7 @@ type MachineRpcHandlers = {
     stopSession: (sessionId: string) => boolean;
     requestShutdown: () => void;
     reactivateSession: (options: ReactivateSessionOptions) => Promise<SpawnSessionResult>;
+    switchSessionAgent: (options: SwitchSessionAgentOptions) => Promise<SpawnSessionResult>;
 }
 
 export class ApiMachineClient {
@@ -108,7 +116,8 @@ export class ApiMachineClient {
         spawnSession,
         stopSession,
         requestShutdown,
-        reactivateSession
+        reactivateSession,
+        switchSessionAgent
     }: MachineRpcHandlers) {
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
@@ -179,6 +188,33 @@ export class ApiMachineClient {
             switch (result.type) {
                 case 'success':
                     logger.debug(`[API MACHINE] Reactivated session ${result.sessionId}`);
+                    return { type: 'success', sessionId: result.sessionId };
+
+                case 'error':
+                    throw new Error(result.errorMessage);
+
+                default:
+                    return result;
+            }
+        });
+
+        // Register switch session agent handler
+        this.rpcHandlerManager.registerHandler('switch-session-agent', async (params: any) => {
+            const { happySessionId, directory, newAgent, dataKey } = params || {};
+            logger.debug(`[API MACHINE] Switching session agent with params: ${JSON.stringify(params)}`);
+
+            if (!happySessionId) {
+                throw new Error('Happy session ID is required');
+            }
+            if (!newAgent) {
+                throw new Error('New agent type is required');
+            }
+
+            const result = await switchSessionAgent({ happySessionId, directory, newAgent, dataKey });
+
+            switch (result.type) {
+                case 'success':
+                    logger.debug(`[API MACHINE] Switched session ${result.sessionId} to agent ${newAgent}`);
                     return { type: 'success', sessionId: result.sessionId };
 
                 case 'error':

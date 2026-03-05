@@ -69,7 +69,7 @@ const useProfileMap = (profiles: AIBackendProfile[]) => {
 
 // Environment variable transformation helper
 // Returns ALL profile environment variables - daemon will use them as-is
-const transformProfileToEnvironmentVars = (profile: AIBackendProfile, agentType: 'claude' | 'codex' | 'gemini' = 'claude') => {
+const transformProfileToEnvironmentVars = (profile: AIBackendProfile, agentType: 'claude' | 'codex' | 'gemini' | 'droid' = 'claude') => {
     // getProfileEnvironmentVariables already returns ALL env vars from profile
     // including custom environmentVariables array and provider-specific configs
     return getProfileEnvironmentVariables(profile);
@@ -320,7 +320,7 @@ function NewSessionWizard() {
         }
         return 'anthropic'; // Default to Anthropic
     });
-    const [agentType, setAgentType] = React.useState<'claude' | 'codex' | 'gemini'>(() => {
+    const [agentType, setAgentType] = React.useState<'claude' | 'codex' | 'gemini' | 'droid'>(() => {
         // Check if agent type was provided in temp data
         if (tempSessionData?.agentType) {
             // Only allow gemini if experiments are enabled
@@ -329,7 +329,7 @@ function NewSessionWizard() {
             }
             return tempSessionData.agentType;
         }
-        if (lastUsedAgent === 'claude' || lastUsedAgent === 'codex') {
+        if (lastUsedAgent === 'claude' || lastUsedAgent === 'codex' || lastUsedAgent === 'droid') {
             return lastUsedAgent;
         }
         // Only allow gemini if experiments are enabled
@@ -339,14 +339,30 @@ function NewSessionWizard() {
         return 'claude';
     });
 
-    // Agent cycling handler (for cycling through claude -> codex -> gemini)
+    // Ref to hold latest CLI availability for use in handleAgentClick
+    // (cliAvailability is declared later in the component, ref avoids ordering issues)
+    const cliAvailabilityRef = React.useRef<{ claude: boolean | null; codex: boolean | null; gemini: boolean | null; droid: boolean | null }>({ claude: null, codex: null, gemini: null, droid: null });
+
+    // Agent cycling handler - skips agents not installed on the machine
     // Note: Does NOT persist immediately - persistence is handled by useEffect below
     const handleAgentClick = React.useCallback(() => {
         setAgentType(prev => {
-            // Cycle: claude -> codex -> gemini (if experiments) -> claude
-            if (prev === 'claude') return 'codex';
-            if (prev === 'codex') return experimentsEnabled ? 'gemini' : 'claude';
-            return 'claude';
+            const cli = cliAvailabilityRef.current;
+            // Ordered list of all agents to cycle through
+            const allAgents: Array<'claude' | 'codex' | 'droid' | 'gemini'> = experimentsEnabled
+                ? ['claude', 'codex', 'droid', 'gemini']
+                : ['claude', 'codex', 'droid'];
+            const currentIndex = allAgents.indexOf(prev);
+            // Find next available agent (skip agents detected as unavailable)
+            for (let i = 1; i <= allAgents.length; i++) {
+                const candidate = allAgents[(currentIndex + i) % allAgents.length];
+                // Droid is always available (managed by happy-cli, not a standalone CLI)
+                // For others: allow if CLI not yet detected (null) or detected as installed (true)
+                if (candidate === 'droid' || cli[candidate] !== false) {
+                    return candidate;
+                }
+            }
+            return prev; // No available agent found, stay on current
         });
     }, [experimentsEnabled]);
 
@@ -536,6 +552,8 @@ function NewSessionWizard() {
 
     // CLI Detection - automatic, non-blocking detection of installed CLIs on selected machine
     const cliAvailability = useCLIDetection(selectedMachineId);
+    // Keep ref in sync for handleAgentClick (declared before cliAvailability)
+    cliAvailabilityRef.current = { claude: cliAvailability.claude, codex: cliAvailability.codex, gemini: cliAvailability.gemini, droid: cliAvailability.droid };
 
     // Project scanning - discover git projects on selected machine's filesystem
     // Pass machineBash as callback to avoid circular dependency (hook must not import ops.ts directly)
@@ -543,16 +561,20 @@ function NewSessionWizard() {
 
     // Auto-correct invalid agent selection after CLI detection completes
     // This handles the case where lastUsedAgent was 'codex' but codex is not installed
+    // Note: droid is managed by happy-cli itself, not a standalone CLI, so skip auto-correct for it
     React.useEffect(() => {
         // Only act when detection has completed (timestamp > 0)
         if (cliAvailability.timestamp === 0) return;
+
+        // Droid is always available (bundled with happy-cli), skip auto-correct
+        if (agentType === 'droid') return;
 
         // Check if currently selected agent is available
         const agentAvailable = cliAvailability[agentType];
 
         if (agentAvailable === false) {
             // Current agent not available - find first available
-            const availableAgent: 'claude' | 'codex' | 'gemini' =
+            const availableAgent: 'claude' | 'codex' | 'gemini' | 'droid' =
                 cliAvailability.claude === true ? 'claude' :
                 cliAvailability.codex === true ? 'codex' :
                 (cliAvailability.gemini === true && experimentsEnabled) ? 'gemini' :
@@ -561,7 +583,7 @@ function NewSessionWizard() {
             console.warn(`[AgentSelection] ${agentType} not available, switching to ${availableAgent}`);
             setAgentType(availableAgent);
         }
-    }, [cliAvailability.timestamp, cliAvailability.claude, cliAvailability.codex, cliAvailability.gemini, agentType, experimentsEnabled]);
+    }, [cliAvailability.timestamp, cliAvailability.claude, cliAvailability.codex, cliAvailability.gemini, cliAvailability.droid, agentType, experimentsEnabled]);
 
     // Extract all ${VAR} references from profiles to query daemon environment
     const envVarRefs = React.useMemo(() => {
@@ -577,7 +599,7 @@ function NewSessionWizard() {
     const { variables: daemonEnv } = useEnvironmentVariables(selectedMachineId, envVarRefs);
 
     // Temporary banner dismissal (X button) - resets when component unmounts or machine changes
-    const [hiddenBanners, setHiddenBanners] = React.useState<{ claude: boolean; codex: boolean; gemini: boolean }>({ claude: false, codex: false, gemini: false });
+    const [hiddenBanners, setHiddenBanners] = React.useState<{ claude: boolean; codex: boolean; gemini: boolean; droid: boolean }>({ claude: false, codex: false, gemini: false, droid: false });
 
     // Helper to check if CLI warning has been dismissed (checks both global and per-machine)
     const isWarningDismissed = React.useCallback((cli: 'claude' | 'codex' | 'gemini'): boolean => {
@@ -766,7 +788,7 @@ function NewSessionWizard() {
                 .map(([agent]) => agent);
 
             if (supportedCLIs.length === 1) {
-                const requiredAgent = supportedCLIs[0] as 'claude' | 'codex' | 'gemini';
+                const requiredAgent = supportedCLIs[0] as 'claude' | 'codex' | 'gemini' | 'droid';
                 // Check if this agent is available and allowed
                 const isAvailable = cliAvailability[requiredAgent] !== false;
                 const isAllowed = requiredAgent !== 'gemini' || experimentsEnabled;
@@ -793,7 +815,7 @@ function NewSessionWizard() {
                 }
             }
         }
-    }, [profileMap, cliAvailability.claude, cliAvailability.codex, cliAvailability.gemini, experimentsEnabled, availableModes, agentType]);
+    }, [profileMap, cliAvailability.claude, cliAvailability.codex, cliAvailability.gemini, cliAvailability.droid, experimentsEnabled, availableModes, agentType]);
 
     // Ensure permission mode is valid for current agent, falling back when needed.
     React.useEffect(() => {
@@ -856,8 +878,8 @@ function NewSessionWizard() {
     }, [scrollToSection]);
 
     const handleAgentInputAgentClick = React.useCallback(() => {
-        scrollToSection(profileSectionRef); // Agent tied to profile section
-    }, [scrollToSection]);
+        handleAgentClick();
+    }, [handleAgentClick]);
 
     const handleAddProfile = React.useCallback(() => {
         const newProfile: AIBackendProfile = {
@@ -1205,6 +1227,7 @@ function NewSessionWizard() {
             cliStatus: includeCLI ? {
                 claude: cliAvailability.claude,
                 codex: cliAvailability.codex,
+                droid: cliAvailability.droid,
                 ...(experimentsEnabled && { gemini: cliAvailability.gemini }),
             } : undefined,
         };
@@ -1385,6 +1408,14 @@ function NewSessionWizard() {
                                             </Text>
                                             <Text style={{ fontSize: 11, color: cliAvailability.codex ? theme.colors.success : theme.colors.textDestructive, ...Typography.default() }}>
                                                 codex
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <Text style={{ fontSize: 11, color: cliAvailability.droid ? theme.colors.success : theme.colors.textDestructive, ...Typography.default() }}>
+                                                {cliAvailability.droid ? '✓' : '✗'}
+                                            </Text>
+                                            <Text style={{ fontSize: 11, color: cliAvailability.droid ? theme.colors.success : theme.colors.textDestructive, ...Typography.default() }}>
+                                                droid
                                             </Text>
                                         </View>
                                         {experimentsEnabled && (

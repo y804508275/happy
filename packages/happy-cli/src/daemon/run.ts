@@ -36,7 +36,7 @@ export const initialMachineMetadata: MachineMetadata = {
 // Get environment variables for a profile, filtered for agent compatibility
 async function getProfileEnvironmentVariablesForAgent(
   profileId: string,
-  agentType: 'claude' | 'codex' | 'gemini'
+  agentType: 'claude' | 'codex' | 'gemini' | 'droid'
 ): Promise<Record<string, string>> {
   try {
     const settings = await readSettings();
@@ -48,7 +48,8 @@ async function getProfileEnvironmentVariablesForAgent(
     }
 
     // Check if profile is compatible with the agent
-    if (!validateProfileForAgent(profile, agentType)) {
+    const compatibilityAgent = agentType === 'droid' ? 'claude' : agentType;
+    if (!validateProfileForAgent(profile, compatibilityAgent)) {
       logger.debug(`[DAEMON RUN] Profile ${profileId} not compatible with agent ${agentType}`);
       return {};
     }
@@ -409,7 +410,7 @@ export async function startDaemon(): Promise<void> {
           // Construct command for the CLI
           const cliPath = join(projectPath(), 'dist', 'index.mjs');
           // Determine agent command - support claude, codex, and gemini
-          const agent = options.agent === 'gemini' ? 'gemini' : (options.agent === 'codex' ? 'codex' : 'claude');
+          const agent = options.agent === 'gemini' ? 'gemini' : (options.agent === 'codex' ? 'codex' : (options.agent === 'droid' ? 'droid' : 'claude'));
           const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon`;
 
           // Spawn in tmux with environment variables
@@ -505,6 +506,9 @@ export async function startDaemon(): Promise<void> {
               break;
             case 'gemini':
               agentCommand = 'gemini';
+              break;
+            case 'droid':
+              agentCommand = 'droid';
               break;
             default:
               return {
@@ -626,6 +630,26 @@ export async function startDaemon(): Promise<void> {
       }
     };
 
+    // Remove persistent session info file so daemon won't respawn it on restart
+    const cleanupSessionInfoFile = (sessionId: string) => {
+      const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+      const sessionInfoPath = join(sessionsDir, `${sessionId}.json`);
+      const restartFilePath = join(sessionsDir, `restart-${sessionId}.json`);
+      try {
+        if (existsSync(sessionInfoPath)) {
+          unlinkSync(sessionInfoPath);
+          logger.debug(`[DAEMON RUN] Cleaned up session info file for ${sessionId}`);
+        }
+      } catch (error) {
+        logger.debug(`[DAEMON RUN] Failed to clean up session info file for ${sessionId}:`, error);
+      }
+      try {
+        if (existsSync(restartFilePath)) {
+          unlinkSync(restartFilePath);
+        }
+      } catch {}
+    };
+
     // Stop a session by sessionId or PID fallback
     const stopSession = (sessionId: string): boolean => {
       logger.debug(`[DAEMON RUN] Attempting to stop session ${sessionId}`);
@@ -654,6 +678,10 @@ export async function startDaemon(): Promise<void> {
 
           pidToTrackedSession.delete(pid);
           persistSessions();
+          // Clean up session info file to prevent respawn on daemon restart
+          if (session.happySessionId) {
+            cleanupSessionInfoFile(session.happySessionId);
+          }
           logger.debug(`[DAEMON RUN] Removed session ${sessionId} from tracking`);
           return true;
         }
@@ -668,7 +696,7 @@ export async function startDaemon(): Promise<void> {
       happySessionId: string;
       directory: string;
       claudeSessionId?: string;
-      agent?: 'claude' | 'codex' | 'gemini';
+      agent?: 'claude' | 'codex' | 'gemini' | 'droid';
       dataKey?: string; // base64-encoded data encryption key from the app
     }): Promise<SpawnSessionResult> => {
       const { happySessionId, directory, claudeSessionId, agent, dataKey } = options;
@@ -757,6 +785,56 @@ export async function startDaemon(): Promise<void> {
           errorMessage: `Failed to reactivate session: ${error instanceof Error ? error.message : String(error)}`
         };
       }
+    };
+
+    // Switch agent type for an existing session (stop old process, spawn new one with different agent)
+    const switchSessionAgent = async (options: {
+      happySessionId: string;
+      directory: string;
+      newAgent: 'claude' | 'codex' | 'gemini' | 'droid';
+      dataKey?: string;
+    }): Promise<SpawnSessionResult> => {
+      const { happySessionId, directory, newAgent, dataKey } = options;
+      logger.debug(`[DAEMON RUN] Switching session ${happySessionId} to agent: ${newAgent}`);
+
+      // Stop existing process for this session
+      for (const [pid, session] of pidToTrackedSession) {
+        if (session.happySessionId === happySessionId) {
+          logger.debug(`[DAEMON RUN] Stopping existing process PID ${pid} for agent switch`);
+          stopSession(happySessionId);
+          break;
+        }
+      }
+
+      // Wait for the old process to die and socket to disconnect
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Update session info file with the new agent type
+      const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+      const sessionInfoPath = join(sessionsDir, `${happySessionId}.json`);
+      if (existsSync(sessionInfoPath)) {
+        try {
+          const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
+          sessionInfo.agent = newAgent;
+          // Clear claudeSessionId when switching away from Claude (new agent starts fresh)
+          if (newAgent !== 'claude') {
+            delete sessionInfo.claudeSessionId;
+          }
+          const { writeFileSync: writeSync } = await import('fs');
+          writeSync(sessionInfoPath, JSON.stringify(sessionInfo), { mode: 0o600 });
+          logger.debug(`[DAEMON RUN] Updated session info file with new agent: ${newAgent}`);
+        } catch (error) {
+          logger.debug(`[DAEMON RUN] Failed to update session info file:`, error);
+        }
+      }
+
+      // Reactivate with the new agent type (no claudeSessionId — new agent starts fresh context)
+      return reactivateSession({
+        happySessionId,
+        directory,
+        agent: newAgent,
+        dataKey,
+      });
     };
 
     // Track respawn attempts to prevent crash loops
@@ -985,7 +1063,8 @@ export async function startDaemon(): Promise<void> {
       spawnSession,
       stopSession,
       requestShutdown: () => requestShutdown('happy-app'),
-      reactivateSession
+      reactivateSession,
+      switchSessionAgent
     });
 
     // Connect to server

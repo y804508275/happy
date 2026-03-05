@@ -136,8 +136,10 @@ export const AIBackendProfileSchema = z.object({
 export type AIBackendProfile = z.infer<typeof AIBackendProfileSchema>;
 
 // Helper functions for profile validation and compatibility
-export function validateProfileForAgent(profile: AIBackendProfile, agent: 'claude' | 'codex' | 'gemini'): boolean {
-    return profile.compatibility[agent];
+export function validateProfileForAgent(profile: AIBackendProfile, agent: 'claude' | 'codex' | 'gemini' | 'droid'): boolean {
+    // Droid uses the same compatibility as claude (both support Anthropic models)
+    const compatKey = agent === 'droid' ? 'claude' : agent;
+    return profile.compatibility[compatKey];
 }
 
 /**

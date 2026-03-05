@@ -320,6 +320,12 @@ export const en: TranslationStructure = {
 
     session: {
         inputPlaceholder: 'Type a message ...',
+        switchAgent: 'Switch Agent',
+        switchAgentTitle: 'Switch Agent',
+        switchAgentDescription: 'Switch to a different AI agent for this session. Conversation history will be carried over.',
+        switchingAgent: 'Switching agent...',
+        switchAgentSuccess: ({ agent }: { agent: string }) => `Switched to ${agent}`,
+        switchAgentFailed: 'Failed to switch agent',
     },
 
     commandPalette: {

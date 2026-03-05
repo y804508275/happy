@@ -175,10 +175,12 @@ async function startLocal(): Promise<void> {
         env.HAPPY_STATIC_DIR = webAppDist;
     }
 
-    // Spawn standalone server
+    // Spawn standalone server (cwd = happy-server root for prisma migrations)
+    const serverCwd = resolve(serverEntry, '..', '..');
     const runtime = isBun() ? 'bun' : 'tsx';
     const serverProcess = spawn(runtime, [serverEntry, 'serve'], {
         env,
+        cwd: serverCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true,
     });
