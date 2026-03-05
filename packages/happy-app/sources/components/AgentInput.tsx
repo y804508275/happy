@@ -951,7 +951,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 )}
 
                 {/* Connection status, context warning, and permission mode */}
-                {(props.connectionStatus || contextWarning || props.modelMode || (props.autoConfirmMode && props.autoConfirmMode !== 'off')) && (
+                {(props.connectionStatus || contextWarning || (props.autoConfirmMode && props.autoConfirmMode !== 'off')) && (
                     <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -1071,15 +1071,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     {props.autoConfirmMode === 'confirm'
                                         ? t('agentInput.autoConfirm.descConfirm')
                                         : t('agentInput.autoConfirm.descAll')}
-                                </Text>
-                            )}
-                            {props.modelMode && (
-                                <Text style={{
-                                    fontSize: 11,
-                                    color: theme.colors.textSecondary,
-                                    ...Typography.default()
-                                }}>
-                                    {props.modelMode.name}
                                 </Text>
                             )}
 
