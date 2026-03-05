@@ -295,6 +295,9 @@ export async function droidRemote(opts: {
         }
 
         autoResumeCount = 0;
+
+        if (opts.signal?.aborted) return;
+
         opts.onReady();
 
         // Wait for next user message

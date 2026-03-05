@@ -102,6 +102,12 @@ export class ApiSessionClient extends EventEmitter {
         activeSubagents: new Set<string>(),
     };
     private lastSeq = 0;
+    private processedUserMessageSeqs = new Set<number>();
+
+    /** Get the latest message sequence number seen by this client */
+    getLastSeq(): number {
+        return this.lastSeq;
+    }
     private pendingOutbox: Array<{ content: string; localId: string }> = [];
     private readonly sendSync: InvalidateSync;
     private readonly receiveSync: InvalidateSync;
@@ -195,7 +201,7 @@ export class ApiSessionClient extends EventEmitter {
                     }
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(data.body.message.content.c));
                     logger.debugLargeJson('[SOCKET] [UPDATE] Received update:', body)
-                    this.routeIncomingMessage(body);
+                    this.routeIncomingMessage(body, messageSeq);
                     this.lastSeq = messageSeq;
                 } else if (data.body.t === 'update-session') {
                     if (data.body.metadata && data.body.metadata.version > this.metadataVersion) {
@@ -244,9 +250,16 @@ export class ApiSessionClient extends EventEmitter {
         };
     }
 
-    private routeIncomingMessage(message: unknown) {
+    private routeIncomingMessage(message: unknown, seq?: number) {
         const userResult = UserMessageSchema.safeParse(message);
         if (userResult.success) {
+            if (seq !== undefined) {
+                if (this.processedUserMessageSeqs.has(seq)) {
+                    logger.debug(`[API] Skipping duplicate user message at seq=${seq}`);
+                    return;
+                }
+                this.processedUserMessageSeqs.add(seq);
+            }
             if (this.pendingMessageCallback) {
                 this.pendingMessageCallback(userResult.data);
             } else {
@@ -286,7 +299,7 @@ export class ApiSessionClient extends EventEmitter {
 
                 try {
                     const body = decrypt(this.encryptionKey, this.encryptionVariant, decodeBase64(message.content.c));
-                    this.routeIncomingMessage(body);
+                    this.routeIncomingMessage(body, message.seq);
                 } catch (error) {
                     logger.debug('[API] Failed to decrypt fetched message', {
                         sessionId: this.sessionId,

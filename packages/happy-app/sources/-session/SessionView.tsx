@@ -3,6 +3,7 @@ import { AgentInput } from '@/components/AgentInput';
 import { FixedAskUserQuestionBar } from '@/components/tools/FixedAskUserQuestionBar';
 import { FixedOptionsBar } from '@/components/tools/FixedOptionsBar';
 import { InlineOptionsProvider } from '@/hooks/useInlineOptions';
+import { FixedMessageQueueBar } from '@/components/FixedMessageQueueBar';
 import { FixedPermissionBar } from '@/components/tools/FixedPermissionBar';
 import { MdReferenceSelector } from '@/components/MdReferenceSelector';
 import { useMdReferences } from '@/hooks/useMdReferences';
@@ -22,6 +23,7 @@ import { EmptyMessages } from '@/components/EmptyMessages';
 import { PreviewPanel } from '@/components/PreviewPanel';
 import { VoiceAssistantStatusBar } from '@/components/VoiceAssistantStatusBar';
 import { useDraft } from '@/hooks/useDraft';
+import { useMessageQueue } from '@/-session/useMessageQueue';
 import { Modal } from '@/modal';
 import { voiceHooks } from '@/realtime/hooks/voiceHooks';
 import { startRealtimeSession, stopRealtimeSession } from '@/realtime/RealtimeSession';
@@ -185,13 +187,18 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         uri: string;
         base64: string;
         mediaType: string;
+        loading?: boolean;
+        _loadingId?: number;
     }>>([]);
     const [attachedFiles, setAttachedFiles] = React.useState<Array<{
         name: string;
         content: string;
         mediaType: string;
         kind: 'text' | 'pdf';
+        loading?: boolean;
+        _loadingId?: number;
     }>>([]);
+    const loadingIdRef = React.useRef(0);
     const realtimeStatus = useRealtimeStatus();
     const { messages, isLoaded } = useSessionMessages(sessionId);
     const acknowledgedCliVersions = useLocalSetting('acknowledgedCliVersions');
@@ -227,6 +234,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         ])
     ), [availableModels, session.modelMode, session.metadata?.currentModelCode, flavor]);
     const sessionStatus = useSessionStatus(session);
+    const { queue: messageQueue, enqueue: enqueueMessage, removeFromQueue: removeQueuedMessage } = useMessageQueue(sessionId, sessionStatus.state);
     const sessionUsage = useSessionUsage(sessionId);
     const alwaysShowContextSize = useSetting('alwaysShowContextSize');
     const experiments = useSetting('experiments');
@@ -244,15 +252,27 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const handleImagePaste = React.useCallback(async (files: File[]) => {
         const { processImageFile } = await import('@/utils/imageProcessor');
         for (const file of files) {
+            const loadingId = ++loadingIdRef.current;
+            // Add loading placeholder immediately
+            setAttachedImages(prev => [...prev, {
+                uri: '',
+                base64: '',
+                mediaType: file.type || 'image/jpeg',
+                loading: true,
+                _loadingId: loadingId,
+            }]);
             try {
                 const processed = await processImageFile(file);
-                setAttachedImages(prev => [...prev, {
-                    uri: processed.uri,
-                    base64: processed.base64,
-                    mediaType: processed.mediaType,
-                }]);
+                // Replace placeholder with processed result
+                setAttachedImages(prev => prev.map(img =>
+                    img._loadingId === loadingId
+                        ? { uri: processed.uri, base64: processed.base64, mediaType: processed.mediaType }
+                        : img
+                ));
             } catch (e) {
                 console.error('Failed to process pasted image:', e);
+                // Remove placeholder on error
+                setAttachedImages(prev => prev.filter(img => img._loadingId !== loadingId));
             }
         }
     }, []);
@@ -262,11 +282,28 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         const { processFile, isSupportedFile } = await import('@/utils/fileProcessor');
         for (const file of files) {
             if (!isSupportedFile(file)) continue;
+            const loadingId = ++loadingIdRef.current;
+            // Add loading placeholder immediately with file name
+            setAttachedFiles(prev => [...prev, {
+                name: file.name,
+                content: '',
+                mediaType: file.type || 'application/octet-stream',
+                kind: 'text' as const,
+                loading: true,
+                _loadingId: loadingId,
+            }]);
             try {
                 const processed = await processFile(file);
-                setAttachedFiles(prev => [...prev, processed]);
+                // Replace placeholder with processed result
+                setAttachedFiles(prev => prev.map(f =>
+                    f._loadingId === loadingId
+                        ? { name: processed.name, content: processed.content, mediaType: processed.mediaType, kind: processed.kind }
+                        : f
+                ));
             } catch (e) {
                 console.error('Failed to process file:', e);
+                // Remove placeholder on error
+                setAttachedFiles(prev => prev.filter(f => f._loadingId !== loadingId));
             }
         }
     }, []);
@@ -407,6 +444,26 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         }
     }, [sessionId, agentLabels, sessionStatus.state, handleAutoConfirmModeChange]);
 
+    // Handle queueing a message while AI is thinking
+    const handleQueueMessage = React.useCallback(async () => {
+        const mdRefContents = await mdRefs.getSelectedContents();
+        const readyImages = attachedImages.filter(img => !img.loading);
+        const readyFiles = attachedFiles.filter(f => !f.loading);
+        if (message.trim() || readyImages.length > 0 || readyFiles.length > 0 || mdRefContents.length > 0) {
+            enqueueMessage({
+                text: message,
+                images: [...readyImages],
+                files: [...readyFiles],
+                mdRefs: mdRefContents,
+            });
+            setMessage('');
+            setAttachedImages([]);
+            setAttachedFiles([]);
+            mdRefs.clearSelection();
+            clearDraft();
+        }
+    }, [message, attachedImages, attachedFiles, mdRefs, enqueueMessage, clearDraft]);
+
     // Memoize header-dependent styles to prevent re-renders
     const headerDependentStyles = React.useMemo(() => ({
         contentContainer: {
@@ -489,6 +546,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         <FixedOptionsBar sessionId={sessionId} metadata={session.metadata} autoConfirmMode={autoConfirmMode} />
         <FixedAskUserQuestionBar sessionId={sessionId} metadata={session.metadata} isConnected={session.presence === 'online'} autoConfirmMode={autoConfirmMode} />
         <FixedPermissionBar sessionId={sessionId} metadata={session.metadata} isConnected={session.presence === 'online'} autoConfirmMode={autoConfirmMode} />
+        <FixedMessageQueueBar queue={messageQueue} onRemove={removeQueuedMessage} />
         <AgentInput
             placeholder={t('session.inputPlaceholder')}
             value={message}
@@ -509,11 +567,13 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             }}
             onSend={async () => {
                 const mdRefContents = await mdRefs.getSelectedContents();
-                if (message.trim() || attachedImages.length > 0 || attachedFiles.length > 0 || mdRefContents.length > 0) {
-                    const images = attachedImages.length > 0
-                        ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
+                const readyImages = attachedImages.filter(img => !img.loading);
+                const readyFiles = attachedFiles.filter(f => !f.loading);
+                if (message.trim() || readyImages.length > 0 || readyFiles.length > 0 || mdRefContents.length > 0) {
+                    const images = readyImages.length > 0
+                        ? readyImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
-                    const files = attachedFiles.length > 0 ? attachedFiles : undefined;
+                    const files = readyFiles.length > 0 ? readyFiles : undefined;
                     setMessage('');
                     setAttachedImages([]);
                     setAttachedFiles([]);
@@ -527,6 +587,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             isMicActive={micButtonState.isMicActive}
             onAbort={() => sessionAbort(sessionId)}
             showAbortButton={sessionStatus.state === 'thinking'}
+            onQueueMessage={sessionStatus.state === 'thinking' ? handleQueueMessage : undefined}
+            queueSize={messageQueue.length}
             attachedImages={attachedImages}
             onImagePaste={Platform.OS === 'web' ? handleImagePaste : undefined}
             onAttachmentPick={Platform.OS === 'web' ? handleAttachmentPick : undefined}

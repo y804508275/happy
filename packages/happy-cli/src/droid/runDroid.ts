@@ -77,7 +77,7 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
             logger.debug(`[DROID-RESTART] Reconnecting to existing session ${restartData.sessionId}`);
             response = {
                 id: restartData.sessionId,
-                seq: 0,
+                seq: restartData.seq || 0,
                 encryptionKey: decodeBase64(restartData.encryptionKey),
                 encryptionVariant: restartData.encryptionVariant,
                 metadata,
@@ -233,6 +233,19 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
     let currentDroidSession: DroidSession | null = null;
     const cleanup = async () => {
         logger.debug('[DROID-START] Cleaning up...');
+
+        // Write lastSeq to session info file so daemon can use it for restart/agent-switch
+        try {
+            if (existsSync(sessionInfoFilePath)) {
+                const existing = JSON.parse(readFileSync(sessionInfoFilePath, 'utf-8'));
+                existing.lastSeq = session.getLastSeq();
+                writeFileSync(sessionInfoFilePath, JSON.stringify(existing), { mode: 0o600 });
+                logger.debug(`[DROID-START] Wrote lastSeq=${existing.lastSeq} to session info file`);
+            }
+        } catch (err) {
+            logger.debug('[DROID-START] Failed to write lastSeq to session info file:', err);
+        }
+
         try {
             if (session) {
                 session.updateMetadata((currentMetadata) => ({

@@ -517,6 +517,10 @@ export const pl: TranslationStructure = {
             descConfirm: 'Odczyt i wyszukiwanie automatyczne, edycja wymaga zatwierdzenia',
             descAll: 'Wszystko automatycznie, w tym edycja plików',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} wiadomości w kolejce`,
+            hint: 'wyślą się po zakończeniu AI',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `Pozostało ${percent}%`,
         },

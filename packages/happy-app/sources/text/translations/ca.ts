@@ -507,6 +507,10 @@ export const ca: TranslationStructure = {
             descConfirm: 'Lectura i cerca automàtiques, edicions necessiten aprovació',
             descAll: 'Tot automàtic, incloent edició de fitxers',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} missatge${count !== 1 ? 's' : ''} en cua`,
+            hint: 's\'enviarà quan la IA acabi',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restant`,
         },

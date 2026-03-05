@@ -437,9 +437,10 @@ function NewSessionWizard() {
     const [showAdvanced, setShowAdvanced] = React.useState(false);
 
     // Image attachment state (web only)
-    const [attachedImages, setAttachedImages] = React.useState<Array<{ uri: string; base64: string; mediaType: string }>>([]);
+    const [attachedImages, setAttachedImages] = React.useState<Array<{ uri: string; base64: string; mediaType: string; loading?: boolean; _loadingId?: number }>>([]);
     // File attachment state (web only)
-    const [attachedFiles, setAttachedFiles] = React.useState<Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf' }>>([]);
+    const [attachedFiles, setAttachedFiles] = React.useState<Array<{ name: string; content: string; mediaType: string; kind: 'text' | 'pdf'; loading?: boolean; _loadingId?: number }>>([]);
+    const loadingIdRef = React.useRef(0);
 
     // MD References
     const { credentials } = useAuth();
@@ -449,15 +450,27 @@ function NewSessionWizard() {
     const handleImagePaste = React.useCallback(async (files: File[]) => {
         const { processImageFile } = await import('@/utils/imageProcessor');
         for (const file of files) {
+            const loadingId = ++loadingIdRef.current;
+            // Add loading placeholder immediately
+            setAttachedImages(prev => [...prev, {
+                uri: '',
+                base64: '',
+                mediaType: file.type || 'image/jpeg',
+                loading: true,
+                _loadingId: loadingId,
+            }]);
             try {
                 const processed = await processImageFile(file);
-                setAttachedImages(prev => [...prev, {
-                    uri: processed.uri,
-                    base64: processed.base64,
-                    mediaType: processed.mediaType,
-                }]);
+                // Replace placeholder with processed result
+                setAttachedImages(prev => prev.map(img =>
+                    img._loadingId === loadingId
+                        ? { uri: processed.uri, base64: processed.base64, mediaType: processed.mediaType }
+                        : img
+                ));
             } catch (e) {
                 console.error('Failed to process image:', e);
+                // Remove placeholder on error
+                setAttachedImages(prev => prev.filter(img => img._loadingId !== loadingId));
             }
         }
     }, []);
@@ -466,11 +479,28 @@ function NewSessionWizard() {
         const { processFile, isSupportedFile } = await import('@/utils/fileProcessor');
         for (const file of files) {
             if (!isSupportedFile(file)) continue;
+            const loadingId = ++loadingIdRef.current;
+            // Add loading placeholder immediately with file name
+            setAttachedFiles(prev => [...prev, {
+                name: file.name,
+                content: '',
+                mediaType: file.type || 'application/octet-stream',
+                kind: 'text' as const,
+                loading: true,
+                _loadingId: loadingId,
+            }]);
             try {
                 const processed = await processFile(file);
-                setAttachedFiles(prev => [...prev, processed]);
+                // Replace placeholder with processed result
+                setAttachedFiles(prev => prev.map(f =>
+                    f._loadingId === loadingId
+                        ? { name: processed.name, content: processed.content, mediaType: processed.mediaType, kind: processed.kind }
+                        : f
+                ));
             } catch (e) {
                 console.error('Failed to process file:', e);
+                // Remove placeholder on error
+                setAttachedFiles(prev => prev.filter(f => f._loadingId !== loadingId));
             }
         }
     }, []);
@@ -881,6 +911,10 @@ function NewSessionWizard() {
         handleAgentClick();
     }, [handleAgentClick]);
 
+    const handleAgentInputSwitchAgent = React.useCallback((agent: 'claude' | 'codex' | 'gemini' | 'droid') => {
+        setAgentType(agent);
+    }, []);
+
     const handleAddProfile = React.useCallback(() => {
         const newProfile: AIBackendProfile = {
             id: randomUUID(),
@@ -1171,11 +1205,13 @@ function NewSessionWizard() {
                 // (e.g. encryption error with image data) doesn't prevent
                 // navigation to the already-created session
                 const mdRefContents = await mdRefs.getSelectedContents();
-                if (sessionPrompt.trim() || attachedImages.length > 0 || attachedFiles.length > 0 || mdRefContents.length > 0) {
-                    const images = attachedImages.length > 0
-                        ? attachedImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
+                const readyImages = attachedImages.filter(img => !img.loading);
+                const readyFiles = attachedFiles.filter(f => !f.loading);
+                if (sessionPrompt.trim() || readyImages.length > 0 || readyFiles.length > 0 || mdRefContents.length > 0) {
+                    const images = readyImages.length > 0
+                        ? readyImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }))
                         : undefined;
-                    const files = attachedFiles.length > 0 ? attachedFiles : undefined;
+                    const files = readyFiles.length > 0 ? readyFiles : undefined;
                     try {
                         await sync.sendMessage(result.sessionId, sessionPrompt, undefined, images, mdRefContents.length > 0 ? mdRefContents : undefined, files);
                     } catch (sendError) {
@@ -1295,7 +1331,8 @@ function NewSessionWizard() {
                                 autocompletePrefixes={[]}
                                 autocompleteSuggestions={async () => []}
                                 agentType={agentType}
-                                onAgentClick={handleAgentClick}
+                                onSwitchAgent={handleAgentInputSwitchAgent}
+                                agentAvailability={cliAvailability}
                                 permissionMode={permissionMode}
                                 availableModes={availableModes}
                                 onPermissionModeChange={handlePermissionModeChange}
@@ -2098,7 +2135,8 @@ function NewSessionWizard() {
                             autocompletePrefixes={[]}
                             autocompleteSuggestions={async () => []}
                             agentType={agentType}
-                            onAgentClick={handleAgentInputAgentClick}
+                            onSwitchAgent={handleAgentInputSwitchAgent}
+                            agentAvailability={cliAvailability}
                             permissionMode={permissionMode}
                             availableModes={availableModes}
                             onPermissionModeChange={handleAgentInputPermissionChange}

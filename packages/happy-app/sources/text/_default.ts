@@ -507,6 +507,10 @@ export const en = {
             descConfirm: 'Auto read & search, edits need approval',
             descAll: 'Auto-run everything, including file edits',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} queued message${count !== 1 ? 's' : ''}`,
+            hint: 'will send when AI finishes',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% left`,
         },

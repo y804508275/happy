@@ -539,6 +539,10 @@ export const ja: TranslationStructure = {
             descConfirm: '読取・検索は自動、編集は確認が必要',
             descAll: 'ファイル編集を含むすべてを自動実行',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} 件のキューメッセージ`,
+            hint: 'AI完了後に自動送信',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `残り ${percent}%`,
         },

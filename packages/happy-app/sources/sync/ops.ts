@@ -579,6 +579,49 @@ export async function sessionKill(sessionId: string): Promise<SessionKillRespons
     }
 }
 
+/**
+ * Archive a session: kill the process AND mark it as archived on the server.
+ * Archived sessions cannot be reactivated by daemon keepalives.
+ */
+export async function sessionArchive(sessionId: string): Promise<{ success: boolean; message?: string }> {
+    // Kill the process first (best-effort)
+    try {
+        await Promise.race([
+            sessionKill(sessionId),
+            new Promise<void>((_, reject) => setTimeout(() => reject(new Error('kill timeout')), 3000))
+        ]);
+    } catch {
+        // Ignore - session might already be offline
+    }
+
+    // Mark as archived on the server so it won't be reactivated
+    try {
+        const response = await apiSocket.request(`/v1/sessions/${sessionId}/archive`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Optimistic update: mark session as inactive locally
+            const session = storage.getState().sessions[sessionId];
+            if (session) {
+                storage.getState().applySessions([{ ...session, active: false }]);
+            }
+            return { success: true };
+        } else {
+            const error = await response.text();
+            return {
+                success: false,
+                message: error || 'Failed to archive session'
+            };
+        }
+    } catch (error) {
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error'
+        };
+    }
+}
+
 interface SessionRestartResponse {
     success: boolean;
     message: string;

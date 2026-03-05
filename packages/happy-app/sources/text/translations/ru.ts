@@ -517,6 +517,10 @@ export const ru: TranslationStructure = {
             descConfirm: 'Чтение и поиск автоматически, правки требуют подтверждения',
             descAll: 'Всё автоматически, включая редактирование файлов',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} сообщ. в очереди`,
+            hint: 'отправится после завершения ИИ',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `Осталось ${percent}%`,
         },

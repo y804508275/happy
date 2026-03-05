@@ -12,7 +12,7 @@ import { StatusDot } from './StatusDot';
 import { useAllMachines, useSetting } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { isMachineOnline } from '@/utils/machineUtils';
-import { machineSpawnNewSession, sessionKill, sessionDelete } from '@/sync/ops';
+import { machineSpawnNewSession, sessionArchive, sessionDelete } from '@/sync/ops';
 import { resolveAbsolutePath } from '@/utils/pathUtils';
 import { storage } from '@/sync/storage';
 import { Modal } from '@/modal';
@@ -306,7 +306,7 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
     const { ref: contextMenuRef, contextMenu, close: closeContextMenu } = useWebContextMenu();
 
     const [archivingSession, performArchive] = useHappyAction(async () => {
-        const result = await sessionKill(session.id);
+        const result = await sessionArchive(session.id);
         if (!result.success) {
             throw new HappyError(result.message || t('sessionInfo.failedToArchiveSession'), false);
         }

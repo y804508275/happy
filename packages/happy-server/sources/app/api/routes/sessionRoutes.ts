@@ -1,4 +1,5 @@
-import { eventRouter, buildNewSessionUpdate } from "@/app/events/eventRouter";
+import { eventRouter, buildNewSessionUpdate, buildSessionActivityEphemeral } from "@/app/events/eventRouter";
+import { activityCache } from "@/app/presence/sessionCache";
 import { type Fastify } from "../types";
 import { db } from "@/storage/db";
 import { z } from "zod";
@@ -352,6 +353,41 @@ export function sessionRoutes(app: Fastify) {
                 updatedAt: v.updatedAt.getTime()
             }))
         });
+    });
+
+    // Archive session (prevents reactivation by daemon keepalives)
+    app.post('/v1/sessions/:sessionId/archive', {
+        schema: {
+            params: z.object({
+                sessionId: z.string()
+            })
+        },
+        preHandler: app.authenticate
+    }, async (request, reply) => {
+        const userId = request.userId;
+        const { sessionId } = request.params;
+
+        const result = await db.session.updateMany({
+            where: { id: sessionId, accountId: userId },
+            data: { archived: true, active: false }
+        });
+
+        if (result.count === 0) {
+            return reply.code(404).send({ error: 'Session not found or not owned by user' });
+        }
+
+        // Invalidate cache so session-alive won't reactivate it
+        activityCache.invalidateSession(sessionId);
+
+        // Broadcast offline status
+        const now = Date.now();
+        eventRouter.emitEphemeral({
+            userId,
+            payload: buildSessionActivityEphemeral(sessionId, false, now, false),
+            recipientFilter: { type: 'user-scoped-only' }
+        });
+
+        return reply.send({ success: true });
     });
 
     // Delete session

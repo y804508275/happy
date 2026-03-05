@@ -509,6 +509,10 @@ export const zhHans: TranslationStructure = {
             descConfirm: '自动读取和搜索，编辑需确认',
             descAll: '自动执行所有操作，包括编辑文件',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} 条排队消息`,
+            hint: 'AI 完成后自动发送',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `剩余 ${percent}%`,
         },

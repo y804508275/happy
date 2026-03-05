@@ -717,27 +717,50 @@ class Sync {
             this.pendingAgentSwitchHistory.set(sessionId, summary);
         }
 
-        const machineId = session.metadata.machineId;
+        const originalMachineId = session.metadata.machineId;
         const dataKey = this.encryption.getSessionDataKey(sessionId);
         let dataKeyBase64: string | undefined;
         if (dataKey) {
             dataKeyBase64 = encodeBase64(dataKey, 'base64');
         }
 
-        try {
-            const result = await apiSocket.machineRPC(machineId, 'switch-session-agent', {
-                happySessionId: sessionId,
-                directory: session.metadata.path,
-                newAgent,
-                dataKey: dataKeyBase64,
-            });
-            log.log(`Session agent switch succeeded: ${JSON.stringify(result)}`);
-            return { success: true };
-        } catch (error) {
-            log.log(`Session agent switch failed: ${error}`);
-            this.pendingAgentSwitchHistory.delete(sessionId);
-            return { success: false, error: error instanceof Error ? error.message : 'Failed to switch agent' };
+        // Build ordered list of machine IDs to try (same pattern as reactivateSession)
+        const allMachines = Object.values(storage.getState().machines);
+        const originalIsActive = allMachines.some(m => m.id === originalMachineId && m.active);
+        const machineIdsToTry: string[] = [];
+        if (originalIsActive) {
+            machineIdsToTry.push(originalMachineId);
         }
+        for (const machine of allMachines) {
+            if (machine.id !== originalMachineId && machine.active) {
+                machineIdsToTry.push(machine.id);
+            }
+        }
+        if (machineIdsToTry.length === 0) {
+            machineIdsToTry.push(originalMachineId);
+        }
+
+        const params = {
+            happySessionId: sessionId,
+            directory: session.metadata.path,
+            newAgent,
+            dataKey: dataKeyBase64,
+        };
+
+        log.log(`Session agent switch: trying machines [${machineIdsToTry.join(', ')}] for session ${sessionId}`);
+
+        for (const machineId of machineIdsToTry) {
+            try {
+                const result = await apiSocket.machineRPC(machineId, 'switch-session-agent', params);
+                log.log(`Session agent switch succeeded on machine ${machineId}: ${JSON.stringify(result)}`);
+                return { success: true };
+            } catch (error) {
+                log.log(`Session agent switch failed on machine ${machineId}: ${error}`);
+            }
+        }
+
+        this.pendingAgentSwitchHistory.delete(sessionId);
+        return { success: false, error: 'Failed to switch agent on all available machines' };
     }
 
     private buildConversationSummary(sessionId: string): string | null {

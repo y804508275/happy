@@ -508,6 +508,10 @@ export const zhHant: TranslationStructure = {
             descConfirm: '自動讀取和搜尋，編輯需確認',
             descAll: '自動執行所有操作，包括編輯檔案',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} 條排隊訊息`,
+            hint: 'AI 完成後自動傳送',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `剩餘 ${percent}%`,
         },

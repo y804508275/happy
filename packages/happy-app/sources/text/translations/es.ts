@@ -507,6 +507,10 @@ export const es: TranslationStructure = {
             descConfirm: 'Lectura y búsqueda automáticas, ediciones necesitan aprobación',
             descAll: 'Todo automático, incluyendo edición de archivos',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} mensaje${count !== 1 ? 's' : ''} en cola`,
+            hint: 'se enviará cuando la IA termine',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
         },

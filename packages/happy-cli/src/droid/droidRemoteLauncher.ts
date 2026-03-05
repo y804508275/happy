@@ -62,6 +62,7 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
 
     async function doAbort() {
         logger.debug('[droid-remote]: doAbort');
+        session.queue.reset();
         await abort();
     }
 

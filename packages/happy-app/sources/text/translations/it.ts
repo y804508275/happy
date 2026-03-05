@@ -536,6 +536,10 @@ export const it: TranslationStructure = {
             descConfirm: 'Lettura e ricerca automatiche, modifiche richiedono approvazione',
             descAll: 'Tutto automatico, inclusa la modifica dei file',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} messaggio${count !== 1 ? 'i' : ''} in coda`,
+            hint: 'verrà inviato al termine dell\'IA',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
         },

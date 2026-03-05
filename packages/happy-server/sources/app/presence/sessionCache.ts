@@ -58,13 +58,13 @@ class ActivityCache {
         
         sessionCacheCounter.inc({ operation: 'session_validation', result: 'miss' });
         
-        // Cache miss - check database
+        // Cache miss - check database (archived sessions are invalid)
         try {
             const session = await db.session.findUnique({
                 where: { id: sessionId, accountId: userId }
             });
             
-            if (session) {
+            if (session && !session.archived) {
                 // Cache the result
                 this.sessionCache.set(sessionId, {
                     validUntil: now + this.CACHE_TTL,
@@ -183,12 +183,12 @@ class ActivityCache {
             }
         }
         
-        // Batch update sessions
+        // Batch update sessions (skip archived sessions)
         if (sessionUpdates.length > 0) {
             try {
                 await Promise.all(sessionUpdates.map(update =>
-                    db.session.update({
-                        where: { id: update.id },
+                    db.session.updateMany({
+                        where: { id: update.id, archived: false },
                         data: { lastActiveAt: new Date(update.timestamp), active: true }
                     })
                 ));
@@ -219,6 +219,10 @@ class ActivityCache {
                 log({ module: 'session-cache', level: 'error' }, `Error updating machines: ${error}`);
             }
         }
+    }
+
+    invalidateSession(sessionId: string): void {
+        this.sessionCache.delete(sessionId);
     }
 
     // Cleanup old cache entries periodically

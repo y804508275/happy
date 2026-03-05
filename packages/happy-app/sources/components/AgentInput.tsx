@@ -83,13 +83,16 @@ interface AgentInputProps {
     onSwitchAgent?: (agent: 'claude' | 'codex' | 'gemini' | 'droid') => void;
     isSwitchingAgent?: boolean;
     agentAvailability?: { claude: boolean | null; codex: boolean | null; gemini: boolean | null; droid: boolean | null };
+    // Message queue (send while AI is thinking)
+    onQueueMessage?: () => void;
+    queueSize?: number;
     // Image support
-    attachedImages?: Array<{ uri: string; mediaType: string }>;
+    attachedImages?: Array<{ uri: string; mediaType: string; loading?: boolean }>;
     onImagePaste?: (files: File[]) => void;
     onImagePick?: () => void;
     onRemoveImage?: (index: number) => void;
     // File support
-    attachedFiles?: Array<{ name: string; mediaType: string }>;
+    attachedFiles?: Array<{ name: string; mediaType: string; loading?: boolean }>;
     onFilePaste?: (files: File[]) => void;
     onAttachmentPick?: () => void;
     onRemoveFile?: (index: number) => void;
@@ -328,8 +331,9 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     const hasImages = (props.attachedImages?.length ?? 0) > 0;
     const hasFiles = (props.attachedFiles?.length ?? 0) > 0;
     const hasMdRefs = (props.selectedMdRefs?.length ?? 0) > 0;
+    const isUploading = (props.attachedImages?.some(img => img.loading) || props.attachedFiles?.some(f => f.loading)) ?? false;
     const hasContent = hasText || hasImages || hasFiles;
-    const hasSendableContent = hasContent || hasMdRefs;
+    const hasSendableContent = (hasContent || hasMdRefs) && !isUploading;
 
     // Check if this is a Codex or Gemini session
     // Use metadata.flavor for existing sessions, agentType prop for new sessions
@@ -459,7 +463,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
     // Agent switcher dropdown state
     const [showAgentSwitcher, setShowAgentSwitcher] = React.useState(false);
-    const currentFlavor = props.metadata?.flavor || 'claude';
+    const currentFlavor = props.agentType || props.metadata?.flavor || 'claude';
     const allAgents: { key: 'claude' | 'codex' | 'gemini' | 'droid'; label: string; icon: any; tintable?: boolean }[] = React.useMemo(() => [
         { key: 'claude', label: 'Claude Code', icon: require('@/assets/images/icon-claude.png') },
         { key: 'droid', label: 'Droid', icon: require('@/assets/images/icon-factory.png') },
@@ -555,7 +559,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                     }
                     return true; // Key was handled
                 }
-                // Block Enter send while agent is working
+                // Queue message while agent is working (if queue handler provided)
+                if (props.showAbortButton && props.onQueueMessage && hasSendableContent) {
+                    props.onQueueMessage();
+                    return true;
+                }
+                // Block Enter send while agent is working (no queue handler)
                 if (props.showAbortButton) {
                     return true; // Consume the key, don't send
                 }
@@ -575,7 +584,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         }
         return false; // Key was not handled
-    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState, hasSendableContent]);
+    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, props.onQueueMessage, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState, hasSendableContent]);
 
 
 
@@ -1175,26 +1184,41 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                         <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingTop: 10, gap: 8, flexWrap: 'wrap' }}>
                             {props.attachedImages.map((img, index) => (
                                 <View key={index} style={{ position: 'relative' }}>
-                                    <RNImage
-                                        source={{ uri: img.uri }}
-                                        style={{ width: 72, height: 72, borderRadius: 8 }}
-                                    />
-                                    <Pressable
-                                        onPress={() => props.onRemoveImage?.(index)}
-                                        style={{
-                                            position: 'absolute',
-                                            top: -6,
-                                            right: -6,
-                                            backgroundColor: theme.colors.button.secondary.tint,
-                                            borderRadius: 10,
-                                            width: 20,
-                                            height: 20,
+                                    {img.loading ? (
+                                        <View style={{
+                                            width: 72,
+                                            height: 72,
+                                            borderRadius: 8,
+                                            backgroundColor: theme.colors.surfacePressed,
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                        }}
-                                    >
-                                        <Ionicons name="close" size={12} color={theme.colors.input.background} />
-                                    </Pressable>
+                                        }}>
+                                            <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <RNImage
+                                                source={{ uri: img.uri }}
+                                                style={{ width: 72, height: 72, borderRadius: 8 }}
+                                            />
+                                            <Pressable
+                                                onPress={() => props.onRemoveImage?.(index)}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: -6,
+                                                    right: -6,
+                                                    backgroundColor: theme.colors.button.secondary.tint,
+                                                    borderRadius: 10,
+                                                    width: 20,
+                                                    height: 20,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                }}
+                                            >
+                                                <Ionicons name="close" size={12} color={theme.colors.input.background} />
+                                            </Pressable>
+                                        </>
+                                    )}
                                 </View>
                             ))}
                         </View>
@@ -1215,25 +1239,31 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     borderWidth: 1,
                                     borderColor: theme.colors.divider,
                                 }}>
-                                    <Ionicons
-                                        name={file.mediaType === 'application/pdf' ? 'document-text-outline' : 'document-outline'}
-                                        size={14}
-                                        color={theme.colors.textSecondary}
-                                    />
+                                    {file.loading ? (
+                                        <ActivityIndicator size={14} color={theme.colors.textSecondary} />
+                                    ) : (
+                                        <Ionicons
+                                            name={file.mediaType === 'application/pdf' ? 'document-text-outline' : 'document-outline'}
+                                            size={14}
+                                            color={theme.colors.textSecondary}
+                                        />
+                                    )}
                                     <Text style={{
                                         fontSize: 12,
-                                        color: theme.colors.text,
+                                        color: file.loading ? theme.colors.textSecondary : theme.colors.text,
                                         maxWidth: 150,
                                         ...Typography.default(),
                                     }} numberOfLines={1}>
                                         {file.name}
                                     </Text>
-                                    <Pressable
-                                        onPress={() => props.onRemoveFile?.(index)}
-                                        hitSlop={4}
-                                    >
-                                        <Ionicons name="close-circle" size={14} color={theme.colors.textSecondary} />
-                                    </Pressable>
+                                    {!file.loading && (
+                                        <Pressable
+                                            onPress={() => props.onRemoveFile?.(index)}
+                                            hitSlop={4}
+                                        >
+                                            <Ionicons name="close-circle" size={14} color={theme.colors.textSecondary} />
+                                        </Pressable>
+                                    )}
                                 </View>
                             ))}
                         </View>
@@ -1302,11 +1332,13 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                 )}
 
                                 {/* Agent selector button (new session wizard) */}
-                                {props.agentType && props.onAgentClick && (
+                                {props.agentType && props.onSwitchAgent && (() => {
+                                    const wizardAgent = allAgents.find(a => a.key === props.agentType) || allAgents[0];
+                                    return (
                                     <Pressable
                                         onPress={() => {
                                             hapticsLight();
-                                            props.onAgentClick?.();
+                                            setShowAgentSwitcher(prev => !prev);
                                         }}
                                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                         style={(p) => ({
@@ -1321,10 +1353,11 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             gap: 6,
                                         })}
                                     >
-                                        <Octicons
-                                            name="cpu"
-                                            size={14}
-                                            color={theme.colors.button.secondary.tint}
+                                        <Image
+                                            source={wizardAgent.icon}
+                                            style={{ width: 14, height: 14 }}
+                                            contentFit="contain"
+                                            tintColor={wizardAgent.tintable ? theme.colors.button.secondary.tint : undefined}
                                         />
                                         <Text style={{
                                             fontSize: 13,
@@ -1332,10 +1365,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             fontWeight: '600',
                                             ...Typography.default('semiBold'),
                                         }}>
-                                            {props.agentType === 'claude' ? t('agentInput.agent.claude') : props.agentType === 'codex' ? t('agentInput.agent.codex') : props.agentType === 'droid' ? 'Droid' : t('agentInput.agent.gemini')}
+                                            {wizardAgent.label}
                                         </Text>
+                                        <Ionicons name="chevron-up" size={12} color={theme.colors.button.secondary.tint} />
                                     </Pressable>
-                                )}
+                                    );
+                                })()}
 
                                 {/* Current agent indicator (existing session) */}
                                 {!props.agentType && props.metadata?.flavor && (
@@ -1539,7 +1574,63 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                 <GitStatusButton sessionId={props.sessionId} onPress={props.onFileViewerPress} />
                                 </View>
 
-                                {/* Send/Abort button - aligned with first row */}
+                                {/* Send/Abort buttons - aligned with first row */}
+                                {/* When AI is thinking and user has content + queue handler: show both queue-send and abort */}
+                                {props.showAbortButton && props.onQueueMessage && hasSendableContent ? (
+                                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                        {/* Queue-send button */}
+                                        <Shaker ref={shakerRef}>
+                                        <View style={[styles.sendButton, styles.sendButtonActive]}>
+                                            <Pressable
+                                                style={(p) => ({
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    opacity: p.pressed ? 0.7 : 1,
+                                                })}
+                                                hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                                onPress={() => {
+                                                    hapticsLight();
+                                                    props.onQueueMessage?.();
+                                                }}
+                                                disabled={props.isSendDisabled || props.isSending}
+                                            >
+                                                <Octicons
+                                                    name="arrow-up"
+                                                    size={16}
+                                                    color={theme.colors.button.primary.tint}
+                                                    style={[
+                                                        styles.sendButtonIcon,
+                                                        { marginTop: Platform.OS === 'web' ? 2 : 0 }
+                                                    ]}
+                                                />
+                                            </Pressable>
+                                        </View>
+                                        </Shaker>
+                                        {/* Abort button */}
+                                        <View style={[styles.sendButton, styles.sendButtonActive]}>
+                                            <Pressable
+                                                style={(p) => ({
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    opacity: p.pressed ? 0.7 : 1,
+                                                })}
+                                                hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
+                                                onPress={handleAbortPress}
+                                                disabled={isAborting}
+                                            >
+                                                {isAborting ? (
+                                                    <ActivityIndicator size="small" color={theme.colors.button.primary.tint} />
+                                                ) : (
+                                                    <Octicons name="square-fill" size={14} color={theme.colors.button.primary.tint} />
+                                                )}
+                                            </Pressable>
+                                        </View>
+                                    </View>
+                                ) : (
                                 <Shaker ref={shakerRef}>
                                 <View
                                     style={[
@@ -1611,6 +1702,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 </View>
                                 </Shaker>
+                                )}
                             </View>
                         </View>
                     </View>

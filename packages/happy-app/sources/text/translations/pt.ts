@@ -507,6 +507,10 @@ export const pt: TranslationStructure = {
             descConfirm: 'Leitura e busca automáticas, edições precisam de aprovação',
             descAll: 'Tudo automático, incluindo edição de arquivos',
         },
+        messageQueue: {
+            label: ({ count }: { count: number }) => `${count} mensagem${count !== 1 ? 'ns' : ''} na fila`,
+            hint: 'será enviado quando a IA terminar',
+        },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% restante`,
         },
