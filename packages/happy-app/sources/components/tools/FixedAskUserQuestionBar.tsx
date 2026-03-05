@@ -71,40 +71,65 @@ const FixedQuestionContent = React.memo(({ tool, sessionId, autoConfirmMode }: {
     autoConfirmMode?: 'off' | 'confirm' | 'all';
 }) => {
     const { theme } = useUnistyles();
+    const [currentQuestionIndex, setCurrentQuestionIndex] = React.useState(0);
     const [focusedIndex, setFocusedIndex] = React.useState(0);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [submittedIndex, setSubmittedIndex] = React.useState<number | null>(null);
+    // Track selections for all questions: questionIndex → optionIndex
+    const [allSelections, setAllSelections] = React.useState<Map<number, number>>(new Map());
     const focusedIndexRef = React.useRef(0);
     focusedIndexRef.current = focusedIndex;
 
     const questions = (tool.input as any)?.questions as Question[] | undefined;
     if (!questions || !Array.isArray(questions) || questions.length === 0) return null;
 
-    // Handle the first question in the fixed bar
-    const question = questions[0];
+    const totalQuestions = questions.length;
+    const question = questions[currentQuestionIndex];
     const options = question.options;
     const optionCount = options.length;
 
     const handleSelect = React.useCallback(async (optionIndex: number) => {
         if (isSubmitting) return;
+
+        const newSelections = new Map(allSelections);
+        newSelections.set(currentQuestionIndex, optionIndex);
+        setAllSelections(newSelections);
+
+        // If there are more questions, advance to the next one
+        if (currentQuestionIndex < totalQuestions - 1) {
+            setSubmittedIndex(optionIndex);
+            // Brief visual feedback, then move to next question
+            setTimeout(() => {
+                setCurrentQuestionIndex(prev => prev + 1);
+                setFocusedIndex(0);
+                focusedIndexRef.current = 0;
+                setSubmittedIndex(null);
+            }, 200);
+            return;
+        }
+
+        // Last question — submit all answers
         setIsSubmitting(true);
         setSubmittedIndex(optionIndex);
 
-        // Store selection in cache so AskUserQuestionView can show it when completed
+        // Store all selections in cache so AskUserQuestionView can show them when completed
         const permissionId = tool.permission?.id;
         if (permissionId) {
             const selectionsMap = new Map<number, Set<number>>();
-            selectionsMap.set(0, new Set([optionIndex]));
+            newSelections.forEach((oIdx, qIdx) => {
+                selectionsMap.set(qIdx, new Set([oIdx]));
+            });
             askQuestionSelectionsCache.set(permissionId, selectionsMap);
         }
 
-        const selectedLabel = options[optionIndex]?.label || '';
-        // Build response for all questions (use first option of first question for single-select)
+        // Build response for all questions
         const responseLines: string[] = [];
-        responseLines.push(`${question.header}: ${selectedLabel}`);
-        // Include default/empty for remaining questions if multi-question
-        for (let i = 1; i < questions.length; i++) {
-            responseLines.push(`${questions[i].header}: -`);
+        for (let i = 0; i < totalQuestions; i++) {
+            const selectedIdx = newSelections.get(i);
+            const selectedLabel = selectedIdx != null
+                ? (questions[i].options[selectedIdx]?.label || '-')
+                : '-';
+            responseLines.push(`${questions[i].header}: ${selectedLabel}`);
         }
         const responseText = responseLines.join('\n');
 
@@ -118,23 +143,23 @@ const FixedQuestionContent = React.memo(({ tool, sessionId, autoConfirmMode }: {
             setIsSubmitting(false);
             setSubmittedIndex(null);
         }
-    }, [sessionId, tool.permission?.id, options, question.header, questions, isSubmitting]);
+    }, [sessionId, tool.permission?.id, questions, totalQuestions, currentQuestionIndex, allSelections, isSubmitting]);
 
     const handleSelectRef = React.useRef(handleSelect);
     handleSelectRef.current = handleSelect;
 
-    // Auto-select first option in 'all' mode after a brief delay
-    const autoTriggered = React.useRef(false);
+    // Auto-select first option in 'all' mode after a brief delay for each question
+    const autoTriggeredForQuestion = React.useRef(-1);
     React.useEffect(() => {
-        if (autoConfirmMode !== 'all' || autoTriggered.current || isSubmitting) return;
-        autoTriggered.current = true;
+        if (autoConfirmMode !== 'all' || autoTriggeredForQuestion.current >= currentQuestionIndex || isSubmitting) return;
+        autoTriggeredForQuestion.current = currentQuestionIndex;
         // Highlight first option immediately, then submit after delay
         setFocusedIndex(0);
         const timer = setTimeout(() => {
             handleSelectRef.current(0);
         }, 300);
         return () => clearTimeout(timer);
-    }, [autoConfirmMode, isSubmitting]);
+    }, [autoConfirmMode, isSubmitting, currentQuestionIndex]);
 
     // Register keyboard handler with InlineOptionsProvider (replaces window listener)
     const { setExternalHandler } = useInlineOptions();
@@ -166,10 +191,40 @@ const FixedQuestionContent = React.memo(({ tool, sessionId, autoConfirmMode }: {
         return () => setExternalHandler(null);
     }, [optionCount, setExternalHandler]);
 
+    // Show previous selections as breadcrumb
+    const previousSelections = React.useMemo(() => {
+        const items: { header: string; label: string }[] = [];
+        for (let i = 0; i < currentQuestionIndex; i++) {
+            const selectedIdx = allSelections.get(i);
+            if (selectedIdx != null) {
+                items.push({
+                    header: questions[i].header,
+                    label: questions[i].options[selectedIdx]?.label || '-',
+                });
+            }
+        }
+        return items;
+    }, [currentQuestionIndex, allSelections, questions]);
+
     return (
         <View style={contentStyles.wrapper}>
+            {/* Previous selections breadcrumb */}
+            {previousSelections.length > 0 && (
+                <View style={contentStyles.breadcrumbContainer}>
+                    {previousSelections.map((sel, idx) => (
+                        <Text key={idx} style={contentStyles.breadcrumbText}>
+                            {sel.header}: {sel.label}
+                        </Text>
+                    ))}
+                </View>
+            )}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={contentStyles.questionText}>{question.question}</Text>
+                <Text style={contentStyles.questionText}>
+                    {totalQuestions > 1 && (
+                        <Text style={contentStyles.questionProgress}>({currentQuestionIndex + 1}/{totalQuestions}) </Text>
+                    )}
+                    {question.question}
+                </Text>
                 {autoConfirmMode === 'all' && (
                     <Text style={[contentStyles.autoLabel, { color: theme.colors.radio.active }]}>Auto</Text>
                 )}
@@ -185,7 +240,7 @@ const FixedQuestionContent = React.memo(({ tool, sessionId, autoConfirmMode }: {
                             (isSubmitting && submittedIndex !== index) && contentStyles.optionButtonDisabled,
                         ]}
                         onPress={() => handleSelect(index)}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || submittedIndex !== null}
                         activeOpacity={0.7}
                     >
                         {isSubmitting && submittedIndex === index ? (
@@ -225,11 +280,30 @@ const contentStyles = StyleSheet.create((theme) => ({
         paddingVertical: 12,
         gap: 8,
     },
+    breadcrumbContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    breadcrumbText: {
+        fontSize: 12,
+        color: theme.colors.textSecondary,
+        backgroundColor: theme.colors.surfaceHighest,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
     questionText: {
         fontSize: 15,
         fontWeight: '500',
         color: theme.colors.text,
         flex: 1,
+    },
+    questionProgress: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: theme.colors.textSecondary,
     },
     autoLabel: {
         fontSize: 11,
