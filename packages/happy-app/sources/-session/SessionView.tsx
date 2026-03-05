@@ -342,6 +342,24 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         storage.getState().updateSessionModelMode(sessionId, mode.key);
     }, [sessionId]);
 
+    // Agent flavor: optimistic local state for instant UI feedback (same pattern as autoConfirmMode)
+    const serverFlavor = session.metadata?.flavor || null;
+    const [localFlavor, setLocalFlavor] = React.useState<string | null>(null);
+    const effectiveFlavor = localFlavor ?? serverFlavor;
+    // Clear local override when server catches up
+    React.useEffect(() => {
+        if (localFlavor !== null && serverFlavor === localFlavor) {
+            setLocalFlavor(null);
+        }
+    }, [serverFlavor, localFlavor]);
+
+    // Build effective metadata with the optimistic flavor
+    const effectiveMetadata = React.useMemo(() => {
+        if (!session.metadata) return null;
+        if (!localFlavor) return session.metadata;
+        return { ...session.metadata, flavor: localFlavor };
+    }, [session.metadata, localFlavor]);
+
     // Handle switching agent type for the current session
     const agentLabels: Record<string, string> = React.useMemo(() => ({
         claude: 'Claude Code',
@@ -362,7 +380,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         Modal.alert(t('session.switchAgent'), t('session.switchingAgent'));
         const result = await sync.switchSessionAgent(sessionId, agent);
         if (result.success) {
-            storage.getState().updateSessionFlavor(sessionId, agent);
+            setLocalFlavor(agent);
             Modal.alert(t('session.switchAgent'), t('session.switchAgentSuccess', { agent: label }));
         } else {
             Modal.alert(t('common.error'), result.error || t('session.switchAgentFailed'));
@@ -462,7 +480,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             modelMode={modelMode}
             availableModels={availableModels}
             onModelModeChange={updateModelMode}
-            metadata={session.metadata}
+            metadata={effectiveMetadata}
             connectionStatus={{
                 text: sessionStatus.statusText,
                 color: sessionStatus.statusColor,

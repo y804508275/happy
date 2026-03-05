@@ -119,9 +119,8 @@ export abstract class BasePermissionHandler {
                     autoConfirmMode: mode
                 }));
 
-                // Auto-approve pending requests only in 'all' mode
-                // 'confirm' mode doesn't auto-approve tool permissions
-                if (mode === 'all') {
+                // Auto-approve pending tool requests in 'confirm' or 'all' mode (skip AskUserQuestion)
+                if (mode === 'confirm' || mode === 'all') {
                     const pendingSnapshot = Array.from(this.pendingRequests.entries());
 
                     for (const [id, pending] of pendingSnapshot) {

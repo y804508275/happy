@@ -14,8 +14,8 @@ export type AutoConfirmMode = 'off' | 'confirm' | 'all';
  *
  * AutoConfirm escalation (applied on top of base):
  *   off    → no change
- *   confirm → escalate to at least high
- *   all    → skip-permissions-unsafe
+ *   confirm → skip-permissions-unsafe (auto-approve all tools, but not questions)
+ *   all    → skip-permissions-unsafe (auto-approve all tools + questions)
  */
 export type DroidAutoLevel = 'none' | 'low' | 'medium' | 'high' | 'skip-permissions-unsafe';
 
@@ -60,7 +60,7 @@ export function mapToDroidAutoLevel(
     // Escalate based on autoConfirmMode
     switch (autoConfirmMode) {
         case 'confirm':
-            return maxAutoLevel(base, 'high');
+            return 'skip-permissions-unsafe';
         case 'all':
             return 'skip-permissions-unsafe';
         default:

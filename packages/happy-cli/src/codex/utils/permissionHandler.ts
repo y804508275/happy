@@ -40,8 +40,8 @@ export class CodexPermissionHandler extends BasePermissionHandler {
         toolName: string,
         input: unknown
     ): Promise<PermissionResult> {
-        // Auto-confirm in 'all' mode only (confirm mode doesn't auto-approve tool permissions)
-        if (this.autoConfirm && this.autoConfirmMode === 'all' && toolName !== 'AskUserQuestion') {
+        // Auto-confirm: 'confirm' mode auto-approves tools only, 'all' mode auto-approves tools + questions
+        if (this.autoConfirm && (this.autoConfirmMode === 'confirm' || this.autoConfirmMode === 'all') && toolName !== 'AskUserQuestion') {
             logger.debug(`${this.getLogPrefix()} Auto-confirming tool ${toolName} (${toolCallId})`);
             return { decision: 'approved' };
         }

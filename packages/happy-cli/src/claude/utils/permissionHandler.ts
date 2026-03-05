@@ -190,9 +190,10 @@ export class PermissionHandler {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
-        // Auto-confirm in 'all' mode: auto-approve tool permissions (skip AskUserQuestion — app handles it)
-        // In 'confirm' mode: don't auto-approve tool permissions, only auto-continue is handled
-        if (this.autoConfirm && this.autoConfirmMode === 'all' && toolName !== 'AskUserQuestion') {
+        // Auto-confirm: auto-approve tool permissions (skip AskUserQuestion — app handles it)
+        // 'confirm' mode: auto-approve tool permissions only
+        // 'all' mode: auto-approve tool permissions + auto-answer questions (AskUserQuestion handled elsewhere)
+        if (this.autoConfirm && (this.autoConfirmMode === 'confirm' || this.autoConfirmMode === 'all') && toolName !== 'AskUserQuestion') {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
@@ -438,9 +439,8 @@ export class PermissionHandler {
                 autoConfirmMode: mode
             }));
 
-            // Auto-approve pending requests only in 'all' mode
-            // 'confirm' mode doesn't auto-approve tool permissions
-            if (mode === 'all') {
+            // Auto-approve pending tool requests in 'confirm' or 'all' mode (skip AskUserQuestion)
+            if (mode === 'confirm' || mode === 'all') {
                 for (const [id, pending] of this.pendingRequests.entries()) {
                     if (pending.toolName === 'AskUserQuestion') {
                         continue;
