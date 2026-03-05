@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 23 (2026.03.04.6) - 2026-03-04
+
+修复队列消息功能中消息排队后未实际发送的 bug。
+
+- 修复 useMessageQueue 中的竞态条件：当 handleQueueMessage 的异步操作（await mdRefs.getSelectedContents()）与 AI 状态转换（thinking→waiting）产生竞争时，消息入队晚于 auto-flush 触发，导致消息永远卡在队列中
+- 新增 catch-up flush effect：当队列中有消息且状态已为 waiting 时立即触发发送
+
+发布方式：OTA 部署生效。
+
 ## Version 22 (2026.03.04.5) - 2026-03-04
 
 修复切换 Agent 时新 Agent 识别到旧会话历史消息的 bug。

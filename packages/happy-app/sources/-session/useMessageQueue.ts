@@ -81,5 +81,15 @@ export function useMessageQueue(sessionId: string, sessionState: SessionState) {
         }
     }, [sessionState, flush]);
 
+    // Catch-up flush: handle race condition where messages are enqueued
+    // after the state has already transitioned to 'waiting'.
+    // This happens when handleQueueMessage's async gap (await mdRefs.getSelectedContents())
+    // allows the thinking→waiting transition to fire flush() before enqueue() runs.
+    React.useEffect(() => {
+        if (sessionState === 'waiting' && queue.length > 0) {
+            flush();
+        }
+    }, [queue, sessionState, flush]);
+
     return { queue, enqueue, removeFromQueue };
 }
