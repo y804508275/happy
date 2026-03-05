@@ -117,7 +117,7 @@ function UserTextBlock(props: {
               <View key={i} style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                backgroundColor: 'rgba(255,255,255,0.12)',
+                backgroundColor: theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
                 borderRadius: 10,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
@@ -126,10 +126,10 @@ function UserTextBlock(props: {
               }}>
                 <FileIcon fileName={file.name} size={28} />
                 <View style={{ flex: 1, gap: 1 }}>
-                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.95)', fontWeight: '600' }} numberOfLines={2}>
+                  <Text style={{ fontSize: 13, color: theme.colors.userMessageText, fontWeight: '600' }} numberOfLines={2}>
                     {file.name}
                   </Text>
-                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }} numberOfLines={1}>
+                  <Text style={{ fontSize: 11, color: theme.dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }} numberOfLines={1}>
                     {file.mediaType === 'application/pdf' ? 'PDF' :
                      file.mediaType.startsWith('text/') ? file.mediaType.replace('text/', '').toUpperCase() :
                      file.name.split('.').pop()?.toUpperCase() || 'FILE'}
