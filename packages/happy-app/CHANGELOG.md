@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 24 (2026.03.04.7) - 2026-03-04
+
+更新 Auto Confirm 功能描述，修复归档 session 被 daemon 重启的问题。
+
+- 更新 Auto Confirm 三态模式的标签和描述：Confirm 模式明确为"自动批准工具权限，不自动回答问题"；Auto 模式明确为"自动批准工具权限，也自动回答问题"
+- 更新全部 11 种语言的翻译
+- 修复 session 归档/退出后 daemon 仍会重启已结束 session 的问题（退出时删除 session info 文件）
+- 修复 Droid abort 后 session 卡死的问题（重置 binary session ID，确保下次消息使用全新 session）
+- 修复 Droid 中断的 tool calls 未正确关闭 turn 的问题
+
+发布方式：需要 OTA 部署（App 翻译）+ CLI 构建重启 Daemon（CLI 修复）生效。
+
 ## Version 23 (2026.03.04.6) - 2026-03-04
 
 修复队列消息功能中消息排队后未实际发送的 bug。

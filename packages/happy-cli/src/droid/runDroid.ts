@@ -266,6 +266,16 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
             happyServer.stop();
             removeDroidMcpServer('happy');
 
+            // Remove session info file so daemon won't respawn this archived session
+            try {
+                if (existsSync(sessionInfoFilePath)) {
+                    unlinkSync(sessionInfoFilePath);
+                    logger.debug('[DROID-START] Removed session info file');
+                }
+            } catch (err) {
+                logger.debug('[DROID-START] Failed to remove session info file:', err);
+            }
+
             logger.debug('[DROID-START] Cleanup complete');
             process.exit(0);
         } catch (error) {
@@ -333,6 +343,16 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
     happyServer.stop();
     removeDroidMcpServer('happy');
     logger.debug('Stopped Happy MCP server');
+
+    // Remove session info file so daemon won't respawn this archived session
+    try {
+        if (existsSync(sessionInfoFilePath)) {
+            unlinkSync(sessionInfoFilePath);
+            logger.debug('Removed session info file');
+        }
+    } catch (err) {
+        logger.debug('Failed to remove session info file:', err);
+    }
 
     process.exit(exitCode);
 }

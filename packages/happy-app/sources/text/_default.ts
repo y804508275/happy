@@ -500,12 +500,12 @@ export const en = {
         },
         autoConfirm: {
             confirm: 'Manual',
-            confirmActive: 'Auto\u2713',
-            all: 'Auto+',
+            confirmActive: 'Confirm',
+            all: 'Auto',
             title: 'AUTO CONFIRM',
             descOff: 'Every action needs your approval',
-            descConfirm: 'Auto read & search, edits need approval',
-            descAll: 'Auto-run everything, including file edits',
+            descConfirm: 'Auto-approve tool permissions, manual answers',
+            descAll: 'Auto-approve permissions and answer questions',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} queued message${count !== 1 ? 's' : ''}`,

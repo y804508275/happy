@@ -529,12 +529,12 @@ export const it: TranslationStructure = {
         },
         autoConfirm: {
             confirm: 'Manuale',
-            confirmActive: 'Auto\u2713',
-            all: 'Auto+',
+            confirmActive: 'Conferma',
+            all: 'Auto',
             title: 'CONFERMA AUTOMATICA',
             descOff: 'Ogni azione richiede la tua approvazione',
-            descConfirm: 'Lettura e ricerca automatiche, modifiche richiedono approvazione',
-            descAll: 'Tutto automatico, inclusa la modifica dei file',
+            descConfirm: 'Approva permessi automaticamente, risposte manuali',
+            descAll: 'Approva permessi e rispondi alle domande automaticamente',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} messaggio${count !== 1 ? 'i' : ''} in coda`,

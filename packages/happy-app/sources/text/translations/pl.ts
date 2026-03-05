@@ -510,12 +510,12 @@ export const pl: TranslationStructure = {
         },
         autoConfirm: {
             confirm: 'Ręcznie',
-            confirmActive: 'Auto\u2713',
-            all: 'Auto+',
+            confirmActive: 'Potwierdź',
+            all: 'Auto',
             title: 'AUTOMATYCZNE ZATWIERDZANIE',
             descOff: 'Każda akcja wymaga zatwierdzenia',
-            descConfirm: 'Odczyt i wyszukiwanie automatyczne, edycja wymaga zatwierdzenia',
-            descAll: 'Wszystko automatycznie, w tym edycja plików',
+            descConfirm: 'Automatyczne zatwierdzanie uprawnień, ręczne odpowiedzi',
+            descAll: 'Automatyczne zatwierdzanie uprawnień i odpowiadanie na pytania',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} wiadomości w kolejce`,

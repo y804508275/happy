@@ -510,8 +510,15 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
             hookServer.stop();
             cleanupHookSettingsFile(hookSettingsPath);
 
-            // Keep session info file for reactivation support
-            // (allows daemon to respawn the session when user sends a new message)
+            // Remove session info file so daemon won't respawn this archived session
+            try {
+                if (existsSync(sessionInfoFilePath)) {
+                    unlinkSync(sessionInfoFilePath);
+                    logger.debug('[START] Removed session info file');
+                }
+            } catch (err) {
+                logger.debug('[START] Failed to remove session info file:', err);
+            }
 
             logger.debug('[START] Cleanup complete, exiting');
             process.exit(0);
@@ -635,6 +642,16 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     hookServer.stop();
     cleanupHookSettingsFile(hookSettingsPath);
     logger.debug('Stopped Hook server and cleaned up settings file');
+
+    // Remove session info file so daemon won't respawn this archived session
+    try {
+        if (existsSync(sessionInfoFilePath)) {
+            unlinkSync(sessionInfoFilePath);
+            logger.debug('Removed session info file');
+        }
+    } catch (err) {
+        logger.debug('Failed to remove session info file:', err);
+    }
 
     // Exit with the code from Claude
     process.exit(exitCode);

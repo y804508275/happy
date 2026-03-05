@@ -531,13 +531,13 @@ export const ja: TranslationStructure = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: '手動確認',
-            confirmActive: '自動\u2713',
-            all: '自動+',
+            confirm: '手動',
+            confirmActive: '確認',
+            all: '自動',
             title: '自動確認',
             descOff: 'すべての操作に確認が必要',
-            descConfirm: '読取・検索は自動、編集は確認が必要',
-            descAll: 'ファイル編集を含むすべてを自動実行',
+            descConfirm: 'ツール権限を自動承認、質問は手動で回答',
+            descAll: 'ツール権限の承認と質問への回答を自動化',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} 件のキューメッセージ`,

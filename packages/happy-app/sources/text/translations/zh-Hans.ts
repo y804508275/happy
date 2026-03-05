@@ -501,13 +501,13 @@ export const zhHans: TranslationStructure = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: '手动确认',
-            confirmActive: '自动\u2713',
-            all: '自动+',
+            confirm: '手动',
+            confirmActive: '确认',
+            all: '自动',
             title: '自动确认',
             descOff: '每一步都需要你确认',
-            descConfirm: '自动读取和搜索，编辑需确认',
-            descAll: '自动执行所有操作，包括编辑文件',
+            descConfirm: '自动批准工具权限，不自动回答问题',
+            descAll: '自动批准工具权限，也自动回答问题',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} 条排队消息`,

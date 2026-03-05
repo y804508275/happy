@@ -187,10 +187,12 @@ async function runDroidExec(opts: {
 
     let droidSessionId = opts.droidSessionId;
     let resultSubtype: string | null = null;
+    let messageCount = 0;
 
     opts.onThinkingChange?.(true);
     try {
         for await (const rawMessage of queryInstance) {
+            messageCount++;
             const message = normalizeDroidMessage(rawMessage);
             logger.debugLargeJson(`[droidRemote] Message ${message.type}`, message);
             opts.onMessage(message);
@@ -215,6 +217,13 @@ async function runDroidExec(opts: {
         }
     } finally {
         opts.onThinkingChange?.(false);
+    }
+
+    // If exec produced no messages and we had a session ID, the session is likely
+    // broken (e.g. after abort). Clear it so the caller can retry with a fresh session.
+    if (messageCount === 0 && droidSessionId) {
+        logger.debug(`[droidRemote] Empty exec with session ${droidSessionId}, clearing session ID`);
+        droidSessionId = null;
     }
 
     return { droidSessionId, resultSubtype };

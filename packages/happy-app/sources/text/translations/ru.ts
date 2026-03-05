@@ -510,12 +510,12 @@ export const ru: TranslationStructure = {
         },
         autoConfirm: {
             confirm: 'Вручную',
-            confirmActive: 'Авто\u2713',
-            all: 'Авто+',
+            confirmActive: 'Подтвердить',
+            all: 'Авто',
             title: 'АВТОПОДТВЕРЖДЕНИЕ',
             descOff: 'Каждое действие требует подтверждения',
-            descConfirm: 'Чтение и поиск автоматически, правки требуют подтверждения',
-            descAll: 'Всё автоматически, включая редактирование файлов',
+            descConfirm: 'Авто-одобрение разрешений, ответы вручную',
+            descAll: 'Авто-одобрение разрешений и ответы на вопросы',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} сообщ. в очереди`,

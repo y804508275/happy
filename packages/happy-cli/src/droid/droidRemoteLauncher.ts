@@ -62,7 +62,6 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
 
     async function doAbort() {
         logger.debug('[droid-remote]: doAbort');
-        session.queue.reset();
         await abort();
     }
 
@@ -231,6 +230,9 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
                 if (!exitReason && abortController.signal.aborted) {
                     session.client.closeClaudeSessionTurn('cancelled');
                     session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
+                    // Reset droid binary session ID after abort — the binary can't reliably
+                    // resume an interrupted session, so start fresh on next message.
+                    session.sessionId = null;
                 }
             } catch (e) {
                 logger.debug('[droid-remote]: launch error', e);
@@ -238,6 +240,7 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
                     if (abortController?.signal.aborted) {
                         session.client.closeClaudeSessionTurn('cancelled');
                         session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
+                        session.sessionId = null;
                     } else {
                         const errorMsg = e instanceof Error ? e.message : 'Unknown error';
                         session.client.closeClaudeSessionTurn('failed');
@@ -246,11 +249,16 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
                     continue;
                 }
             } finally {
+                let hadInterruptedToolCalls = false;
                 for (let [toolCallId, { parentToolCallId }] of ongoingToolCalls) {
                     const converted = sdkToLogConverter.generateInterruptedToolResult(toolCallId, parentToolCallId);
                     if (converted) {
                         session.client.sendClaudeSessionMessage(converted);
+                        hadInterruptedToolCalls = true;
                     }
+                }
+                if (hadInterruptedToolCalls) {
+                    session.client.closeClaudeSessionTurn('cancelled');
                 }
                 ongoingToolCalls.clear();
                 await messageQueue.flush();

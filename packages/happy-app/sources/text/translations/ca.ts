@@ -500,12 +500,12 @@ export const ca: TranslationStructure = {
         },
         autoConfirm: {
             confirm: 'Manual',
-            confirmActive: 'Auto\u2713',
-            all: 'Auto+',
+            confirmActive: 'Confirmar',
+            all: 'Auto',
             title: 'CONFIRMACIÓ AUTOMÀTICA',
             descOff: 'Cada acció necessita la teva aprovació',
-            descConfirm: 'Lectura i cerca automàtiques, edicions necessiten aprovació',
-            descAll: 'Tot automàtic, incloent edició de fitxers',
+            descConfirm: 'Aprovar permisos automàticament, respostes manuals',
+            descAll: 'Aprovar permisos i respondre preguntes automàticament',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} missatge${count !== 1 ? 's' : ''} en cua`,

@@ -500,13 +500,13 @@ export const zhHant: TranslationStructure = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: '手動確認',
-            confirmActive: '自動\u2713',
-            all: '自動+',
+            confirm: '手動',
+            confirmActive: '確認',
+            all: '自動',
             title: '自動確認',
             descOff: '每一步都需要你確認',
-            descConfirm: '自動讀取和搜尋，編輯需確認',
-            descAll: '自動執行所有操作，包括編輯檔案',
+            descConfirm: '自動批准工具權限，不自動回答問題',
+            descAll: '自動批准工具權限，也自動回答問題',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} 條排隊訊息`,

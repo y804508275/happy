@@ -500,12 +500,12 @@ export const pt: TranslationStructure = {
         },
         autoConfirm: {
             confirm: 'Manual',
-            confirmActive: 'Auto\u2713',
-            all: 'Auto+',
+            confirmActive: 'Confirmar',
+            all: 'Auto',
             title: 'CONFIRMAÇÃO AUTOMÁTICA',
             descOff: 'Cada ação precisa da sua aprovação',
-            descConfirm: 'Leitura e busca automáticas, edições precisam de aprovação',
-            descAll: 'Tudo automático, incluindo edição de arquivos',
+            descConfirm: 'Aprovar permissões automaticamente, respostas manuais',
+            descAll: 'Aprovar permissões e responder perguntas automaticamente',
         },
         messageQueue: {
             label: ({ count }: { count: number }) => `${count} mensagem${count !== 1 ? 'ns' : ''} na fila`,
