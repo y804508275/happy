@@ -310,6 +310,7 @@ export const zhHans: TranslationStructure = {
         switchAgent: '切换 Agent',
         switchAgentTitle: '切换 Agent',
         switchAgentDescription: '切换到不同的 AI Agent 继续本次会话，对话历史会自动传递。',
+        switchAgentConfirm: ({ agent }: { agent: string }) => `确认要切换到 ${agent} 吗？`,
         switchingAgent: '正在切换...',
         switchAgentSuccess: ({ agent }: { agent: string }) => `已切换到 ${agent}`,
         switchAgentFailed: '切换失败',
@@ -500,9 +501,13 @@ export const zhHans: TranslationStructure = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: '自动',
+            confirm: '手动确认',
             confirmActive: '自动\u2713',
             all: '自动+',
+            title: '自动确认',
+            descOff: '每一步都需要你确认',
+            descConfirm: '自动读取和搜索，编辑需确认',
+            descAll: '自动执行所有操作，包括编辑文件',
         },
         context: {
             remaining: ({ percent }: { percent: number }) => `剩余 ${percent}%`,

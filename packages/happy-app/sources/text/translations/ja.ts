@@ -340,6 +340,7 @@ export const ja: TranslationStructure = {
         switchAgent: 'Switch Agent',
         switchAgentTitle: 'Switch Agent',
         switchAgentDescription: 'Switch to a different AI agent for this session. Conversation history will be carried over.',
+        switchAgentConfirm: ({ agent }: { agent: string }) => `Switch to ${agent}?`,
         switchingAgent: 'Switching agent...',
         switchAgentSuccess: ({ agent }: { agent: string }) => `Switched to ${agent}`,
         switchAgentFailed: 'Failed to switch agent',
@@ -530,9 +531,13 @@ export const ja: TranslationStructure = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: '自動',
+            confirm: '手動確認',
             confirmActive: '自動\u2713',
             all: '自動+',
+            title: '自動確認',
+            descOff: 'すべての操作に確認が必要',
+            descConfirm: '読取・検索は自動、編集は確認が必要',
+            descAll: 'ファイル編集を含むすべてを自動実行',
         },
         context: {
             remaining: ({ percent }: { percent: number }) => `残り ${percent}%`,

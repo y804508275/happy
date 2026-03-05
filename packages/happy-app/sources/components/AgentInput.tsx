@@ -81,6 +81,8 @@ interface AgentInputProps {
     autoConfirmMode?: 'off' | 'confirm' | 'all';
     onAutoConfirmModeChange?: (mode: 'off' | 'confirm' | 'all') => void;
     onSwitchAgent?: (agent: 'claude' | 'codex' | 'gemini' | 'droid') => void;
+    isSwitchingAgent?: boolean;
+    agentAvailability?: { claude: boolean | null; codex: boolean | null; gemini: boolean | null; droid: boolean | null };
     // Image support
     attachedImages?: Array<{ uri: string; mediaType: string }>;
     onImagePaste?: (files: File[]) => void;
@@ -452,15 +454,19 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // Settings modal state
     const [showSettings, setShowSettings] = React.useState(false);
 
+    // Auto-confirm selector dropdown state
+    const [showAutoConfirmSelector, setShowAutoConfirmSelector] = React.useState(false);
+
     // Agent switcher dropdown state
     const [showAgentSwitcher, setShowAgentSwitcher] = React.useState(false);
     const currentFlavor = props.metadata?.flavor || 'claude';
-    const allAgents: { key: 'claude' | 'codex' | 'gemini' | 'droid'; label: string }[] = React.useMemo(() => [
-        { key: 'claude', label: 'Claude Code' },
-        { key: 'droid', label: 'Droid' },
-        { key: 'codex', label: 'Codex' },
-        { key: 'gemini', label: 'Gemini' },
+    const allAgents: { key: 'claude' | 'codex' | 'gemini' | 'droid'; label: string; icon: any; tintable?: boolean }[] = React.useMemo(() => [
+        { key: 'claude', label: 'Claude Code', icon: require('@/assets/images/icon-claude.png') },
+        { key: 'droid', label: 'Droid', icon: require('@/assets/images/icon-factory.png') },
+        { key: 'codex', label: 'Codex', icon: require('@/assets/images/icon-gpt.png'), tintable: true },
+        { key: 'gemini', label: 'Gemini', icon: require('@/assets/images/icon-gemini.png') },
     ], []);
+    const currentAgent = allAgents.find(a => a.key === currentFlavor) || allAgents[0];
 
     // Handle settings button press
     const handleSettingsPress = React.useCallback(() => {
@@ -553,7 +559,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 if (props.showAbortButton) {
                     return true; // Consume the key, don't send
                 }
-                if (props.value.trim() || hasImages) {
+                if (hasSendableContent) {
                     props.onSend();
                     return true; // Key was handled
                 }
@@ -569,7 +575,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
 
         }
         return false; // Key was not handled
-    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState, hasImages]);
+    }, [suggestions, moveUp, moveDown, selected, handleSuggestionSelect, props.showAbortButton, props.onAbort, isAborting, handleAbortPress, agentInputEnterToSend, props.value, props.onSend, props.onPermissionModeChange, availableModes, permissionModeKey, inputState, hasSendableContent]);
 
 
 
@@ -801,22 +807,26 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Text>
                                     {allAgents.map((agent) => {
                                         const isSelected = currentFlavor === agent.key;
+                                        const isAvailable = props.agentAvailability?.[agent.key] !== false;
+                                        const isDisabled = isSelected || !isAvailable;
                                         return (
                                             <Pressable
                                                 key={agent.key}
                                                 onPress={() => {
-                                                    if (!isSelected) {
+                                                    if (!isDisabled) {
                                                         hapticsLight();
                                                         setShowAgentSwitcher(false);
                                                         props.onSwitchAgent?.(agent.key);
                                                     }
                                                 }}
+                                                disabled={isDisabled && !isSelected}
                                                 style={({ pressed }) => ({
                                                     flexDirection: 'row',
                                                     alignItems: 'center',
                                                     paddingHorizontal: 16,
                                                     paddingVertical: 8,
-                                                    backgroundColor: pressed && !isSelected ? theme.colors.surfacePressed : 'transparent',
+                                                    backgroundColor: pressed && !isDisabled ? theme.colors.surfacePressed : 'transparent',
+                                                    opacity: !isAvailable && !isSelected ? 0.4 : 1,
                                                 })}
                                             >
                                                 <View style={{
@@ -827,7 +837,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                     borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    marginRight: 12,
+                                                    marginRight: 10,
                                                 }}>
                                                     {isSelected && (
                                                         <View style={{
@@ -838,6 +848,12 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                         }} />
                                                     )}
                                                 </View>
+                                                <Image
+                                                    source={agent.icon}
+                                                    style={{ width: 16, height: 16, marginRight: 8 }}
+                                                    contentFit="contain"
+                                                    tintColor={agent.tintable ? (isSelected ? theme.colors.radio.active : theme.colors.text) : undefined}
+                                                />
                                                 <Text style={{
                                                     fontSize: 14,
                                                     color: isSelected ? theme.colors.radio.active : theme.colors.text,
@@ -854,8 +870,88 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                     </>
                 )}
 
+                {/* Auto-Confirm selector overlay */}
+                {showAutoConfirmSelector && props.onAutoConfirmModeChange && (
+                    <>
+                        <TouchableWithoutFeedback onPress={() => setShowAutoConfirmSelector(false)}>
+                            <View style={styles.overlayBackdrop} />
+                        </TouchableWithoutFeedback>
+                        <View style={[
+                            styles.settingsOverlay,
+                            { paddingHorizontal: screenWidth > 700 ? 0 : 8 }
+                        ]}>
+                            <FloatingOverlay maxHeight={300} keyboardShouldPersistTaps="always">
+                                <View style={styles.overlaySection}>
+                                    <Text style={styles.overlaySectionTitle}>
+                                        {t('agentInput.autoConfirm.title')}
+                                    </Text>
+                                    {([
+                                        { key: 'off' as const, label: t('agentInput.autoConfirm.confirm'), desc: t('agentInput.autoConfirm.descOff') },
+                                        { key: 'confirm' as const, label: t('agentInput.autoConfirm.confirmActive'), desc: t('agentInput.autoConfirm.descConfirm') },
+                                        { key: 'all' as const, label: t('agentInput.autoConfirm.all'), desc: t('agentInput.autoConfirm.descAll') },
+                                    ]).map((option) => {
+                                        const isSelected = (props.autoConfirmMode || 'off') === option.key;
+                                        return (
+                                            <Pressable
+                                                key={option.key}
+                                                onPress={() => {
+                                                    hapticsLight();
+                                                    props.onAutoConfirmModeChange?.(option.key);
+                                                }}
+                                                style={({ pressed }) => ({
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    paddingHorizontal: 16,
+                                                    paddingVertical: 8,
+                                                    backgroundColor: pressed ? theme.colors.surfacePressed : 'transparent'
+                                                })}
+                                            >
+                                                <View style={{
+                                                    width: 16,
+                                                    height: 16,
+                                                    borderRadius: 8,
+                                                    borderWidth: 2,
+                                                    borderColor: isSelected ? theme.colors.radio.active : theme.colors.radio.inactive,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginRight: 12
+                                                }}>
+                                                    {isSelected && (
+                                                        <View style={{
+                                                            width: 6,
+                                                            height: 6,
+                                                            borderRadius: 3,
+                                                            backgroundColor: theme.colors.radio.dot
+                                                        }} />
+                                                    )}
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={{
+                                                        fontSize: 14,
+                                                        color: isSelected ? theme.colors.radio.active : theme.colors.text,
+                                                        ...Typography.default()
+                                                    }}>
+                                                        {option.label}
+                                                    </Text>
+                                                    <Text style={{
+                                                        fontSize: 11,
+                                                        color: theme.colors.textSecondary,
+                                                        ...Typography.default()
+                                                    }}>
+                                                        {option.desc}
+                                                    </Text>
+                                                </View>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </FloatingOverlay>
+                        </View>
+                    </>
+                )}
+
                 {/* Connection status, context warning, and permission mode */}
-                {(props.connectionStatus || contextWarning || displayPermissionMode || props.modelMode) && (
+                {(props.connectionStatus || contextWarning || displayPermissionMode || props.modelMode || (props.autoConfirmMode && props.autoConfirmMode !== 'off')) && (
                     <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -991,7 +1087,18 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     {props.modelMode.name}
                                 </Text>
                             )}
-                            
+                            {props.autoConfirmMode && props.autoConfirmMode !== 'off' && (
+                                <Text style={{
+                                    fontSize: 11,
+                                    color: theme.colors.radio.active,
+                                    ...Typography.default()
+                                }}>
+                                    {props.autoConfirmMode === 'confirm'
+                                        ? t('agentInput.autoConfirm.descConfirm')
+                                        : t('agentInput.autoConfirm.descAll')}
+                                </Text>
+                            )}
+
                         </View>
                     </View>
                 )}
@@ -1282,11 +1389,11 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     <Pressable
                                         onPress={() => {
                                             hapticsLight();
-                                            if (props.onSwitchAgent) {
+                                            if (props.onSwitchAgent && !props.isSwitchingAgent) {
                                                 setShowAgentSwitcher(prev => !prev);
                                             }
                                         }}
-                                        disabled={!props.onSwitchAgent}
+                                        disabled={!props.onSwitchAgent || props.isSwitchingAgent}
                                         hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                         style={(p) => ({
                                             flexDirection: 'row',
@@ -1296,26 +1403,32 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             paddingVertical: 6,
                                             justifyContent: 'center',
                                             height: 32,
-                                            opacity: p.pressed && props.onSwitchAgent ? 0.7 : 1,
+                                            opacity: (p.pressed && props.onSwitchAgent) || props.isSwitchingAgent ? 0.7 : 1,
                                             gap: 6,
                                         })}
                                     >
-                                        <Octicons
-                                            name="cpu"
-                                            size={14}
-                                            color={theme.colors.button.secondary.tint}
-                                        />
+                                        {props.isSwitchingAgent ? (
+                                            <ActivityIndicator size={14} color={theme.colors.button.secondary.tint} />
+                                        ) : (
+                                            <Image
+                                                source={currentAgent.icon}
+                                                style={{ width: 14, height: 14 }}
+                                                contentFit="contain"
+                                                tintColor={currentAgent.tintable ? theme.colors.button.secondary.tint : undefined}
+                                            />
+                                        )}
                                         <Text style={{
                                             fontSize: 13,
                                             color: theme.colors.button.secondary.tint,
                                             fontWeight: '600',
                                             ...Typography.default('semiBold'),
                                         }}>
-                                            {props.metadata.flavor === 'droid' ? 'Droid' :
+                                            {props.isSwitchingAgent ? t('session.switchingAgent') :
+                                             props.metadata.flavor === 'droid' ? 'Droid' :
                                              props.metadata.flavor === 'codex' ? 'Codex' :
                                              props.metadata.flavor === 'gemini' ? 'Gemini' : 'Claude Code'}
                                         </Text>
-                                        {props.onSwitchAgent && (
+                                        {props.onSwitchAgent && !props.isSwitchingAgent && (
                                             <Ionicons name="chevron-up" size={12} color={theme.colors.button.secondary.tint} />
                                         )}
                                     </Pressable>
@@ -1422,28 +1535,21 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     </Pressable>
                                 )}
 
-                                {/* Auto-Confirm toggle button (3-state: off → confirm → all → off) */}
+                                {/* Auto-Confirm selector button */}
                                 {props.onAutoConfirmModeChange && (() => {
                                     const mode = props.autoConfirmMode || 'off';
-                                    const nextMode = mode === 'off' ? 'confirm' : mode === 'confirm' ? 'all' : 'off';
-                                    // Three visually distinct states:
-                                    //   off:     ○ Auto     (gray, no bg)
-                                    //   confirm: ✓ Auto✓    (colored, light bg)
-                                    //   all:     ⚡ Auto+    (colored, strong bg)
                                     const iconName = mode === 'off' ? 'check-circle' : mode === 'confirm' ? 'check-circle-fill' : 'zap';
                                     const label = mode === 'off'
                                         ? t('agentInput.autoConfirm.confirm')
                                         : mode === 'confirm'
                                             ? t('agentInput.autoConfirm.confirmActive')
                                             : t('agentInput.autoConfirm.all');
-                                    const isActive = mode !== 'off';
-                                    const color = isActive ? theme.colors.radio.active : theme.colors.button.secondary.tint;
-                                    const bgOpacity = mode === 'all' ? '35' : mode === 'confirm' ? '20' : '';
+                                    const color = theme.colors.button.secondary.tint;
                                     return (
                                         <Pressable
                                             onPress={() => {
                                                 hapticsLight();
-                                                props.onAutoConfirmModeChange?.(nextMode);
+                                                setShowAutoConfirmSelector(prev => !prev);
                                             }}
                                             hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                             style={(p) => ({
@@ -1456,7 +1562,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 height: 32,
                                                 opacity: p.pressed ? 0.7 : 1,
                                                 gap: 6,
-                                                backgroundColor: isActive ? theme.colors.radio.active + bgOpacity : 'transparent',
                                             })}
                                         >
                                             <Octicons
@@ -1472,6 +1577,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                             }}>
                                                 {label}
                                             </Text>
+                                            <Ionicons name="chevron-up" size={12} color={color} />
                                         </Pressable>
                                     );
                                 })()}
@@ -1502,7 +1608,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                                 handleAbortPress();
                                             } else {
                                                 hapticsLight();
-                                                if (hasContent) {
+                                                if (hasSendableContent) {
                                                     props.onSend();
                                                 } else {
                                                     props.onMicPress?.();

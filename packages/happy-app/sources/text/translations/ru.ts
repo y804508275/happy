@@ -448,6 +448,7 @@ export const ru: TranslationStructure = {
         switchAgent: 'Switch Agent',
         switchAgentTitle: 'Switch Agent',
         switchAgentDescription: 'Switch to a different AI agent for this session. Conversation history will be carried over.',
+        switchAgentConfirm: ({ agent }: { agent: string }) => `Switch to ${agent}?`,
         switchingAgent: 'Switching agent...',
         switchAgentSuccess: ({ agent }: { agent: string }) => `Switched to ${agent}`,
         switchAgentFailed: 'Failed to switch agent',
@@ -508,9 +509,13 @@ export const ru: TranslationStructure = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: 'Авто',
+            confirm: 'Вручную',
             confirmActive: 'Авто\u2713',
             all: 'Авто+',
+            title: 'АВТОПОДТВЕРЖДЕНИЕ',
+            descOff: 'Каждое действие требует подтверждения',
+            descConfirm: 'Чтение и поиск автоматически, правки требуют подтверждения',
+            descAll: 'Всё автоматически, включая редактирование файлов',
         },
         context: {
             remaining: ({ percent }: { percent: number }) => `Осталось ${percent}%`,

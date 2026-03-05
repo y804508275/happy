@@ -307,6 +307,7 @@ export const en = {
         switchAgent: 'Switch Agent',
         switchAgentTitle: 'Switch Agent',
         switchAgentDescription: 'Switch to a different AI agent for this session. Conversation history will be carried over.',
+        switchAgentConfirm: ({ agent }: { agent: string }) => `Switch to ${agent}?`,
         switchingAgent: 'Switching agent...',
         switchAgentSuccess: ({ agent }: { agent: string }) => `Switched to ${agent}`,
         switchAgentFailed: 'Failed to switch agent',
@@ -498,9 +499,13 @@ export const en = {
             badgeYolo: 'YOLO',
         },
         autoConfirm: {
-            confirm: 'Auto',
+            confirm: 'Manual',
             confirmActive: 'Auto\u2713',
             all: 'Auto+',
+            title: 'AUTO CONFIRM',
+            descOff: 'Every action needs your approval',
+            descConfirm: 'Auto read & search, edits need approval',
+            descAll: 'Auto-run everything, including file edits',
         },
         context: {
             remaining: ({ percent }: { percent: number }) => `${percent}% left`,

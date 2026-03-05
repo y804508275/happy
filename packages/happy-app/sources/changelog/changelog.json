@@ -1,6 +1,38 @@
 {
   "entries": [
     {
+      "version": 20,
+      "deployVersion": "2026.03.04.3",
+      "date": "2026-03-04",
+      "summary": "优化 auto-confirm 模式选择交互，改为弹窗选择器并添加清晰的功能描述。",
+      "changes": [
+        "重构 auto-confirm 按钮为弹窗选择器（与模型切换一致的 FloatingOverlay 样式）",
+        "默认模式按钮文案从\"自动\"改为\"手动确认\"，更直观",
+        "按钮样式统一：去掉蓝色选中背景，添加向上箭头图标",
+        "每个模式添加描述文案，说明 AI 会做什么（如\"自动读取和搜索，编辑需确认\"）",
+        "输入框右上角显示当前 auto-confirm 模式描述",
+        "支持 11 种语言翻译"
+      ],
+      "rawMarkdown": "## Version 20 (2026.03.04.3) - 2026-03-04\n\n\n优化 auto-confirm 模式选择交互，改为弹窗选择器并添加清晰的功能描述。\n\n- 重构 auto-confirm 按钮为弹窗选择器（与模型切换一致的 FloatingOverlay 样式）\n- 默认模式按钮文案从\"自动\"改为\"手动确认\"，更直观\n- 按钮样式统一：去掉蓝色选中背景，添加向上箭头图标\n- 每个模式添加描述文案，说明 AI 会做什么（如\"自动读取和搜索，编辑需确认\"）\n- 输入框右上角显示当前 auto-confirm 模式描述\n- 支持 11 种语言翻译\n\n发布方式：OTA 部署生效。"
+    },
+    {
+      "version": 19,
+      "deployVersion": "2026.03.04.2",
+      "date": "2026-03-04",
+      "summary": "新增 Droid agent 集成、会话内切换 agent、auto-confirm 模式优化及多项 bug 修复。",
+      "changes": [
+        "新增 Droid agent 类型：支持 Factory Droid 作为第四个 AI agent（贯穿 app、CLI、daemon）",
+        "新增会话内切换 agent：在已有会话中点击 agent 名称可切换到不同 AI agent，对话历史自动传递",
+        "优化 auto-confirm 模式：confirm 模式不再自动批准工具权限（仅 all 模式才会），修复权限误批准问题",
+        "修复 stale pending requests：CLI 重启时自动清理上一个进程遗留的过期权限请求",
+        "修复 session badge：只对 online 会话显示 action badge，避免已断开会话显示误导性提示",
+        "修复 SPA fallback：将路由 fallback 移到 error handler，解决 fastify 注册顺序冲突",
+        "修复 save_memory 错误信息：API 失败时显示详细错误原因",
+        "修复 todos 类型检查：使用 Array.isArray 防止非数组值导致崩溃"
+      ],
+      "rawMarkdown": "## Version 19 (2026.03.04.2) - 2026-03-04\n\n\n新增 Droid agent 集成、会话内切换 agent、auto-confirm 模式优化及多项 bug 修复。\n\n- 新增 Droid agent 类型：支持 Factory Droid 作为第四个 AI agent（贯穿 app、CLI、daemon）\n- 新增会话内切换 agent：在已有会话中点击 agent 名称可切换到不同 AI agent，对话历史自动传递\n- 优化 auto-confirm 模式：confirm 模式不再自动批准工具权限（仅 all 模式才会），修复权限误批准问题\n- 修复 stale pending requests：CLI 重启时自动清理上一个进程遗留的过期权限请求\n- 修复 session badge：只对 online 会话显示 action badge，避免已断开会话显示误导性提示\n- 修复 SPA fallback：将路由 fallback 移到 error handler，解决 fastify 注册顺序冲突\n- 修复 save_memory 错误信息：API 失败时显示详细错误原因\n- 修复 todos 类型检查：使用 Array.isArray 防止非数组值导致崩溃\n\n发布方式：OTA 部署生效（app 端），daemon 和 CLI 需要更新 happy-cli。"
+    },
+    {
       "version": 18,
       "deployVersion": "2026.03.04.1",
       "date": "2026-03-04",
@@ -233,5 +265,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 18
+  "latestVersion": 20
 }
