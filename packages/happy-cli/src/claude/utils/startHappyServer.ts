@@ -367,7 +367,7 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
         try {
             client.sendSessionEvent({
                 type: 'message',
-                message: `✅ Rule applied: ${args.rule_title} — ${args.brief}`,
+                message: `Rule applied: ${args.rule_title} — ${args.brief}`,
             });
             return {
                 content: [{ type: 'text', text: `Notified user about rule: ${args.rule_title}` }],

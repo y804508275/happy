@@ -185,6 +185,15 @@ function AgentEventBlock(props: {
     );
   }
   if (props.event.type === 'message') {
+    const isRuleApplied = props.event.message.startsWith('Rule applied:') || props.event.message.startsWith('✅ Rule applied:');
+    if (isRuleApplied) {
+      const displayText = props.event.message.replace(/^✅\s*/, '');
+      return (
+        <View style={styles.ruleAppliedContainer}>
+          <Text style={styles.ruleAppliedText}>{displayText}</Text>
+        </View>
+      );
+    }
     return (
       <View style={styles.agentEventContainer}>
         <Text style={styles.agentEventText}>{props.event.message}</Text>
@@ -300,6 +309,16 @@ const styles = StyleSheet.create((theme) => ({
   agentEventText: {
     color: theme.colors.agentEventText,
     fontSize: 14,
+  },
+  ruleAppliedContainer: {
+    marginHorizontal: 16,
+    alignItems: 'flex-start',
+    paddingVertical: 1,
+  },
+  ruleAppliedText: {
+    color: theme.colors.textSecondary,
+    fontSize: 11,
+    opacity: 0.5,
   },
   toolContainer: {
     marginHorizontal: 8,
