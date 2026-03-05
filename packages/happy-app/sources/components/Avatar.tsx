@@ -26,6 +26,7 @@ const flavorIcons = {
     claude: require('@/assets/images/icon-claude.png'),
     codex: require('@/assets/images/icon-gpt.png'),
     gemini: require('@/assets/images/icon-gemini.png'),
+    droid: require('@/assets/images/icon-factory.png'),
 };
 
 const styles = StyleSheet.create((theme) => ({

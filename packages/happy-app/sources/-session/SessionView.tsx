@@ -34,6 +34,7 @@ import { sync } from '@/sync/sync';
 import { t } from '@/text';
 import { tracking, trackMessageSent } from '@/track';
 import type { NewSessionAgentType } from '@/sync/persistence';
+import { useCLIDetection } from '@/hooks/useCLIDetection';
 import { isRunningOnMac } from '@/utils/platform';
 import { useDeviceType, useHeaderHeight, useIsLandscape, useIsTablet } from '@/utils/responsive';
 import { formatPathRelativeToHome, getSessionAvatarId, getSessionName, useSessionStatus } from '@/utils/sessionUtils';
@@ -197,7 +198,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
 
     // Check if CLI version is outdated and not already acknowledged
     const cliVersion = session.metadata?.version;
-    const machineId = session.metadata?.machineId;
+    const machineId = session.metadata?.machineId || null;
+    const cliAvailability = useCLIDetection(machineId);
     const isCliOutdated = cliVersion && !isVersionSupported(cliVersion, MINIMUM_CLI_VERSION);
     const isAcknowledged = machineId && acknowledgedCliVersions[machineId] === cliVersion;
     const shouldShowCliWarning = isCliOutdated && !isAcknowledged;
@@ -367,25 +369,43 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         codex: 'Codex',
         gemini: 'Gemini',
     }), []);
+    const [isSwitchingAgent, setIsSwitchingAgent] = React.useState(false);
 
     const handleSwitchAgent = React.useCallback(async (agent: 'claude' | 'codex' | 'gemini' | 'droid') => {
         const label = agentLabels[agent] || agent;
         const confirmed = await Modal.confirm(
-            t('session.switchAgent'),
+            t('session.switchAgentConfirm', { agent: label }),
             t('session.switchAgentDescription'),
-            { confirmText: label },
         );
         if (!confirmed) return;
 
-        Modal.alert(t('session.switchAgent'), t('session.switchingAgent'));
-        const result = await sync.switchSessionAgent(sessionId, agent);
-        if (result.success) {
-            setLocalFlavor(agent);
-            Modal.alert(t('session.switchAgent'), t('session.switchAgentSuccess', { agent: label }));
-        } else {
-            Modal.alert(t('common.error'), result.error || t('session.switchAgentFailed'));
+        setIsSwitchingAgent(true);
+        setLocalFlavor(agent);
+
+        // Force abort if agent is currently working
+        if (sessionStatus.state === 'thinking') {
+            try { await sessionAbort(sessionId); } catch { /* best effort */ }
         }
-    }, [sessionId, agentLabels]);
+
+        // Reset to most restrictive modes so user reviews the new agent first
+        storage.getState().updateSessionPermissionMode(sessionId, 'default');
+        handleAutoConfirmModeChange('off');
+
+        try {
+            const result = await sync.switchSessionAgent(sessionId, agent);
+            if (result.success) {
+                Modal.alert(t('session.switchAgent'), t('session.switchAgentSuccess', { agent: label }));
+            } else {
+                setLocalFlavor(null);
+                Modal.alert(t('common.error'), result.error || t('session.switchAgentFailed'));
+            }
+        } catch {
+            setLocalFlavor(null);
+            Modal.alert(t('common.error'), t('session.switchAgentFailed'));
+        } finally {
+            setIsSwitchingAgent(false);
+        }
+    }, [sessionId, agentLabels, sessionStatus.state, handleAutoConfirmModeChange]);
 
     // Memoize header-dependent styles to prevent re-renders
     const headerDependentStyles = React.useMemo(() => ({
@@ -519,6 +539,8 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             autoConfirmMode={autoConfirmMode}
             onAutoConfirmModeChange={handleAutoConfirmModeChange}
             onSwitchAgent={session.metadata?.machineId ? handleSwitchAgent : undefined}
+            isSwitchingAgent={isSwitchingAgent}
+            agentAvailability={cliAvailability}
             // Autocomplete configuration
             autocompletePrefixes={['@', '/']}
             autocompleteSuggestions={(query) => getSuggestions(sessionId, query)}

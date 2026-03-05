@@ -379,29 +379,44 @@ export const storage = create<StorageState>()((set, get) => {
                     permissionMode: resolvedPermissionMode
                 };
 
-                // Clear stale agentState.requests when session goes offline.
-                // When a CLI process dies, its pending permission requests become
-                // unfulfillable. Mark them as canceled locally to prevent stale
-                // "needs permission" UI.
-                if (presence !== "online" && session.agentState?.requests && Object.keys(session.agentState.requests).length > 0) {
-                    const staleRequests = session.agentState.requests;
-                    const completedRequests = { ...session.agentState.completedRequests };
-                    for (const [id, request] of Object.entries(staleRequests)) {
-                        completedRequests[id] = {
-                            ...request,
-                            completedAt: Date.now(),
-                            status: 'canceled',
-                            reason: 'Session disconnected'
+                // Clear stale agentState.requests to prevent non-functional
+                // "needs permission" UI after CLI process death/restart.
+                // Two cases:
+                //   1. Session is offline → all pending requests are stale
+                //   2. Session is online but requests are old (>5 min) → CLI lost them
+                if (session.agentState?.requests && Object.keys(session.agentState.requests).length > 0) {
+                    const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+                    const now = Date.now();
+                    const isOffline = presence !== "online";
+
+                    const staleIds: string[] = [];
+                    for (const [id, request] of Object.entries(session.agentState.requests)) {
+                        if (isOffline || (request.createdAt && now - request.createdAt > STALE_THRESHOLD_MS)) {
+                            staleIds.push(id);
+                        }
+                    }
+
+                    if (staleIds.length > 0) {
+                        const remainingRequests = { ...session.agentState.requests };
+                        const completedRequests = { ...session.agentState.completedRequests };
+                        for (const id of staleIds) {
+                            completedRequests[id] = {
+                                ...remainingRequests[id],
+                                completedAt: now,
+                                status: 'canceled',
+                                reason: isOffline ? 'Session disconnected' : 'Request expired'
+                            };
+                            delete remainingRequests[id];
+                        }
+                        mergedSessions[session.id] = {
+                            ...mergedSessions[session.id],
+                            agentState: {
+                                ...session.agentState,
+                                requests: remainingRequests,
+                                completedRequests
+                            }
                         };
                     }
-                    mergedSessions[session.id] = {
-                        ...mergedSessions[session.id],
-                        agentState: {
-                            ...session.agentState,
-                            requests: {},
-                            completedRequests
-                        }
-                    };
                 }
             });
 

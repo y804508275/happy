@@ -43,7 +43,7 @@ export const FixedPermissionBar = React.memo((props: {
     const autoApprovedRef = React.useRef<Set<string>>(new Set());
     React.useEffect(() => {
         if (!pendingTool || !props.isConnected) return;
-        if (props.autoConfirmMode !== 'all') return;
+        if (props.autoConfirmMode !== 'confirm' && props.autoConfirmMode !== 'all') return;
         const permId = pendingTool.tool.permission!.id;
         if (autoApprovedRef.current.has(permId)) return;
         autoApprovedRef.current.add(permId);
@@ -55,7 +55,7 @@ export const FixedPermissionBar = React.memo((props: {
     if (!props.isConnected || !pendingTool) {
         return null;
     }
-    if (props.autoConfirmMode === 'all') {
+    if (props.autoConfirmMode === 'confirm' || props.autoConfirmMode === 'all') {
         return null;
     }
 

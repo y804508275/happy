@@ -59,6 +59,26 @@ export class PermissionHandler {
             this.autoConfirmMode = currentState.autoConfirmMode || 'all';
             logger.debug(`Restored autoConfirm=true, mode=${this.autoConfirmMode} from existing agent state`);
         }
+
+        // Clear stale pending requests from a previous CLI process (e.g. after crash + resume).
+        // The new process has an empty pendingRequests map, so these can never be fulfilled.
+        if (currentState?.requests && Object.keys(currentState.requests).length > 0) {
+            logger.debug(`Clearing ${Object.keys(currentState.requests).length} stale pending request(s) from previous session`);
+            this.session.client.updateAgentState((state) => {
+                const staleRequests = state.requests || {};
+                if (Object.keys(staleRequests).length === 0) return state;
+                const completedRequests = { ...state.completedRequests };
+                for (const [id, request] of Object.entries(staleRequests)) {
+                    completedRequests[id] = {
+                        ...request,
+                        completedAt: Date.now(),
+                        status: 'canceled',
+                        reason: 'Session restarted'
+                    };
+                }
+                return { ...state, requests: {}, completedRequests };
+            });
+        }
     }
     
     /**
