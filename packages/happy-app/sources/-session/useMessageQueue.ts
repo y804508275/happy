@@ -35,6 +35,11 @@ export function useMessageQueue(sessionId: string, sessionState: SessionState) {
     const queueRef = React.useRef<QueuedMessage[]>(queue);
     queueRef.current = queue;
 
+    // Guard against double-flush: flush reads from queueRef (sync) but
+    // setQueue([]) is async (React batch), so a second effect in the same
+    // render cycle would see stale queueRef and send duplicates.
+    const flushingRef = React.useRef(false);
+
     const enqueue = React.useCallback((msg: Omit<QueuedMessage, 'id' | 'createdAt'>) => {
         setQueue(prev => [...prev, {
             ...msg,
@@ -51,6 +56,8 @@ export function useMessageQueue(sessionId: string, sessionState: SessionState) {
     const flush = React.useCallback(() => {
         const current = queueRef.current;
         if (current.length === 0) return;
+        if (flushingRef.current) return; // Already flushing in this render cycle
+        flushingRef.current = true;
 
         const mergedText = current.map(m => m.text).filter(Boolean).join('\n\n');
         const mergedImages = current.flatMap(m =>
@@ -70,6 +77,13 @@ export function useMessageQueue(sessionId: string, sessionState: SessionState) {
 
         setQueue([]);
     }, [sessionId]);
+
+    // Reset flushing guard when queue actually empties (after React state update)
+    React.useEffect(() => {
+        if (queue.length === 0) {
+            flushingRef.current = false;
+        }
+    }, [queue]);
 
     // Auto-flush when session transitions to 'waiting' from an active state
     React.useEffect(() => {

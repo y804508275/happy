@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 25 (2026.03.04.8) - 2026-03-04
+
+修复队列消息被重复发送两次的 bug。
+
+- 修复 useMessageQueue 中两个 useEffect（状态转换检测 + catch-up flush）在同一渲染周期内同时触发 flush() 导致消息重复发送的问题
+- 新增 flushingRef 互斥锁：flush 执行后标记为 flushing，直到 React 状态更新（queue 清空）后才重置，防止同周期内的第二次 flush 读取到旧的 queueRef
+
+发布方式：OTA 部署生效。
+
 ## Version 24 (2026.03.04.7) - 2026-03-04
 
 更新 Auto Confirm 功能描述，修复归档 session 被 daemon 重启的问题。
