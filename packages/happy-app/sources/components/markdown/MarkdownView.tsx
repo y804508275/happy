@@ -26,6 +26,11 @@ export const MarkdownView = React.memo((props: {
     onOptionPress?: (option: Option) => void;
 }) => {
     const blocks = React.useMemo(() => parseMarkdown(props.markdown), [props.markdown]);
+    const [contentWidth, setContentWidth] = React.useState(0);
+    const handleLayout = React.useCallback((e: any) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0) setContentWidth(w);
+    }, []);
     
     // Backwards compatibility: The original version just returned the view, wrapping the list of blocks.
     // It made each of the individual text elements selectable. When we enable the markdownCopyV2 feature,
@@ -47,7 +52,7 @@ export const MarkdownView = React.memo((props: {
     }, [props.markdown, router]);
     const renderContent = () => {
         return (
-            <View style={{ width: '100%' }}>
+            <View style={{ width: '100%' }} onLayout={handleLayout}>
                 {blocks.map((block, index) => {
                     if (block.type === 'text') {
                         return <RenderTextBlock spans={block.content} key={index} first={index === 0} last={index === blocks.length - 1} selectable={selectable} />;
@@ -67,7 +72,7 @@ export const MarkdownView = React.memo((props: {
                         // Options are rendered by FixedOptionsBar, skip inline rendering
                         return null;
                     } else if (block.type === 'table') {
-                        return <RenderTableBlock headers={block.headers} rows={block.rows} key={index} first={index === 0} last={index === blocks.length - 1} />;
+                        return <RenderTableBlock headers={block.headers} rows={block.rows} key={index} first={index === 0} last={index === blocks.length - 1} contentWidth={contentWidth} />;
                     } else {
                         return null;
                     }
@@ -270,48 +275,92 @@ function RenderTableBlock(props: {
     headers: string[],
     rows: string[][],
     first: boolean,
-    last: boolean
+    last: boolean,
+    contentWidth: number
 }) {
     const columnCount = props.headers.length;
     const rowCount = props.rows.length;
     const isLastRow = (rowIndex: number) => rowIndex === rowCount - 1;
+    const webScrollRef = React.useRef<any>(null);
+
+    React.useEffect(() => {
+        if (Platform.OS !== 'web') return;
+        const el = webScrollRef.current;
+        if (!el) return;
+
+        const onWheel = (e: any) => {
+            if (el.scrollWidth <= el.clientWidth) return;
+            if (e.deltaX !== 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                el.scrollLeft += e.deltaX;
+            }
+        };
+
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
+
+    const columns = props.headers.map((header, colIndex) => (
+        <View
+            key={`column-${colIndex}`}
+            style={[
+                style.tableColumn,
+                colIndex === columnCount - 1 && style.tableColumnLast
+            ]}
+        >
+            <View style={[style.tableCell, style.tableHeaderCell, style.tableCellFirst]}>
+                <Text style={style.tableHeaderText}>{header}</Text>
+            </View>
+            {props.rows.map((row, rowIndex) => (
+                <View
+                    key={`cell-${rowIndex}-${colIndex}`}
+                    style={[
+                        style.tableCell,
+                        isLastRow(rowIndex) && style.tableCellLast
+                    ]}
+                >
+                    <Text style={style.tableCellText}>{row[colIndex] ?? ''}</Text>
+                </View>
+            ))}
+        </View>
+    ));
+
+    const containerStyle = [
+        style.tableContainer,
+        props.contentWidth > 0 && { maxWidth: props.contentWidth },
+        props.first && style.first,
+        props.last && style.last,
+    ];
+
+    if (Platform.OS === 'web') {
+        return (
+            <View style={containerStyle}>
+                {React.createElement('div', {
+                    ref: webScrollRef,
+                    style: {
+                        overflowX: 'auto',
+                        overflowY: 'hidden',
+                    }
+                },
+                    <View style={style.tableContent}>
+                        {columns}
+                    </View>
+                )}
+            </View>
+        );
+    }
 
     return (
-        <View style={[style.tableContainer, props.first && style.first, props.last && style.last]}>
+        <View style={containerStyle}>
             <ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={Platform.OS !== 'web'}
+                showsHorizontalScrollIndicator={true}
                 nestedScrollEnabled={true}
                 style={style.tableScrollView}
             >
                 <View style={style.tableContent}>
-                    {/* Render each column as a vertical container */}
-                    {props.headers.map((header, colIndex) => (
-                        <View
-                            key={`column-${colIndex}`}
-                            style={[
-                                style.tableColumn,
-                                colIndex === columnCount - 1 && style.tableColumnLast
-                            ]}
-                        >
-                            {/* Header cell for this column */}
-                            <View style={[style.tableCell, style.tableHeaderCell, style.tableCellFirst]}>
-                                <Text style={style.tableHeaderText}>{header}</Text>
-                            </View>
-                            {/* Data cells for this column */}
-                            {props.rows.map((row, rowIndex) => (
-                                <View
-                                    key={`cell-${rowIndex}-${colIndex}`}
-                                    style={[
-                                        style.tableCell,
-                                        isLastRow(rowIndex) && style.tableCellLast
-                                    ]}
-                                >
-                                    <Text style={style.tableCellText}>{row[colIndex] ?? ''}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    ))}
+                    {columns}
                 </View>
             </ScrollView>
         </View>

@@ -2,7 +2,7 @@ import * as React from "react";
 import { View, Text, Image as RNImage } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { FileIcon } from './FileIcon';
+
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { MarkdownView } from "./markdown/MarkdownView";
 import { t } from '@/text';
@@ -85,6 +85,38 @@ function RenderBlock(props: {
   }
 }
 
+// Feishu-style file type color mapping
+function getFileTypeColor(ext: string): string {
+  switch (ext) {
+    case 'pdf': return '#E74C3C';
+    case 'doc': case 'docx': return '#3B82F6';
+    case 'xls': case 'xlsx': case 'csv': return '#22C55E';
+    case 'ppt': case 'pptx': return '#F97316';
+    case 'txt': case 'md': case 'rtf': return '#8B5CF6';
+    case 'zip': case 'rar': case '7z': case 'tar': case 'gz': return '#EAB308';
+    case 'jpg': case 'jpeg': case 'png': case 'gif': case 'svg': case 'webp': return '#06B6D4';
+    case 'mp3': case 'wav': case 'flac': case 'aac': return '#EC4899';
+    case 'mp4': case 'mov': case 'avi': case 'mkv': return '#A855F7';
+    case 'js': case 'ts': case 'jsx': case 'tsx': return '#FBBF24';
+    case 'py': return '#3B82F6';
+    case 'json': case 'xml': case 'yaml': case 'yml': return '#6B7280';
+    default: return '#64748B';
+  }
+}
+
+function getFileTypeLabel(mediaType: string, ext: string): string {
+  if (mediaType === 'application/pdf') return 'PDF 文档';
+  if (mediaType.includes('word') || ext === 'doc' || ext === 'docx') return 'Word 文档';
+  if (mediaType.includes('sheet') || ext === 'xls' || ext === 'xlsx') return 'Excel 表格';
+  if (mediaType.includes('presentation') || ext === 'ppt' || ext === 'pptx') return 'PPT 演示';
+  if (mediaType.startsWith('text/')) return ext.toUpperCase() + ' 文件';
+  if (mediaType.startsWith('image/')) return '图片文件';
+  if (mediaType.startsWith('audio/')) return '音频文件';
+  if (mediaType.startsWith('video/')) return '视频文件';
+  if (ext) return ext.toUpperCase() + ' 文件';
+  return '文件';
+}
+
 function UserTextBlock(props: {
   message: UserTextMessage;
   sessionId: string;
@@ -112,31 +144,73 @@ function UserTextBlock(props: {
           </View>
         )}
         {props.message.files && props.message.files.length > 0 && (
-          <View style={{ flexDirection: 'column', gap: 6, marginBottom: props.message.text ? 8 : 0 }}>
-            {props.message.files.map((file, i) => (
-              <View key={i} style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: theme.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                gap: 10,
-                minWidth: 180,
-              }}>
-                <FileIcon fileName={file.name} size={28} />
-                <View style={{ flex: 1, gap: 1 }}>
-                  <Text style={{ fontSize: 13, color: theme.colors.userMessageText, fontWeight: '600' }} numberOfLines={2}>
-                    {file.name}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: theme.dark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }} numberOfLines={1}>
-                    {file.mediaType === 'application/pdf' ? 'PDF' :
-                     file.mediaType.startsWith('text/') ? file.mediaType.replace('text/', '').toUpperCase() :
-                     file.name.split('.').pop()?.toUpperCase() || 'FILE'}
-                  </Text>
+          <View style={{ flexDirection: 'column', gap: 8, marginBottom: props.message.text ? 8 : 0 }}>
+            {props.message.files.map((file, i) => {
+              const ext = file.name.split('.').pop()?.toLowerCase() || '';
+              const typeColor = getFileTypeColor(ext);
+              const typeLabel = getFileTypeLabel(file.mediaType, ext);
+              return (
+                <View key={i} style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.75)',
+                  borderWidth: 0.5,
+                  borderColor: theme.dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  gap: 12,
+                  minWidth: 200,
+                }}>
+                  {/* Feishu-style file type badge */}
+                  <View style={{
+                    width: 40,
+                    height: 48,
+                    borderRadius: 8,
+                    backgroundColor: typeColor,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}>
+                    {/* Folded corner effect */}
+                    <View style={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      width: 12,
+                      height: 12,
+                      backgroundColor: theme.dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.35)',
+                      borderBottomLeftRadius: 6,
+                    }} />
+                    <Text style={{
+                      color: '#FFFFFF',
+                      fontSize: ext.length > 3 ? 9 : 10,
+                      fontWeight: '800',
+                      letterSpacing: 0.5,
+                      marginTop: 2,
+                    }}>
+                      {ext.toUpperCase().slice(0, 4)}
+                    </Text>
+                  </View>
+                  {/* File info */}
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={{
+                      fontSize: 14,
+                      color: theme.colors.userMessageText,
+                      fontWeight: '500',
+                    }} numberOfLines={2}>
+                      {file.name}
+                    </Text>
+                    <Text style={{
+                      fontSize: 12,
+                      color: theme.dark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.35)',
+                    }} numberOfLines={1}>
+                      {typeLabel}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
         {props.message.text ? (
@@ -304,7 +378,6 @@ const styles = StyleSheet.create((theme) => ({
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 16,
-    alignSelf: 'flex-start',
   },
   agentEventContainer: {
     marginHorizontal: 8,

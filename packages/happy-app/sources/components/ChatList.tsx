@@ -339,6 +339,5 @@ const streamingStyles = StyleSheet.create((theme) => ({
         marginHorizontal: 16,
         marginBottom: 12,
         borderRadius: 16,
-        alignSelf: 'flex-start',
     },
 }));
