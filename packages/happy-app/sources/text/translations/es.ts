@@ -600,6 +600,10 @@ export const es: TranslationStructure = {
             other: 'Otro',
             otherDescription: 'Escribe tu propia respuesta',
             otherPlaceholder: 'Escribe tu respuesta...',
+        },
+        group: {
+            stepsCompleted: 'Steps Completed',
+            steps: 'Steps',
         }
     },
 

@@ -601,6 +601,10 @@ export const zhHant: TranslationStructure = {
             modifyingFiles: ({ count }: { count: number }) => `正在修改 ${count} 個檔案`,
             modifyingMultipleFiles: ({ file, count }: { file: string; count: number }) => `${file} 和其他 ${count} 個`,
             showingDiff: '顯示更改',
+        },
+        group: {
+            stepsCompleted: '步驟已完成',
+            steps: '步驟',
         }
     },
 

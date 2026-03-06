@@ -600,6 +600,10 @@ export const pt: TranslationStructure = {
             other: 'Outro',
             otherDescription: 'Digite sua própria resposta',
             otherPlaceholder: 'Digite sua resposta...',
+        },
+        group: {
+            stepsCompleted: 'Steps Completed',
+            steps: 'Steps',
         }
     },
 

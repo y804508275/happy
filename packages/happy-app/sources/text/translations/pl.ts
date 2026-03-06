@@ -610,6 +610,10 @@ export const pl: TranslationStructure = {
             other: 'Inne',
             otherDescription: 'Wpisz własną odpowiedź',
             otherPlaceholder: 'Wpisz swoją odpowiedź...',
+        },
+        group: {
+            stepsCompleted: 'Steps Completed',
+            steps: 'Steps',
         }
     },
 

@@ -615,6 +615,10 @@ export const en: TranslationStructure = {
             modifyingFiles: ({ count }: { count: number }) => `Modifying ${count} files`,
             modifyingMultipleFiles: ({ file, count }: { file: string; count: number }) => `${file} and ${count} more`,
             showingDiff: 'Showing changes',
+        },
+        group: {
+            stepsCompleted: 'Steps Completed',
+            steps: 'Steps',
         }
     },
 

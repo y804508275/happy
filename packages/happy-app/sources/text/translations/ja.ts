@@ -632,6 +632,10 @@ export const ja: TranslationStructure = {
             modifyingFiles: ({ count }: { count: number }) => `${count}ファイルを変更中`,
             modifyingMultipleFiles: ({ file, count }: { file: string; count: number }) => `${file} 他${count}件`,
             showingDiff: '変更を表示中',
+        },
+        group: {
+            stepsCompleted: 'Steps Completed',
+            steps: 'Steps',
         }
     },
 

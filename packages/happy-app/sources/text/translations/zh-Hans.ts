@@ -602,6 +602,10 @@ export const zhHans: TranslationStructure = {
             other: '其他',
             otherDescription: '输入您自己的答案',
             otherPlaceholder: '输入您的答案...',
+        },
+        group: {
+            stepsCompleted: '步骤已完成',
+            steps: '步骤',
         }
     },
 
