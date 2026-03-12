@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": 27,
+      "deployVersion": "2026.03.11.2",
+      "date": "2026-03-11",
+      "summary": "修复会话因 EPIPE 错误意外退出的问题。",
+      "changes": [
+        "修复 daemon 重启后管道断裂导致 EPIPE 错误杀死活跃会话的问题",
+        "在 uncaughtException 处理器中特殊处理 EPIPE，不再触发会话清理",
+        "将 daemon spawn 子进程的 stdio 从 pipe 改为 ignore，从根源消除管道断裂",
+        "添加 stdout/stderr error handler 静默处理 EPIPE 错误"
+      ],
+      "rawMarkdown": "## Version 27 (2026.03.11.2) - 2026-03-11\n\n\n修复会话因 EPIPE 错误意外退出的问题。\n\n- 修复 daemon 重启后管道断裂导致 EPIPE 错误杀死活跃会话的问题\n- 在 uncaughtException 处理器中特殊处理 EPIPE，不再触发会话清理\n- 将 daemon spawn 子进程的 stdio 从 pipe 改为 ignore，从根源消除管道断裂\n- 添加 stdout/stderr error handler 静默处理 EPIPE 错误"
+    },
+    {
       "version": 26,
       "deployVersion": "2026.03.11.1",
       "date": "2026-03-11",
@@ -338,5 +351,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 26
+  "latestVersion": 27
 }

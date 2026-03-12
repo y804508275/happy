@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 27 (2026.03.11.2) - 2026-03-11
+
+修复会话因 EPIPE 错误意外退出的问题。
+
+- 修复 daemon 重启后管道断裂导致 EPIPE 错误杀死活跃会话的问题
+- 在 uncaughtException 处理器中特殊处理 EPIPE，不再触发会话清理
+- 将 daemon spawn 子进程的 stdio 从 pipe 改为 ignore，从根源消除管道断裂
+- 添加 stdout/stderr error handler 静默处理 EPIPE 错误
+
 ## Version 26 (2026.03.11.1) - 2026-03-11
 
 优化工作状态指示器动画效果。
