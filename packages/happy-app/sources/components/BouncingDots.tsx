@@ -9,29 +9,29 @@ interface BouncingDotsProps {
 }
 
 /**
- * Three bouncing dots animation for loading/thinking states.
- * Each dot bounces up with a staggered delay for a wave effect.
+ * Three pulsing dots animation for loading/thinking states.
+ * Each dot scales up then down with a staggered delay for a wave effect.
  */
 export const BouncingDots = React.memo(({ color, size = 4, gap = 3 }: BouncingDotsProps) => {
     return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap, height: size * 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap }}>
             <Dot color={color} size={size} delay={0} />
-            <Dot color={color} size={size} delay={150} />
-            <Dot color={color} size={size} delay={300} />
+            <Dot color={color} size={size} delay={200} />
+            <Dot color={color} size={size} delay={400} />
         </View>
     );
 });
 
 const Dot = React.memo(({ color, size, delay }: { color: string; size: number; delay: number }) => {
-    const translateY = useSharedValue(0);
+    const scale = useSharedValue(1);
 
     React.useEffect(() => {
-        translateY.value = withDelay(delay,
+        scale.value = withDelay(delay,
             withRepeat(
                 withSequence(
-                    withTiming(-size * 1.5, { duration: 300 }),
-                    withTiming(0, { duration: 300 }),
-                    withTiming(0, { duration: 400 }), // pause at bottom
+                    withTiming(1.6, { duration: 300 }),
+                    withTiming(1, { duration: 300 }),
+                    withTiming(1, { duration: 500 }), // pause
                 ),
                 -1,
             )
@@ -39,7 +39,7 @@ const Dot = React.memo(({ color, size, delay }: { color: string; size: number; d
     }, []);
 
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: translateY.value }],
+        transform: [{ scale: scale.value }],
     }));
 
     return (
