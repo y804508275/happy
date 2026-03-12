@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": 28,
+      "deployVersion": "2026.03.11.3",
+      "date": "2026-03-11",
+      "summary": "登录页简化，只保留飞书登录入口。",
+      "changes": [
+        "登录页移除\"创建账户\"按钮",
+        "登录页移除\"使用移动应用登录\"按钮",
+        "登录页移除\"链接或恢复账户\"按钮",
+        "所有平台（Web/iOS/Android）统一使用飞书 OAuth 登录"
+      ],
+      "rawMarkdown": "## Version 28 (2026.03.11.3) - 2026-03-11\n\n\n登录页简化，只保留飞书登录入口。\n\n- 登录页移除\"创建账户\"按钮\n- 登录页移除\"使用移动应用登录\"按钮\n- 登录页移除\"链接或恢复账户\"按钮  \n- 所有平台（Web/iOS/Android）统一使用飞书 OAuth 登录"
+    },
+    {
       "version": 27,
       "deployVersion": "2026.03.11.2",
       "date": "2026-03-11",
@@ -351,5 +364,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 27
+  "latestVersion": 28
 }
