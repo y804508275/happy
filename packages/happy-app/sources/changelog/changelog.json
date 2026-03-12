@@ -1,6 +1,16 @@
 {
   "entries": [
     {
+      "version": 26,
+      "deployVersion": "2026.03.11.1",
+      "date": "2026-03-11",
+      "summary": "优化工作状态指示器动画效果。",
+      "changes": [
+        "将状态指示器从上下弹跳动画改为更优雅的缩放脉冲效果"
+      ],
+      "rawMarkdown": "## Version 26 (2026.03.11.1) - 2026-03-11\n\n\n优化工作状态指示器动画效果。\n\n- 将状态指示器从上下弹跳动画改为更优雅的缩放脉冲效果\n\n发布方式：OTA 部署生效。"
+    },
+    {
       "version": 25,
       "deployVersion": "2026.03.04.8",
       "date": "2026-03-04",
@@ -328,5 +338,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 25
+  "latestVersion": 26
 }
