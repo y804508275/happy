@@ -7,6 +7,7 @@ import { sync } from '@/sync/sync';
 import { Metadata } from '@/sync/storageTypes';
 import { ToolCallMessage } from '@/sync/typesMessage';
 import { layout } from '@/components/layout';
+import { useInlineOptions } from '@/hooks/useInlineOptions';
 
 /**
  * Renders markdown <options> blocks in a fixed position above the input bar.
@@ -114,34 +115,35 @@ const FixedOptionsContent = React.memo(({ items, sessionId, autoConfirmMode, has
         return () => clearTimeout(timer);
     }, [isAutoMode, submitted, hasAnyUserMessage]);
 
-    // Keyboard navigation: up/down to focus, enter to confirm (web only)
+    // Keyboard navigation via InlineOptionsProvider (session-scoped, replaces global window listener)
+    const { setExternalHandler } = useInlineOptions();
     React.useEffect(() => {
         if (Platform.OS !== 'web') return;
 
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
+        setExternalHandler((key: string, shiftKey: boolean): boolean => {
+            if (key === 'ArrowUp') {
                 setFocusedIndex(i => {
                     const next = (i - 1 + items.length) % items.length;
                     focusedIndexRef.current = next;
                     return next;
                 });
-            } else if (e.key === 'ArrowDown') {
-                e.preventDefault();
+                return true;
+            } else if (key === 'ArrowDown') {
                 setFocusedIndex(i => {
                     const next = (i + 1) % items.length;
                     focusedIndexRef.current = next;
                     return next;
                 });
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
+                return true;
+            } else if (key === 'Enter' && !shiftKey) {
                 handleSelectRef.current(focusedIndexRef.current);
+                return true;
             }
-        };
+            return false;
+        });
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [items.length]);
+        return () => setExternalHandler(null);
+    }, [items.length, setExternalHandler]);
 
     return (
         <View style={contentStyles.wrapper}>
