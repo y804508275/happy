@@ -14,7 +14,10 @@ interface ChatHeaderViewProps {
     subtitle?: string;
     onBackPress?: () => void;
     onAvatarPress?: () => void;
-    onContextPress?: () => void;
+    onSidebarToggle?: () => void;
+    sidebarCollapsed?: boolean;
+    onChatPositionToggle?: () => void;
+    chatPosition?: 'left' | 'right';
     avatarId?: string;
     backgroundColor?: string;
     tintColor?: string;
@@ -27,7 +30,10 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
     subtitle,
     onBackPress,
     onAvatarPress,
-    onContextPress,
+    onSidebarToggle,
+    sidebarCollapsed,
+    onChatPositionToggle,
+    chatPosition,
     avatarId,
     isConnected = true,
     flavor,
@@ -49,13 +55,24 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.colors.header.background }]}>
             <View style={styles.contentWrapper}>
                 <View style={[styles.content, { height: headerHeight }]}>
-                <Pressable onPress={handleBackPress} style={styles.backButton} hitSlop={15}>
-                    <Ionicons
-                        name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
-                        size={Platform.select({ ios: 28, default: 24 })}
-                        color={theme.colors.header.tint}
-                    />
-                </Pressable>
+                {onSidebarToggle && (
+                    <Pressable onPress={onSidebarToggle} style={styles.backButton} hitSlop={15}>
+                        <Ionicons
+                            name={sidebarCollapsed ? 'reorder-three-outline' : 'reorder-three-outline'}
+                            size={24}
+                            color={theme.colors.header.tint}
+                        />
+                    </Pressable>
+                )}
+                {!onSidebarToggle && (
+                    <Pressable onPress={handleBackPress} style={styles.backButton} hitSlop={15}>
+                        <Ionicons
+                            name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
+                            size={Platform.select({ ios: 28, default: 24 })}
+                            color={theme.colors.header.tint}
+                        />
+                    </Pressable>
+                )}
                 
                 <View style={styles.titleContainer}>
                     <Text
@@ -89,15 +106,15 @@ export const ChatHeaderView: React.FC<ChatHeaderViewProps> = ({
                     )}
                 </View>
                 
-                {onContextPress && (
+                {onChatPositionToggle && (
                     <Pressable
-                        onPress={onContextPress}
+                        onPress={onChatPositionToggle}
                         hitSlop={15}
                         style={styles.contextButton}
                     >
                         <Ionicons
-                            name="book-outline"
-                            size={22}
+                            name={chatPosition === 'left' ? 'swap-horizontal-outline' : 'swap-horizontal-outline'}
+                            size={20}
                             color={theme.colors.header.tint}
                         />
                     </Pressable>

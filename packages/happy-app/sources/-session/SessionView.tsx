@@ -101,7 +101,6 @@ export const SessionView = React.memo((props: { id: string }) => {
             subtitle: session.metadata?.path ? formatPathRelativeToHome(session.metadata.path, session.metadata?.homeDir) : undefined,
             avatarId: getSessionAvatarId(session),
             onAvatarPress: () => router.push(`/session/${sessionId}/info`),
-            onContextPress: session.metadata?.path ? () => router.push(`/session/${sessionId}/context`) : undefined,
             isConnected: isConnected,
             flavor: session.metadata?.flavor || null,
             tintColor: isConnected ? '#000' : '#8E8E93'
@@ -686,7 +685,7 @@ function SessionViewLoaded({ sessionId, session, headerProps, onBackPress, showH
 
     const sidebarWidth = React.useMemo(() => {
         if (typeof window === 'undefined') return 300;
-        return Math.min(Math.max(Math.floor(window.innerWidth * 0.3), 250), 360);
+        return Math.min(Math.max(Math.floor(window.innerWidth * 0.25), 220), 300);
     }, []);
     const defaultChatWidth = sidebarWidth;
     const [dragChatWidth, setDragChatWidth] = React.useState<number | null>(null);

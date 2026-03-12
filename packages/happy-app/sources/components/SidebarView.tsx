@@ -1,12 +1,11 @@
-import { useSocketStatus, useFriendRequests, useSettings } from '@/sync/storage';
+import { useSocketStatus, useFriendRequests } from '@/sync/storage';
 import * as React from 'react';
-import { Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useHeaderHeight } from '@/utils/responsive';
 import { Typography } from '@/constants/Typography';
 import { StatusDot } from './StatusDot';
-import { FABWide } from './FABWide';
 import { VoiceAssistantStatusBar } from './VoiceAssistantStatusBar';
 import { useRealtimeStatus } from '@/sync/storage';
 import { MainView } from './MainView';
@@ -14,7 +13,6 @@ import { Image } from 'expo-image';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useInboxHasContent } from '@/hooks/useInboxHasContent';
-import { useSessionsBadgeCount } from '@/hooks/useSessionBadge';
 import { Ionicons } from '@expo/vector-icons';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
@@ -28,62 +26,61 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
+        paddingHorizontal: 24,
         backgroundColor: theme.colors.groupped.background,
-        position: 'relative',
-    },
-    logoContainer: {
-        width: 32,
     },
     logo: {
         height: 24,
         width: 24,
     },
-    titleContainer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        flexDirection: 'column',
-        alignItems: 'center',
-        pointerEvents: 'none',
-    },
-    titleContainerLeft: {
-        flex: 1,
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        marginLeft: 8,
-        justifyContent: 'center',
-    },
     titleText: {
-        fontSize: 17,
+        fontSize: 15,
         fontWeight: '600',
         color: theme.colors.header.tint,
+        marginLeft: 10,
         ...Typography.default('semiBold'),
     },
-    statusContainer: {
+    statusTag: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: -2,
+        marginLeft: 'auto',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        gap: 4,
     },
-    statusDot: {
-        marginRight: 4,
-    },
-    statusText: {
+    statusTagText: {
         fontSize: 11,
         fontWeight: '500',
-        lineHeight: 16,
         ...Typography.default(),
     },
-    rightContainer: {
-        marginLeft: 'auto',
-        alignItems: 'flex-end',
+    // Status colors
+    statusConnected: {
+        color: theme.colors.status.connected,
+    },
+    statusConnecting: {
+        color: theme.colors.status.connecting,
+    },
+    statusDisconnected: {
+        color: theme.colors.status.disconnected,
+    },
+    statusError: {
+        color: theme.colors.status.error,
+    },
+    statusDefault: {
+        color: theme.colors.status.default,
+    },
+    // Bottom bar
+    bottomBar: {
         flexDirection: 'row',
-        gap: 8,
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: theme.colors.divider,
+        gap: 16,
     },
-    settingsButton: {
-        color: theme.colors.header.tint,
-    },
-    notificationButton: {
+    bottomButton: {
         position: 'relative',
     },
     badge: {
@@ -102,22 +99,6 @@ const stylesheet = StyleSheet.create((theme, runtime) => ({
         color: '#FFFFFF',
         fontSize: 10,
         ...Typography.default('semiBold'),
-    },
-    // Status colors
-    statusConnected: {
-        color: theme.colors.status.connected,
-    },
-    statusConnecting: {
-        color: theme.colors.status.connecting,
-    },
-    statusDisconnected: {
-        color: theme.colors.status.disconnected,
-    },
-    statusError: {
-        color: theme.colors.status.error,
-    },
-    statusDefault: {
-        color: theme.colors.status.default,
     },
     indicatorDot: {
         position: 'absolute',
@@ -140,8 +121,6 @@ export const SidebarView = React.memo(() => {
     const realtimeStatus = useRealtimeStatus();
     const friendRequests = useFriendRequests();
     const inboxHasContent = useInboxHasContent();
-    const sessionsBadgeCount = useSessionsBadgeCount();
-    const settings = useSettings();
 
     // Compute connection status once per render (theme-reactive, no stale memoization)
     const connectionStatus = (() => {
@@ -185,123 +164,69 @@ export const SidebarView = React.memo(() => {
         }
     })();
 
-    // Calculate sidebar width and determine title positioning
-    // Uses same formula as SidebarNavigator.tsx:18 for consistency
-    const { width: windowWidth } = useWindowDimensions();
-    const sidebarWidth = Math.min(Math.max(Math.floor(windowWidth * 0.3), 250), 360);
-    // With experiments: 4 icons (148px total), threshold 408px > max 360px → always left-justify
-    // Without experiments: 3 icons (108px total), threshold 328px → left-justify below ~340px
-    const shouldLeftJustify = settings.experiments || sidebarWidth < 340;
+    return (
+        <View style={[styles.container, { paddingTop: safeArea.top }]}>
+            {/* Header: Logo + App Name */}
+            <View style={[styles.header, { height: headerHeight }]}>
+                <Image
+                    source={theme.dark ? require('@/assets/images/logo-white.png') : require('@/assets/images/logo-black.png')}
+                    contentFit="contain"
+                    style={[styles.logo, { height: 24, width: 24 }]}
+                />
+                <Text style={styles.titleText}>Happy</Text>
+            </View>
 
-    const handleNewSession = React.useCallback(() => {
-        router.push('/new');
-    }, [router]);
+            {realtimeStatus !== 'disconnected' && (
+                <VoiceAssistantStatusBar variant="sidebar" />
+            )}
 
-    // Title content used in both centered and left-justified modes (DRY)
-    const titleContent = (
-        <>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.titleText}>{t('sidebar.sessionsTitle')}</Text>
-                {sessionsBadgeCount > 0 && (
-                    <View style={[styles.badge, { position: 'relative', top: 0, right: 0, marginLeft: 6 }]}>
-                        <Text style={styles.badgeText}>
-                            {sessionsBadgeCount > 99 ? '99+' : sessionsBadgeCount}
+            {/* Session list */}
+            <MainView variant="sidebar" />
+
+            {/* Bottom bar: Inbox + Settings + Knowledge + Status tag */}
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(safeArea.bottom, 12) }]}>
+                <Pressable
+                    onPress={() => router.push('/(app)/inbox')}
+                    hitSlop={15}
+                    style={styles.bottomButton}
+                >
+                    <Ionicons name="mail-outline" size={20} color={theme.colors.header.tint} />
+                    {friendRequests.length > 0 && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>
+                                {friendRequests.length > 99 ? '99+' : friendRequests.length}
+                            </Text>
+                        </View>
+                    )}
+                    {inboxHasContent && friendRequests.length === 0 && (
+                        <View style={styles.indicatorDot} />
+                    )}
+                </Pressable>
+                <Pressable
+                    onPress={() => router.push('/settings')}
+                    hitSlop={15}
+                >
+                    <Ionicons name="settings-outline" size={20} color={theme.colors.header.tint} />
+                </Pressable>
+                <Pressable
+                    onPress={() => router.push('/(app)/knowledge')}
+                    hitSlop={15}
+                >
+                    <Ionicons name="book-outline" size={20} color={theme.colors.header.tint} />
+                </Pressable>
+                {connectionStatus.text && (
+                    <View style={[styles.statusTag, { backgroundColor: connectionStatus.color + '18' }]}>
+                        <StatusDot
+                            color={connectionStatus.color}
+                            isPulsing={connectionStatus.isPulsing}
+                            size={6}
+                        />
+                        <Text style={[styles.statusTagText, { color: connectionStatus.textColor }]}>
+                            {connectionStatus.text}
                         </Text>
                     </View>
                 )}
             </View>
-            {connectionStatus.text && (
-                <View style={styles.statusContainer}>
-                    <StatusDot
-                        color={connectionStatus.color}
-                        isPulsing={connectionStatus.isPulsing}
-                        size={6}
-                        style={styles.statusDot}
-                    />
-                    <Text style={[styles.statusText, { color: connectionStatus.textColor }]}>
-                        {connectionStatus.text}
-                    </Text>
-                </View>
-            )}
-        </>
+        </View>
     );
-
-    return (
-        <>
-            <View style={[styles.container, { paddingTop: safeArea.top }]}>
-                <View style={[styles.header, { height: headerHeight }]}>
-                    {/* Logo - always first */}
-                    <View style={styles.logoContainer}>
-                        <Image
-                            source={theme.dark ? require('@/assets/images/logo-white.png') : require('@/assets/images/logo-black.png')}
-                            contentFit="contain"
-                            style={[styles.logo, { height: 24, width: 24 }]}
-                        />
-                    </View>
-
-                    {/* Left-justified title - in document flow, prevents overlap */}
-                    {shouldLeftJustify && (
-                        <View style={styles.titleContainerLeft}>
-                            {titleContent}
-                        </View>
-                    )}
-
-                    {/* Navigation icons */}
-                    <View style={styles.rightContainer}>
-                        <Pressable
-                            onPress={() => router.push('/(app)/inbox')}
-                            hitSlop={15}
-                            style={styles.notificationButton}
-                        >
-                            <Image
-                                source={require('@/assets/images/brutalist/Brutalism 27.png')}
-                                contentFit="contain"
-                                style={[{ width: 32, height: 32 }]}
-                                tintColor={theme.colors.header.tint}
-                            />
-                            {friendRequests.length > 0 && (
-                                <View style={styles.badge}>
-                                    <Text style={styles.badgeText}>
-                                        {friendRequests.length > 99 ? '99+' : friendRequests.length}
-                                    </Text>
-                                </View>
-                            )}
-                            {inboxHasContent && friendRequests.length === 0 && (
-                                <View style={styles.indicatorDot} />
-                            )}
-                        </Pressable>
-                        <Pressable
-                            onPress={() => router.push('/settings')}
-                            hitSlop={15}
-                        >
-                            <Image
-                                source={require('@/assets/images/brutalist/Brutalism 9.png')}
-                                contentFit="contain"
-                                style={[{ width: 32, height: 32 }]}
-                                tintColor={theme.colors.header.tint}
-                            />
-                        </Pressable>
-                        <Pressable
-                            onPress={handleNewSession}
-                            hitSlop={15}
-                        >
-                            <Ionicons name="add-outline" size={28} color={theme.colors.header.tint} />
-                        </Pressable>
-                    </View>
-
-                    {/* Centered title - absolute positioned over full header */}
-                    {!shouldLeftJustify && (
-                        <View style={styles.titleContainer}>
-                            {titleContent}
-                        </View>
-                    )}
-                </View>
-                {realtimeStatus !== 'disconnected' && (
-                    <VoiceAssistantStatusBar variant="sidebar" />
-                )}
-                <MainView variant="sidebar" />
-            </View>
-            <FABWide onPress={handleNewSession} />
-        </>
-    )
 });

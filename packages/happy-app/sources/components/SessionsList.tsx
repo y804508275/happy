@@ -50,9 +50,41 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingHorizontal: 24,
         paddingTop: 20,
         paddingBottom: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    headerIcon: {
+        color: theme.colors.groupped.sectionTitle,
     },
     headerText: {
-        fontSize: 14,
+        fontSize: 12,
+        fontWeight: '600',
+        color: theme.colors.groupped.sectionTitle,
+        letterSpacing: 0.1,
+        ...Typography.default('semiBold'),
+    },
+    newSessionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        marginTop: 8,
+        gap: 6,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    newSessionRowPressed: {
+        opacity: 0.6,
+    },
+    newSessionRowHovered: {
+        backgroundColor: theme.colors.surfaceSelected,
+        borderRadius: 8,
+    },
+    newSessionIcon: {
+        color: theme.colors.groupped.sectionTitle,
+    },
+    newSessionText: {
+        fontSize: 12,
         fontWeight: '600',
         color: theme.colors.groupped.sectionTitle,
         letterSpacing: 0.1,
@@ -76,7 +108,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         ...Typography.default(),
     },
     sessionItem: {
-        height: 88,
+        height: 72,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
@@ -105,11 +137,11 @@ const stylesheet = StyleSheet.create((theme) => ({
     sessionItemContainerLast: {
         borderBottomLeftRadius: 12,
         borderBottomRightRadius: 12,
-        marginBottom: 12,
+        marginBottom: 8,
     },
     sessionItemContainerSingle: {
         borderRadius: 12,
-        marginBottom: 12,
+        marginBottom: 8,
     },
     sessionItemSelected: {
         backgroundColor: theme.colors.surfaceSelected,
@@ -125,7 +157,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         marginBottom: 2,
     },
     sessionTitle: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '500',
         flex: 1,
         ...Typography.default('semiBold'),
@@ -137,9 +169,9 @@ const stylesheet = StyleSheet.create((theme) => ({
         color: theme.colors.textSecondary,
     },
     sessionSubtitle: {
-        fontSize: 13,
+        fontSize: 12,
         color: theme.colors.textSecondary,
-        marginBottom: 4,
+        marginBottom: 2,
         ...Typography.default(),
     },
     statusRow: {
@@ -253,6 +285,9 @@ export function SessionsList() {
             case 'header':
                 return (
                     <View style={styles.headerSection}>
+                        {item.icon && (
+                            <Ionicons name={item.icon as any} size={14} style={styles.headerIcon} />
+                        )}
                         <Text style={styles.headerText}>
                             {item.title}
                         </Text>
@@ -288,6 +323,15 @@ export function SessionsList() {
                 );
 
             case 'session':
+                if (compactSessionView) {
+                    return (
+                        <CompactSessionItem
+                            session={item.session}
+                            selected={item.selected}
+                        />
+                    );
+                }
+
                 // Determine card styling based on position within date group
                 const prevItem = index > 0 && dataWithSelected ? dataWithSelected[index - 1] : null;
                 const nextItem = index < (dataWithSelected?.length || 0) - 1 && dataWithSelected ? dataWithSelected[index + 1] : null;
@@ -314,9 +358,22 @@ export function SessionsList() {
 
     const HeaderComponent = React.useCallback(() => {
         return (
-            <UpdateBanner />
+            <>
+                <UpdateBanner />
+                <Pressable
+                    style={({ pressed, hovered }: any) => [
+                        styles.newSessionRow,
+                        pressed && styles.newSessionRowPressed,
+                        hovered && styles.newSessionRowHovered,
+                    ]}
+                    onPress={() => router.push('/new')}
+                >
+                    <Ionicons name="create-outline" size={14} style={styles.newSessionIcon} />
+                    <Text style={styles.newSessionText}>{t('newSession.title')}</Text>
+                </Pressable>
+            </>
         );
-    }, []);
+    }, [router]);
 
     // Footer removed - all sessions now shown inline
 
@@ -537,5 +594,165 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                 {itemContent}
             </Swipeable>
         </View>
+    );
+});
+
+// Compact session item for inactive sessions - Claude-style minimal design
+const compactItemStylesheet = StyleSheet.create((theme) => ({
+    row: {
+        height: 36,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        backgroundColor: theme.colors.groupped.background,
+    },
+    rowSelected: {
+        backgroundColor: theme.colors.surfaceSelected,
+        borderRadius: 8,
+    },
+    rowHovered: {
+        backgroundColor: theme.colors.surfaceSelected,
+        borderRadius: 8,
+    },
+    trailingIndicator: {
+        marginLeft: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    title: {
+        fontSize: 13,
+        flex: 1,
+        color: theme.colors.textSecondary,
+        ...Typography.default('regular'),
+    },
+    swipeAction: {
+        width: 80,
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: theme.colors.status.error,
+    },
+    swipeActionText: {
+        marginTop: 4,
+        fontSize: 12,
+        color: '#FFFFFF',
+        textAlign: 'center',
+        ...Typography.default('semiBold'),
+    },
+}));
+
+const CompactSessionItem = React.memo(({ session, selected }: {
+    session: Session;
+    selected?: boolean;
+}) => {
+    const styles = compactItemStylesheet;
+    const { theme } = useUnistyles();
+    const sessionName = getSessionName(session);
+    const navigateToSession = useNavigateToSession();
+    const isTablet = useIsTablet();
+    const swipeableRef = React.useRef<Swipeable | null>(null);
+    const swipeEnabled = Platform.OS !== 'web';
+    const badgeType = useSessionBadge(session);
+    const { ref: contextMenuRef, contextMenu, close: closeContextMenu } = useWebContextMenu();
+
+    const [deletingSession, performDelete] = useHappyAction(async () => {
+        const result = await sessionDelete(session.id);
+        if (!result.success) {
+            throw new HappyError(result.message || t('sessionInfo.failedToDeleteSession'), false);
+        }
+    });
+
+    const handleDelete = React.useCallback(() => {
+        swipeableRef.current?.close();
+        Modal.alert(
+            t('sessionInfo.deleteSession'),
+            t('sessionInfo.deleteSessionWarning'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('sessionInfo.deleteSession'),
+                    style: 'destructive',
+                    onPress: performDelete
+                }
+            ]
+        );
+    }, [performDelete]);
+
+    const itemContent = (
+        <Pressable
+            style={({ hovered }: any) => [
+                styles.row,
+                selected && styles.rowSelected,
+                !selected && hovered && styles.rowHovered,
+            ]}
+            onPressIn={() => {
+                if (isTablet) {
+                    navigateToSession(session.id);
+                }
+            }}
+            onPress={() => {
+                if (!isTablet) {
+                    navigateToSession(session.id);
+                }
+            }}
+        >
+            <Text style={styles.title} numberOfLines={1}>
+                {sessionName}
+            </Text>
+            {badgeType && (
+                <View style={styles.trailingIndicator}>
+                    <StatusDot
+                        color={badgeType === 'action' ? theme.colors.badge.action : theme.colors.badge.info}
+                        isPulsing={badgeType === 'action'}
+                    />
+                </View>
+            )}
+        </Pressable>
+    );
+
+    if (!swipeEnabled) {
+        return (
+            <View ref={contextMenuRef}>
+                {itemContent}
+                <WebContextMenu
+                    visible={contextMenu !== null}
+                    position={contextMenu || { x: 0, y: 0 }}
+                    items={[
+                        {
+                            label: t('sessionInfo.deleteSession'),
+                            icon: 'trash-outline',
+                            color: theme.colors.status.error,
+                            onPress: handleDelete,
+                            disabled: deletingSession,
+                        },
+                    ]}
+                    onClose={closeContextMenu}
+                />
+            </View>
+        );
+    }
+
+    const renderRightActions = () => (
+        <Pressable
+            style={styles.swipeAction}
+            onPress={handleDelete}
+            disabled={deletingSession}
+        >
+            <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.swipeActionText} numberOfLines={2}>
+                {t('sessionInfo.deleteSession')}
+            </Text>
+        </Pressable>
+    );
+
+    return (
+        <Swipeable
+            ref={swipeableRef}
+            renderRightActions={renderRightActions}
+            overshootRight={false}
+            enabled={!deletingSession}
+        >
+            {itemContent}
+        </Swipeable>
     );
 });
