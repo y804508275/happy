@@ -383,6 +383,14 @@ export async function startDaemon(): Promise<void> {
           };
         }
 
+        // Pass delegated Happy auth credentials to spawned CLI process (for shared machine multi-user support)
+        if (options.happyAuthToken) {
+          extraEnv.HAPPY_AUTH_TOKEN = options.happyAuthToken;
+        }
+        if (options.happyAuthSecret) {
+          extraEnv.HAPPY_AUTH_SECRET = options.happyAuthSecret;
+        }
+
         // Check if tmux is available and should be used
         const tmuxAvailable = await isTmuxAvailable();
         let useTmux = tmuxAvailable;
@@ -1085,6 +1093,25 @@ export async function startDaemon(): Promise<void> {
       daemonState: initialDaemonState
     });
     logger.debug(`[DAEMON RUN] Machine registered: ${machine.id}`);
+
+    // Share machine if HAPPY_MACHINE_SHARED env var is set
+    const shouldShareMachine = process.env.HAPPY_MACHINE_SHARED === 'true' || process.env.HAPPY_MACHINE_SHARED === '1';
+    if (shouldShareMachine) {
+      try {
+        // Get the machine key for sharing
+        let sharedKey: Uint8Array;
+        if (credentials.encryption.type === 'dataKey') {
+          sharedKey = credentials.encryption.machineKey;
+        } else {
+          sharedKey = credentials.encryption.secret;
+        }
+        await api.shareMachine(machine.id, true, sharedKey);
+        logger.debug(`[DAEMON RUN] Machine ${machine.id} marked as shared`);
+      } catch (error) {
+        logger.warn(`[DAEMON RUN] Failed to mark machine as shared: ${error instanceof Error ? error.message : String(error)}`);
+        // Non-fatal: daemon continues running even if sharing fails
+      }
+    }
 
     // Create realtime machine session
     const apiMachine = api.machineSyncClient(machine);

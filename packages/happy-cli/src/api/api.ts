@@ -273,6 +273,37 @@ export class ApiClient {
     }
   }
 
+  /**
+   * Mark a machine as shared (or unshared) for multi-user support
+   */
+  async shareMachine(machineId: string, shared: boolean, sharedKey: Uint8Array): Promise<void> {
+    try {
+      await axios.post(
+        `${configuration.serverUrl}/v1/machines/${machineId}/share`,
+        {
+          shared,
+          sharedKey: encodeBase64(sharedKey)
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.credential.token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+      logger.debug(`[API] Machine ${machineId} shared=${shared}`);
+    } catch (error) {
+      logger.debug(`[API] [ERROR] Failed to share machine:`, error);
+      // Non-fatal: log warning but don't throw - machine can still work unshared
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        logger.warn(`[API] Share endpoint not available (404) - server may need update`);
+      } else {
+        throw new Error(`Failed to share machine: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }
+
   sessionSyncClient(session: Session): ApiSessionClient {
     return new ApiSessionClient(this.credential.token, session);
   }

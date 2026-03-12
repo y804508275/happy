@@ -642,6 +642,15 @@ class Sync {
                 dataKeyBase64 = encodeBase64(dataKey, 'base64');
             }
 
+            // For shared machines, include user credentials so the daemon can authenticate
+            let happyAuthToken: string | undefined;
+            let happyAuthSecret: string | undefined;
+            const originalMachine = storage.getState().machines[originalMachineId];
+            if (originalMachine && !originalMachine.isOwned) {
+                happyAuthToken = this.credentials?.token;
+                happyAuthSecret = this.credentials?.secret;
+            }
+
             const params = {
                 happySessionId: sessionId,
                 directory: session.metadata!.path,
@@ -649,6 +658,8 @@ class Sync {
                 agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini' | 'droid' | 'opencode') || undefined,
                 dataKey: dataKeyBase64,
                 lastSeq: this.sessionLastSeq.get(sessionId) ?? 0,
+                happyAuthToken,
+                happyAuthSecret,
             };
 
             log.log(`Session reactivation: trying machines [${machineIdsToTry.join(', ')}] for session ${sessionId}`);
@@ -741,11 +752,22 @@ class Sync {
             machineIdsToTry.push(originalMachineId);
         }
 
+        // For shared machines, include user credentials so the daemon can authenticate
+        let happyAuthToken: string | undefined;
+        let happyAuthSecret: string | undefined;
+        const originalMachine = storage.getState().machines[originalMachineId];
+        if (originalMachine && !originalMachine.isOwned) {
+            happyAuthToken = this.credentials?.token;
+            happyAuthSecret = this.credentials?.secret;
+        }
+
         const params = {
             happySessionId: sessionId,
             directory: session.metadata.path,
             newAgent,
             dataKey: dataKeyBase64,
+            happyAuthToken,
+            happyAuthSecret,
         };
 
         log.log(`Session agent switch: trying machines [${machineIdsToTry.join(', ')}] for session ${sessionId}`);
@@ -1380,6 +1402,7 @@ class Sync {
             daemonState?: string | null;
             daemonStateVersion?: number;
             dataEncryptionKey?: string | null; // Add support for per-machine encryption keys
+            isOwned?: boolean; // true for user's own machines, false for shared machines
             seq: number;
             active: boolean;
             activeAt: number;  // Changed from lastActiveAt
@@ -1390,8 +1413,16 @@ class Sync {
         // First, collect and decrypt encryption keys for all machines
         const machineKeysMap = new Map<string, Uint8Array | null>();
         for (const machine of machines) {
+            const isOwned = machine.isOwned !== false; // Default to true for backward compatibility
             if (machine.dataEncryptionKey) {
-                const decryptedKey = await this.encryption.decryptEncryptionKey(machine.dataEncryptionKey);
+                let decryptedKey: Uint8Array | null;
+                if (isOwned) {
+                    // Owned machine: key is encrypted with user's public key
+                    decryptedKey = await this.encryption.decryptEncryptionKey(machine.dataEncryptionKey);
+                } else {
+                    // Shared machine: key is raw (just base64 decode)
+                    decryptedKey = this.encryption.decodeSharedEncryptionKey(machine.dataEncryptionKey);
+                }
                 if (!decryptedKey) {
                     console.error(`Failed to decrypt data encryption key for machine ${machine.id}`);
                     continue;
@@ -1417,6 +1448,8 @@ class Sync {
                 continue;
             }
 
+            const isOwned = machine.isOwned !== false; // Default to true for backward compatibility
+
             try {
 
                 // Use machine-specific encryption (which handles fallback internally)
@@ -1438,7 +1471,8 @@ class Sync {
                     metadata,
                     metadataVersion: machine.metadataVersion,
                     daemonState,
-                    daemonStateVersion: machine.daemonStateVersion || 0
+                    daemonStateVersion: machine.daemonStateVersion || 0,
+                    isOwned,
                 });
             } catch (error) {
                 console.error(`Failed to decrypt machine ${machine.id}:`, error);
@@ -1453,7 +1487,8 @@ class Sync {
                     metadata: null,
                     metadataVersion: machine.metadataVersion,
                     daemonState: null,
-                    daemonStateVersion: 0
+                    daemonStateVersion: 0,
+                    isOwned,
                 });
             }
         }
@@ -2246,7 +2281,8 @@ class Sync {
                 metadata: machine?.metadata ?? null,
                 metadataVersion: machine?.metadataVersion ?? 0,
                 daemonState: machine?.daemonState ?? null,
-                daemonStateVersion: machine?.daemonStateVersion ?? 0
+                daemonStateVersion: machine?.daemonStateVersion ?? 0,
+                isOwned: machine?.isOwned ?? true,  // Preserve isOwned from initial fetch
             };
 
             // Get machine-specific encryption (might not exist if machine wasn't initialized)

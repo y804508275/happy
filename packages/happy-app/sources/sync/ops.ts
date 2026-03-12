@@ -6,6 +6,7 @@
 import { apiSocket } from './apiSocket';
 import { sync } from './sync';
 import { storage } from './storage';
+import { TokenStorage } from '@/auth/tokenStorage';
 import type { MachineMetadata, Metadata, AutoConfirmMode } from './storageTypes';
 
 // Strict type definitions for all operations
@@ -164,6 +165,18 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
     const { machineId, directory, approvedNewDirectoryCreation = false, token, agent, environmentVariables } = options;
 
     try {
+        // Check if this is a shared machine - if so, include user credentials
+        const machine = storage.getState().machines[machineId];
+        let happyAuthToken: string | undefined;
+        let happyAuthSecret: string | undefined;
+        if (machine && !machine.isOwned) {
+            const credentials = await TokenStorage.getCredentials();
+            if (credentials) {
+                happyAuthToken = credentials.token;
+                happyAuthSecret = credentials.secret;
+            }
+        }
+
         const result = await apiSocket.machineRPC<SpawnSessionResult, {
             type: 'spawn-in-directory'
             directory: string
@@ -171,10 +184,12 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             token?: string,
             agent?: 'codex' | 'claude' | 'gemini' | 'droid' | 'opencode',
             environmentVariables?: Record<string, string>;
+            happyAuthToken?: string;
+            happyAuthSecret?: string;
         }>(
             machineId,
             'spawn-happy-session',
-            { type: 'spawn-in-directory', directory, approvedNewDirectoryCreation, token, agent, environmentVariables }
+            { type: 'spawn-in-directory', directory, approvedNewDirectoryCreation, token, agent, environmentVariables, happyAuthToken, happyAuthSecret }
         );
         return result;
     } catch (error) {

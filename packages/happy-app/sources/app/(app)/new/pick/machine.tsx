@@ -118,10 +118,10 @@ export default function MachinePickerScreen() {
                     config={{
                         getItemId: (machine) => machine.id,
                         getItemTitle: (machine) => machine.metadata?.displayName || machine.metadata?.host || machine.id,
-                        getItemSubtitle: undefined,
+                        getItemSubtitle: (machine) => machine.isOwned ? undefined : 'Shared',
                         getItemIcon: (machine) => (
                             <Ionicons
-                                name="desktop-outline"
+                                name={machine.isOwned ? "desktop-outline" : "people-outline"}
                                 size={24}
                                 color={theme.colors.textSecondary}
                             />

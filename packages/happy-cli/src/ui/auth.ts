@@ -5,7 +5,7 @@ import tweetnacl from 'tweetnacl';
 import axios from 'axios';
 import { displayQRCode } from "./qrcode";
 import { delay } from "@/utils/time";
-import { writeCredentialsLegacy, readCredentials, updateSettings, Credentials, writeCredentialsDataKey } from "@/persistence";
+import { writeCredentialsLegacy, readCredentials, readSettings, updateSettings, Credentials, writeCredentialsDataKey } from "@/persistence";
 import { generateWebAuthUrl } from "@/api/webAuth";
 import { openBrowser } from "@/utils/browser";
 import { AuthSelector, AuthMethod } from "./ink/AuthSelector";
@@ -252,6 +252,9 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
     let credentials = await readCredentials();
     let newAuth = false;
 
+    // Check if using env var based delegated credentials
+    const usingEnvVarAuth = !!(process.env.HAPPY_AUTH_TOKEN && process.env.HAPPY_AUTH_SECRET);
+
     if (!credentials) {
         logger.debug('[AUTH] No credentials found, starting authentication flow...');
         const authResult = await doAuth();
@@ -262,6 +265,16 @@ export async function authAndSetupMachineIfNeeded(): Promise<{
         newAuth = true;
     } else {
         logger.debug('[AUTH] Using existing credentials');
+    }
+
+    // When running with env var credentials (delegated auth), don't create or modify machine ID.
+    // The CLI should only use the provided credentials for auth and session creation.
+    if (usingEnvVarAuth) {
+        logger.debug('[AUTH] Using delegated env var credentials, skipping machine setup');
+        const settings = await readSettings();
+        // Use existing machineId or generate a temporary one (won't be persisted for delegated sessions)
+        const machineId = settings.machineId || randomUUID();
+        return { credentials, machineId };
     }
 
     // Make sure we have a machine ID

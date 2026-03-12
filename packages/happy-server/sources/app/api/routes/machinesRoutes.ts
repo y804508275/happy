@@ -114,12 +114,22 @@ export function machinesRoutes(app: Fastify) {
     }, async (request, reply) => {
         const userId = request.userId;
 
-        const machines = await db.machine.findMany({
+        // Fetch user's own machines
+        const ownMachines = await db.machine.findMany({
             where: { accountId: userId },
             orderBy: { lastActiveAt: 'desc' }
         });
 
-        return machines.map(m => ({
+        // Fetch shared machines from other users
+        const sharedMachines = await db.machine.findMany({
+            where: {
+                shared: true,
+                accountId: { not: userId }
+            },
+            orderBy: { lastActiveAt: 'desc' }
+        });
+
+        const ownResult = ownMachines.map(m => ({
             id: m.id,
             metadata: m.metadata,
             metadataVersion: m.metadataVersion,
@@ -130,8 +140,26 @@ export function machinesRoutes(app: Fastify) {
             active: m.active,
             activeAt: m.lastActiveAt.getTime(),
             createdAt: m.createdAt.getTime(),
-            updatedAt: m.updatedAt.getTime()
+            updatedAt: m.updatedAt.getTime(),
+            isOwned: true,
         }));
+
+        const sharedResult = sharedMachines.map(m => ({
+            id: m.id,
+            metadata: m.metadata,
+            metadataVersion: m.metadataVersion,
+            daemonState: m.daemonState,
+            daemonStateVersion: m.daemonStateVersion,
+            dataEncryptionKey: m.sharedKey ? Buffer.from(m.sharedKey).toString('base64') : null,
+            seq: m.seq,
+            active: m.active,
+            activeAt: m.lastActiveAt.getTime(),
+            createdAt: m.createdAt.getTime(),
+            updatedAt: m.updatedAt.getTime(),
+            isOwned: false,
+        }));
+
+        return [...ownResult, ...sharedResult];
     });
 
     // GET /v1/machines/:id - Get single machine by ID
@@ -170,6 +198,54 @@ export function machinesRoutes(app: Fastify) {
                 activeAt: machine.lastActiveAt.getTime(),
                 createdAt: machine.createdAt.getTime(),
                 updatedAt: machine.updatedAt.getTime()
+            }
+        };
+    });
+
+    // POST /v1/machines/:id/share - Toggle sharing for a machine
+    app.post('/v1/machines/:id/share', {
+        preHandler: app.authenticate,
+        schema: {
+            params: z.object({
+                id: z.string()
+            }),
+            body: z.object({
+                shared: z.boolean(),
+                sharedKey: z.string().optional() // base64-encoded raw key
+            })
+        }
+    }, async (request, reply) => {
+        const userId = request.userId;
+        const { id } = request.params;
+        const { shared, sharedKey } = request.body;
+
+        // Only the machine owner can share/unshare
+        const machine = await db.machine.findFirst({
+            where: {
+                accountId: userId,
+                id: id
+            }
+        });
+
+        if (!machine) {
+            return reply.code(404).send({ error: 'Machine not found' });
+        }
+
+        const updated = await db.machine.update({
+            where: { id },
+            data: {
+                shared,
+                sharedKey: sharedKey ? new Uint8Array(Buffer.from(sharedKey, 'base64')) : (shared ? machine.sharedKey : null),
+            }
+        });
+
+        log({ module: 'machines', machineId: id, userId }, `Machine sharing ${shared ? 'enabled' : 'disabled'}`);
+
+        return {
+            ok: true,
+            machine: {
+                id: updated.id,
+                shared: updated.shared,
             }
         };
     });

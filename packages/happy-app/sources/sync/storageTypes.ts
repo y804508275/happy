@@ -152,6 +152,7 @@ export interface Machine {
     metadataVersion: number;
     daemonState: any | null;  // Dynamic daemon state (runtime info)
     daemonStateVersion: number;
+    isOwned: boolean;  // true for user's own machines, false for shared machines
 }
 
 //

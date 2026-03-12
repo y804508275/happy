@@ -52,3 +52,6 @@ CLAUDE.local.md
 notes/
 # ralphex progress logs
 progress*.txt
+
+# npm lock file (project uses yarn)
+package-lock.json

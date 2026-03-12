@@ -444,6 +444,23 @@ export type Credentials = {
 }
 
 export async function readCredentials(): Promise<Credentials | null> {
+  // Check for env var based auth override (used for delegated/shared machine sessions)
+  const envToken = process.env.HAPPY_AUTH_TOKEN;
+  const envSecret = process.env.HAPPY_AUTH_SECRET;
+  if (envToken && envSecret) {
+    try {
+      return {
+        token: envToken,
+        encryption: {
+          type: 'legacy',
+          secret: new Uint8Array(Buffer.from(envSecret, 'base64'))
+        }
+      };
+    } catch {
+      // Fall through to file-based credentials if env var parsing fails
+    }
+  }
+
   if (!existsSync(configuration.privateKeyFile)) {
     return null
   }

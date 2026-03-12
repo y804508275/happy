@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 31 (2026.03.11.6) - 2026-03-11
+
+修复服务端部署依赖问题。
+
+- 降级 pglite-prisma-adapter 到 0.6.1 以兼容 @prisma/client 6.x
+- 移除冲突的 package-lock.json（项目使用 yarn）
+- 将 package-lock.json 加入 .gitignore 防止再次生成
+- 重新生成 yarn.lock 修复损坏的 lockfile 条目
+
 ## Version 30 (2026.03.11.5) - 2026-03-11
 
 新增 Task 工具完整展开视图组件。

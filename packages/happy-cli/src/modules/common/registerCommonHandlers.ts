@@ -126,6 +126,10 @@ export interface SpawnSessionOptions {
     resumeClaudeSessionId?: string;
     /** Path to restart state file containing session encryption info */
     restartFilePath?: string;
+    /** Delegated Happy auth token for shared machine multi-user support */
+    happyAuthToken?: string;
+    /** Delegated Happy auth secret (base64-encoded) for shared machine multi-user support */
+    happyAuthSecret?: string;
     environmentVariables?: {
         // Anthropic Claude API configuration
         ANTHROPIC_BASE_URL?: string;        // Custom API endpoint (overrides default)

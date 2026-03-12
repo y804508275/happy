@@ -182,6 +182,15 @@ export class Encryption {
         return decrypted;
     }
 
+    /**
+     * Decode a shared machine encryption key.
+     * Shared machines have their dataEncryptionKey as a raw key (not encrypted for the user's public key).
+     * Simply base64 decode it to get the raw key bytes.
+     */
+    decodeSharedEncryptionKey(encoded: string): Uint8Array {
+        return decodeBase64(encoded, 'base64');
+    }
+
     async encryptEncryptionKey(key: Uint8Array): Promise<Uint8Array> {
         // Use public key for encryption (encrypt TO ourselves)
         const encrypted = encryptBox(key, this.contentKeyPair.publicKey);

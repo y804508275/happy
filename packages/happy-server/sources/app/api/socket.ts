@@ -7,7 +7,7 @@ import { log } from "@/utils/log";
 import { auth } from "@/app/auth/auth";
 import { decrementWebSocketConnection, incrementWebSocketConnection, websocketEventsCounter } from "../monitoring/metrics2";
 import { usageHandler } from "./socket/usageHandler";
-import { rpcHandler } from "./socket/rpcHandler";
+import { rpcHandler, SharedMachineLookup } from "./socket/rpcHandler";
 import { pingHandler } from "./socket/pingHandler";
 import { sessionUpdateHandler } from "./socket/sessionUpdateHandler";
 import { machineUpdateHandler } from "./socket/machineUpdateHandler";
@@ -212,7 +212,26 @@ export function startSocket(app: Fastify) {
             userRpcListeners = new Map<string, Socket>();
             rpcListeners.set(userId, userRpcListeners);
         }
-        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance, rpcRegistrationEmitter);
+
+        // Shared machine lookup: parse machineId from method, find the owner's daemon socket
+        const lookupSharedMachine: SharedMachineLookup = async (method: string) => {
+            const colonIdx = method.indexOf(':');
+            if (colonIdx <= 0) return null;
+            const machineId = method.substring(0, colonIdx);
+
+            const machine = await db.machine.findUnique({ where: { id: machineId } });
+            if (!machine || !machine.shared || machine.accountId === userId) return null;
+
+            const ownerUserId = machine.accountId;
+            const ownerRpcListeners = rpcListeners.get(ownerUserId);
+            const ownerSocket = ownerRpcListeners?.get(method);
+            if (ownerSocket && ownerSocket.connected) {
+                return { ownerUserId, socket: ownerSocket };
+            }
+            return { ownerUserId, socket: null };
+        };
+
+        rpcHandler(userId, socket, userRpcListeners, () => forwardRpcCrossInstance, rpcRegistrationEmitter, lookupSharedMachine);
         usageHandler(userId, socket);
         sessionUpdateHandler(userId, socket, connection);
         pingHandler(socket);

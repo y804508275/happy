@@ -4,12 +4,20 @@ import { EventEmitter } from "events";
 
 type RpcForwarder = ((userId: string, method: string, params: any) => Promise<any>) | null;
 
+export type SharedMachineTarget = {
+    ownerUserId: string;
+    socket: Socket | null;
+} | null;
+
+export type SharedMachineLookup = (method: string) => Promise<SharedMachineTarget>;
+
 export function rpcHandler(
     userId: string,
     socket: Socket,
     rpcListeners: Map<string, Socket>,
     getForwarder: () => RpcForwarder,
-    registrationEmitter: EventEmitter
+    registrationEmitter: EventEmitter,
+    lookupSharedMachine?: SharedMachineLookup
 ) {
 
     // RPC register - Register this socket as a listener for an RPC method
@@ -140,34 +148,92 @@ export function rpcHandler(
                 }
             }
 
-            // Method not found locally or cross-instance — wait for daemon to reconnect
+            // Try shared machine routing: parse machineId from method and look up owner's daemon
+            if (lookupSharedMachine) {
+                try {
+                    const sharedTarget = await lookupSharedMachine(method);
+                    if (sharedTarget && sharedTarget.socket && sharedTarget.socket.connected) {
+                        log({ module: 'websocket-rpc' }, `RPC call: routing to shared machine owner ${sharedTarget.ownerUserId} for ${method}`);
+                        try {
+                            const response = await sharedTarget.socket.timeout(30000).emitWithAck('rpc-request', {
+                                method,
+                                params
+                            });
+                            if (callback) callback({ ok: true, result: response });
+                            return;
+                        } catch (error) {
+                            const errorMsg = error instanceof Error ? error.message : 'RPC call to shared machine failed';
+                            if (callback) callback({ ok: false, error: errorMsg });
+                            return;
+                        }
+                    }
+
+                    // Try cross-instance forwarding for shared machine owner
+                    if (sharedTarget && forwarder) {
+                        try {
+                            const response = await forwarder(sharedTarget.ownerUserId, method, params);
+                            if (response) {
+                                if (callback) callback(response);
+                                return;
+                            }
+                        } catch (e) {
+                            log({ module: 'websocket-rpc', level: 'error' }, `RPC forward to shared machine owner error: ${e}`);
+                        }
+                    }
+                } catch (e) {
+                    log({ module: 'websocket-rpc', level: 'error' }, `Shared machine lookup error: ${e}`);
+                }
+            }
+
+            // Method not found locally, cross-instance, or via shared machines — wait for daemon to reconnect
             const RECONNECT_WAIT_MS = 15000;
             const eventName = `registered:${userId}:${method}`;
+
+            // Also listen for shared machine owner's daemon registration
+            let sharedEventName: string | null = null;
+            let sharedOwnerUserId: string | null = null;
+            if (lookupSharedMachine) {
+                try {
+                    const sharedTarget = await lookupSharedMachine(method);
+                    if (sharedTarget) {
+                        sharedOwnerUserId = sharedTarget.ownerUserId;
+                        sharedEventName = `registered:${sharedTarget.ownerUserId}:${method}`;
+                    }
+                } catch (e) {
+                    // Ignore lookup errors during wait setup
+                }
+            }
 
             log({ module: 'websocket-rpc' }, `RPC call: waiting up to ${RECONNECT_WAIT_MS}ms for method ${method} to be registered`);
 
             const registered = await new Promise<boolean>((resolve) => {
                 const timer = setTimeout(() => {
                     registrationEmitter.removeListener(eventName, onRegistered);
+                    if (sharedEventName) registrationEmitter.removeListener(sharedEventName, onRegistered);
                     resolve(false);
                 }, RECONNECT_WAIT_MS);
 
                 function onRegistered() {
                     clearTimeout(timer);
+                    registrationEmitter.removeListener(eventName, onRegistered);
+                    if (sharedEventName) registrationEmitter.removeListener(sharedEventName, onRegistered);
                     resolve(true);
                 }
                 registrationEmitter.once(eventName, onRegistered);
+                if (sharedEventName) registrationEmitter.once(sharedEventName, onRegistered);
 
                 // Check immediately in case it was registered between our last check and now
                 const currentSocket = rpcListeners.get(method);
                 if (currentSocket && currentSocket.connected) {
                     clearTimeout(timer);
                     registrationEmitter.removeListener(eventName, onRegistered);
+                    if (sharedEventName) registrationEmitter.removeListener(sharedEventName, onRegistered);
                     resolve(true);
                 }
             });
 
             if (registered) {
+                // Check own listeners first
                 const retrySocket = rpcListeners.get(method);
                 if (retrySocket && retrySocket.connected) {
                     log({ module: 'websocket-rpc' }, `RPC call: method ${method} now available after waiting, proceeding`);
@@ -185,6 +251,30 @@ export function rpcHandler(
                     }
                 }
 
+                // Try shared machine owner after reconnection
+                if (lookupSharedMachine) {
+                    try {
+                        const sharedTarget = await lookupSharedMachine(method);
+                        if (sharedTarget && sharedTarget.socket && sharedTarget.socket.connected) {
+                            log({ module: 'websocket-rpc' }, `RPC call: shared machine owner reconnected for ${method}`);
+                            try {
+                                const response = await sharedTarget.socket.timeout(30000).emitWithAck('rpc-request', {
+                                    method,
+                                    params
+                                });
+                                if (callback) callback({ ok: true, result: response });
+                                return;
+                            } catch (error) {
+                                const errorMsg = error instanceof Error ? error.message : 'RPC call to shared machine failed after reconnect';
+                                if (callback) callback({ ok: false, error: errorMsg });
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        log({ module: 'websocket-rpc', level: 'error' }, `Shared machine lookup retry error: ${e}`);
+                    }
+                }
+
                 // Try cross-instance one more time after waiting
                 const forwarder2 = getForwarder();
                 if (forwarder2) {
@@ -196,6 +286,19 @@ export function rpcHandler(
                         }
                     } catch (e) {
                         log({ module: 'websocket-rpc', level: 'error' }, `RPC forward retry error: ${e}`);
+                    }
+
+                    // Also try cross-instance for shared machine owner
+                    if (sharedOwnerUserId) {
+                        try {
+                            const response = await forwarder2(sharedOwnerUserId, method, params);
+                            if (response) {
+                                if (callback) callback(response);
+                                return;
+                            }
+                        } catch (e) {
+                            log({ module: 'websocket-rpc', level: 'error' }, `RPC forward retry for shared machine owner error: ${e}`);
+                        }
                     }
                 }
             }

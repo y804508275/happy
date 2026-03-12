@@ -222,6 +222,8 @@ model Machine {
     daemonState        String? // Encrypted - contains dynamic daemon state
     daemonStateVersion Int         @default(0)
     dataEncryptionKey  Bytes?
+    shared             Boolean     @default(false)
+    sharedKey          Bytes?
     seq                Int         @default(0)
     active             Boolean     @default(true)
     lastActiveAt       DateTime    @default(now())
