@@ -138,6 +138,20 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
 
     const session = api.sessionSyncClient(response);
 
+    // If reconnecting via restart file, push current metadata to server
+    // (server may have stale metadata from the previous agent)
+    if (restartFilePath) {
+        try {
+            session.updateMetadata((currentMetadata) => ({
+                ...currentMetadata,
+                ...metadata,
+            }));
+            logger.debug('[DROID-START] Pushed updated metadata to server after restart file reconnection');
+        } catch (error) {
+            logger.debug('[DROID-START] Failed to push updated metadata after reconnection:', error);
+        }
+    }
+
     const projects = await getProjects();
     logger.debug(`[DROID-START] Loaded ${projects.length} local projects`);
 
@@ -266,14 +280,17 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
             happyServer.stop();
             removeDroidMcpServer('happy');
 
-            // Remove session info file so daemon won't respawn this archived session
+            // Mark session info file as archived (keep for reactivation with correct lastSeq)
             try {
                 if (existsSync(sessionInfoFilePath)) {
-                    unlinkSync(sessionInfoFilePath);
-                    logger.debug('[DROID-START] Removed session info file');
+                    const existing = JSON.parse(readFileSync(sessionInfoFilePath, 'utf-8'));
+                    existing.archived = true;
+                    existing.lastSeq = session.getLastSeq();
+                    writeFileSync(sessionInfoFilePath, JSON.stringify(existing), { mode: 0o600 });
+                    logger.debug('[DROID-START] Marked session info file as archived');
                 }
             } catch (err) {
-                logger.debug('[DROID-START] Failed to remove session info file:', err);
+                logger.debug('[DROID-START] Failed to mark session info file as archived:', err);
             }
 
             logger.debug('[DROID-START] Cleanup complete');
@@ -284,9 +301,25 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
         }
     };
 
+    // Prevent EPIPE on stdout/stderr from becoming uncaughtException
+    process.stdout?.on('error', (err) => {
+        if ((err as any)?.code === 'EPIPE') return;
+        throw err;
+    });
+    process.stderr?.on('error', (err) => {
+        if ((err as any)?.code === 'EPIPE') return;
+        throw err;
+    });
+
     process.on('SIGTERM', cleanup);
     process.on('SIGINT', cleanup);
     process.on('uncaughtException', (error) => {
+        // EPIPE means stdout/stderr pipe was broken (e.g. daemon restarted).
+        // This is not fatal — ignore it so daemon can respawn us.
+        if ((error as any)?.code === 'EPIPE') {
+            logger.debug('[DROID-START] EPIPE detected (broken pipe), ignoring');
+            return;
+        }
         logger.debug('[DROID-START] Uncaught exception:', error);
         cleanup();
     });
@@ -344,14 +377,17 @@ export async function runDroid(credentials: Credentials, options: DroidStartOpti
     removeDroidMcpServer('happy');
     logger.debug('Stopped Happy MCP server');
 
-    // Remove session info file so daemon won't respawn this archived session
+    // Mark session info file as archived (keep for reactivation with correct lastSeq)
     try {
         if (existsSync(sessionInfoFilePath)) {
-            unlinkSync(sessionInfoFilePath);
-            logger.debug('Removed session info file');
+            const existing = JSON.parse(readFileSync(sessionInfoFilePath, 'utf-8'));
+            existing.archived = true;
+            existing.lastSeq = session.getLastSeq();
+            writeFileSync(sessionInfoFilePath, JSON.stringify(existing), { mode: 0o600 });
+            logger.debug('Marked session info file as archived');
         }
     } catch (err) {
-        logger.debug('Failed to remove session info file:', err);
+        logger.debug('Failed to mark session info file as archived:', err);
     }
 
     process.exit(exitCode);

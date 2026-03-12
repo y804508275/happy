@@ -36,7 +36,7 @@ export const initialMachineMetadata: MachineMetadata = {
 // Get environment variables for a profile, filtered for agent compatibility
 async function getProfileEnvironmentVariablesForAgent(
   profileId: string,
-  agentType: 'claude' | 'codex' | 'gemini' | 'droid'
+  agentType: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode'
 ): Promise<Record<string, string>> {
   try {
     const settings = await readSettings();
@@ -48,7 +48,7 @@ async function getProfileEnvironmentVariablesForAgent(
     }
 
     // Check if profile is compatible with the agent
-    const compatibilityAgent = agentType === 'droid' ? 'claude' : agentType;
+    const compatibilityAgent = (agentType === 'droid' || agentType === 'opencode') ? 'claude' : agentType;
     if (!validateProfileForAgent(profile, compatibilityAgent)) {
       logger.debug(`[DAEMON RUN] Profile ${profileId} not compatible with agent ${agentType}`);
       return {};
@@ -409,8 +409,8 @@ export async function startDaemon(): Promise<void> {
 
           // Construct command for the CLI
           const cliPath = join(projectPath(), 'dist', 'index.mjs');
-          // Determine agent command - support claude, codex, and gemini
-          const agent = options.agent === 'gemini' ? 'gemini' : (options.agent === 'codex' ? 'codex' : (options.agent === 'droid' ? 'droid' : 'claude'));
+          // Determine agent command - support claude, codex, gemini, droid, opencode
+          const agent = options.agent === 'gemini' ? 'gemini' : (options.agent === 'codex' ? 'codex' : (options.agent === 'droid' ? 'droid' : (options.agent === 'opencode' ? 'acp opencode' : 'claude')));
           const fullCommand = `node --no-warnings --no-deprecation ${cliPath} ${agent} --happy-starting-mode remote --started-by daemon`;
 
           // Spawn in tmux with environment variables
@@ -494,21 +494,24 @@ export async function startDaemon(): Promise<void> {
         if (!useTmux) {
           logger.debug(`[DAEMON RUN] Using regular process spawning`);
 
-          // Construct arguments for the CLI - support claude, codex, and gemini
-          let agentCommand: string;
+          // Construct arguments for the CLI - support claude, codex, gemini, droid, opencode
+          let agentArgs: string[];
           switch (options.agent) {
             case 'claude':
             case undefined:
-              agentCommand = 'claude';
+              agentArgs = ['claude'];
               break;
             case 'codex':
-              agentCommand = 'codex';
+              agentArgs = ['codex'];
               break;
             case 'gemini':
-              agentCommand = 'gemini';
+              agentArgs = ['gemini'];
               break;
             case 'droid':
-              agentCommand = 'droid';
+              agentArgs = ['droid'];
+              break;
+            case 'opencode':
+              agentArgs = ['acp', 'opencode'];
               break;
             default:
               return {
@@ -517,7 +520,7 @@ export async function startDaemon(): Promise<void> {
               };
           }
           const args = [
-            agentCommand,
+            ...agentArgs,
             '--happy-starting-mode', 'remote',
             '--started-by', 'daemon'
           ];
@@ -535,22 +538,12 @@ export async function startDaemon(): Promise<void> {
           const happyProcess = spawnHappyCLI(args, {
             cwd: directory,
             detached: true,  // Sessions stay alive when daemon stops
-            stdio: ['ignore', 'pipe', 'pipe'],  // Capture stdout/stderr for debugging
+            stdio: ['ignore', 'ignore', 'ignore'],  // Detached sessions don't need pipes (avoids EPIPE on daemon restart)
             env: {
               ...process.env,
               ...extraEnv
             }
           });
-
-          // Log output for debugging
-          if (process.env.DEBUG) {
-            happyProcess.stdout?.on('data', (data) => {
-              logger.debug(`[DAEMON RUN] Child stdout: ${data.toString()}`);
-            });
-            happyProcess.stderr?.on('data', (data) => {
-              logger.debug(`[DAEMON RUN] Child stderr: ${data.toString()}`);
-            });
-          }
 
           if (!happyProcess.pid) {
             logger.debug('[DAEMON RUN] Failed to spawn process - no PID returned');
@@ -696,11 +689,12 @@ export async function startDaemon(): Promise<void> {
       happySessionId: string;
       directory: string;
       claudeSessionId?: string;
-      agent?: 'claude' | 'codex' | 'gemini' | 'droid';
+      agent?: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
       dataKey?: string; // base64-encoded data encryption key from the app
+      lastSeq?: number; // last message seq known by the app, used to skip old messages on reconnect
     }): Promise<SpawnSessionResult> => {
-      const { happySessionId, directory, claudeSessionId, agent, dataKey } = options;
-      logger.debug(`[DAEMON RUN] Reactivating session ${happySessionId}, dir=${directory}, claude=${claudeSessionId}, hasDataKey=${!!dataKey}`);
+      const { happySessionId, directory, claudeSessionId, agent, dataKey, lastSeq } = options;
+      logger.debug(`[DAEMON RUN] Reactivating session ${happySessionId}, dir=${directory}, claude=${claudeSessionId}, hasDataKey=${!!dataKey}, lastSeq=${lastSeq}`);
 
       // Check if there's already a running process for this session
       for (const [, session] of pidToTrackedSession) {
@@ -726,13 +720,14 @@ export async function startDaemon(): Promise<void> {
           // Include lastSeq so the new process skips already-processed messages
           const restartFilePath = join(sessionsDir, `restart-${happySessionId}.json`);
           const { writeFileSync: writeSync } = await import('fs');
+          const effectiveSeq = sessionInfo.lastSeq || lastSeq || 0;
           writeSync(restartFilePath, JSON.stringify({
             sessionId: sessionInfo.sessionId,
             encryptionKey: sessionInfo.encryptionKey,
             encryptionVariant: sessionInfo.encryptionVariant,
-            seq: sessionInfo.lastSeq || 0,
+            seq: effectiveSeq,
           }), { mode: 0o600 });
-          logger.debug(`[DAEMON RUN] Restart file created with seq=${sessionInfo.lastSeq || 0}`);
+          logger.debug(`[DAEMON RUN] Restart file created with seq=${effectiveSeq} (file=${sessionInfo.lastSeq}, app=${lastSeq})`);
 
           // Use the effective claudeSessionId (from RPC params or session info file)
           const effectiveClaudeSessionId = claudeSessionId || sessionInfo.claudeSessionId;
@@ -757,6 +752,7 @@ export async function startDaemon(): Promise<void> {
             sessionId: happySessionId,
             encryptionKey: dataKey,
             encryptionVariant: 'dataKey',
+            seq: lastSeq || 0,
           }), { mode: 0o600 });
 
           const result = await spawnSession({
@@ -794,35 +790,40 @@ export async function startDaemon(): Promise<void> {
     const switchSessionAgent = async (options: {
       happySessionId: string;
       directory: string;
-      newAgent: 'claude' | 'codex' | 'gemini' | 'droid';
+      newAgent: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
       dataKey?: string;
     }): Promise<SpawnSessionResult> => {
       const { happySessionId, directory, newAgent, dataKey } = options;
       logger.debug(`[DAEMON RUN] Switching session ${happySessionId} to agent: ${newAgent}`);
 
-      // Kill existing process but DON'T delete session info file.
-      // The process SIGTERM handler writes lastSeq to the session info file,
-      // which is needed to avoid replaying old messages when the new agent starts.
+      // Kill ALL existing processes for this session (there may be multiple due to race conditions).
+      // DON'T delete session info file — the process SIGTERM handler writes lastSeq to it.
+      const pidsToKill: number[] = [];
       for (const [pid, session] of pidToTrackedSession) {
         if (session.happySessionId === happySessionId) {
-          logger.debug(`[DAEMON RUN] Killing existing process PID ${pid} for agent switch`);
-          if (session.startedBy === 'daemon' && session.childProcess) {
-            try {
-              session.childProcess.kill('SIGTERM');
-            } catch (error) {
-              logger.debug(`[DAEMON RUN] Failed to kill session PID ${pid}:`, error);
-            }
-          } else {
-            try {
-              process.kill(pid, 'SIGTERM');
-            } catch (error) {
-              logger.debug(`[DAEMON RUN] Failed to kill external session PID ${pid}:`, error);
-            }
-          }
-          pidToTrackedSession.delete(pid);
-          persistSessions();
-          break;
+          pidsToKill.push(pid);
         }
+      }
+      for (const pid of pidsToKill) {
+        const session = pidToTrackedSession.get(pid)!;
+        logger.debug(`[DAEMON RUN] Killing existing process PID ${pid} for agent switch`);
+        if (session.startedBy === 'daemon' && session.childProcess) {
+          try {
+            session.childProcess.kill('SIGTERM');
+          } catch (error) {
+            logger.debug(`[DAEMON RUN] Failed to kill session PID ${pid}:`, error);
+          }
+        } else {
+          try {
+            process.kill(pid, 'SIGTERM');
+          } catch (error) {
+            logger.debug(`[DAEMON RUN] Failed to kill external session PID ${pid}:`, error);
+          }
+        }
+        pidToTrackedSession.delete(pid);
+      }
+      if (pidsToKill.length > 0) {
+        persistSessions();
       }
 
       // Wait for the old process to die and write lastSeq to session info file
@@ -835,6 +836,8 @@ export async function startDaemon(): Promise<void> {
         try {
           const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
           sessionInfo.agent = newAgent;
+          // Ensure sessionId in the file matches the happySessionId (ACP agents may have written a different one)
+          sessionInfo.sessionId = happySessionId;
           // Clear claudeSessionId when switching away from Claude (new agent starts fresh)
           if (newAgent !== 'claude') {
             delete sessionInfo.claudeSessionId;
@@ -946,6 +949,14 @@ export async function startDaemon(): Promise<void> {
 
       try {
         const sessionInfo = JSON.parse(readFileSync(sessionInfoPath, 'utf-8'));
+
+        // Skip auto-respawn for archived sessions (user-terminated).
+        // The file is kept so user-triggered reactivation can use lastSeq and claudeSessionId.
+        if (sessionInfo.archived) {
+          logger.debug(`[DAEMON RUN] Session ${sessionId} is archived, skipping auto-respawn`);
+          return;
+        }
+
         logger.debug(`[DAEMON RUN] Auto-respawning session ${sessionId} (reason: ${reason}), dir=${sessionInfo.directory}`);
 
         // Update respawn attempts
@@ -961,6 +972,7 @@ export async function startDaemon(): Promise<void> {
           sessionId: sessionInfo.sessionId,
           encryptionKey: sessionInfo.encryptionKey,
           encryptionVariant: sessionInfo.encryptionVariant,
+          seq: sessionInfo.lastSeq || 0,
         }), { mode: 0o600 });
 
         // Brief delay to let socket disconnect propagate

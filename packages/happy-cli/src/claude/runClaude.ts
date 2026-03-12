@@ -248,6 +248,20 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     // Create realtime session
     const session = api.sessionSyncClient(response);
 
+    // If reconnecting via restart file, push current metadata to server
+    // (server may have stale metadata from the previous agent)
+    if (restartFilePath) {
+        try {
+            session.updateMetadata((currentMetadata) => ({
+                ...currentMetadata,
+                ...metadata,
+            }));
+            logger.debug('[START] Pushed updated metadata to server after restart file reconnection');
+        } catch (error) {
+            logger.debug('[START] Failed to push updated metadata after reconnection:', error);
+        }
+    }
+
     // Load local projects for Claude context
     const projects = await getProjects();
     logger.debug(`[START] Loaded ${projects.length} local projects`);
@@ -528,12 +542,28 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         }
     };
 
+    // Prevent EPIPE on stdout/stderr from becoming uncaughtException
+    process.stdout?.on('error', (err) => {
+        if ((err as any)?.code === 'EPIPE') return;
+        throw err;
+    });
+    process.stderr?.on('error', (err) => {
+        if ((err as any)?.code === 'EPIPE') return;
+        throw err;
+    });
+
     // Handle termination signals
     process.on('SIGTERM', cleanup);
     process.on('SIGINT', cleanup);
 
     // Handle uncaught exceptions and rejections
     process.on('uncaughtException', (error) => {
+        // EPIPE means stdout/stderr pipe was broken (e.g. daemon restarted).
+        // This is not fatal — ignore it so daemon can respawn us.
+        if ((error as any)?.code === 'EPIPE') {
+            logger.debug('[START] EPIPE detected (broken pipe), ignoring');
+            return;
+        }
         logger.debug('[START] Uncaught exception:', error);
         cleanup();
     });
@@ -613,6 +643,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
         jsRuntime: options.jsRuntime,
         projects,
         projectContext,
+        installedApps: happyServer.installedApps,
     });
 
     // Cleanup session resources (intervals, callbacks) - prevents memory leak
