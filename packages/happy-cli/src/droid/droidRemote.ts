@@ -9,6 +9,20 @@ import { logger } from "@/lib";
 import { DroidEnhancedMode } from './session';
 import { mapToDroidAutoLevel, buildDroidAutoArgs } from './utils/permissionMode';
 import type { ScannedProject } from '@/claude/utils/projectScanner';
+import { listInstalledApps } from '@/apps';
+
+// MCP capability tools that should always be allowed (auto-approved) in remote mode
+const STATIC_CAPABILITY_TOOLS = [
+    'happy___browser_navigate',
+    'happy___browser_screenshot',
+];
+
+function getCapabilityAllowedTools(): string[] {
+    const appTools = listInstalledApps().flatMap(app =>
+        app.manifest.tools.map(t => `happy___app__${app.manifest.id}__${t.name}`)
+    );
+    return [...STATIC_CAPABILITY_TOOLS, ...appTools];
+}
 
 let tmpImageCounter = 0;
 const DROID_TMP_DIR = join(tmpdir(), 'happy-droid-images');
@@ -36,6 +50,20 @@ function flattenMultimodalToText(content: Array<unknown>): string {
             }
         } else if (b.type === 'image' && b.source?.type === 'url' && b.source?.url) {
             parts.push(`[Image URL: ${b.source.url}]`);
+        } else if (b.type === 'document' && b.source?.type === 'base64' && b.source?.data) {
+            try {
+                mkdirSync(DROID_TMP_DIR, { recursive: true });
+                const mimeType = b.source.media_type || 'application/octet-stream';
+                const ext = mimeType === 'application/pdf' ? 'pdf' : (mimeType.split('/')[1] || 'bin');
+                const filename = `doc_${Date.now()}_${++tmpImageCounter}.${ext}`;
+                const filepath = join(DROID_TMP_DIR, filename);
+                writeFileSync(filepath, Buffer.from(b.source.data, 'base64'));
+                parts.push(`[Document attached: ${filepath}]`);
+                logger.debug(`[droidRemote] Saved temp document: ${filepath}`);
+            } catch (e) {
+                parts.push('[Document: failed to save]');
+                logger.debug(`[droidRemote] Failed to save temp document: ${e}`);
+            }
         }
     }
     return parts.join('\n\n');
@@ -115,8 +143,15 @@ async function runDroidExec(opts: {
     onSessionFound: (id: string) => void,
     onThinkingChange?: (thinking: boolean) => void,
     onMessage: (message: SDKMessage) => void,
-}): Promise<{ droidSessionId: string | null, resultSubtype: string | null }> {
-    const autoLevel = mapToDroidAutoLevel(opts.mode.permissionMode as any, opts.mode.autoConfirmMode);
+}): Promise<{ droidSessionId: string | null, resultSubtype: string | null, permissionInsufficient: boolean }> {
+    let autoLevel = mapToDroidAutoLevel(opts.mode.permissionMode as any, opts.mode.autoConfirmMode);
+    // In remote mode, MCP tools (e.g. browser_navigate) require at least 'high' auto level
+    // to avoid permission prompts that can't be confirmed in headless mode.
+    // Escalate 'medium' → 'high' when capability tools are available.
+    const CAPABILITY_ALLOWED_TOOLS = getCapabilityAllowedTools();
+    if (CAPABILITY_ALLOWED_TOOLS.length > 0 && autoLevel === 'medium') {
+        autoLevel = 'high';
+    }
     const autoArgs = buildDroidAutoArgs(autoLevel);
 
     const args: string[] = [
@@ -133,8 +168,13 @@ async function runDroidExec(opts: {
         args.push('--session-id', opts.droidSessionId);
     }
 
-    if (opts.mode.allowedTools && opts.mode.allowedTools.length > 0) {
-        args.push('--enabled-tools', opts.mode.allowedTools.join(','));
+    // Merge user-specified allowed tools with capability tools (always auto-approved in remote mode)
+    const allEnabledTools = [
+        ...(opts.mode.allowedTools || []),
+        ...CAPABILITY_ALLOWED_TOOLS,
+    ];
+    if (allEnabledTools.length > 0) {
+        args.push('--enabled-tools', allEnabledTools.join(','));
     }
 
     if (opts.mode.disallowedTools && opts.mode.disallowedTools.length > 0) {
@@ -187,6 +227,7 @@ async function runDroidExec(opts: {
 
     let droidSessionId = opts.droidSessionId;
     let resultSubtype: string | null = null;
+    let permissionInsufficient = false;
     let messageCount = 0;
 
     opts.onThinkingChange?.(true);
@@ -207,6 +248,22 @@ async function runDroidExec(opts: {
 
             if (message.type === 'result') {
                 resultSubtype = (message as SDKResultMessage).subtype ?? null;
+                const resultText = (message as SDKResultMessage).result ?? '';
+                if (resultText.includes('insufficient permission')) {
+                    permissionInsufficient = true;
+                }
+            }
+
+            // Detect permission errors in assistant messages
+            if (message.type === 'assistant') {
+                const content = (message as any).message?.content;
+                if (Array.isArray(content)) {
+                    for (const block of content) {
+                        if (block.type === 'text' && typeof block.text === 'string' && block.text.includes('insufficient permission')) {
+                            permissionInsufficient = true;
+                        }
+                    }
+                }
             }
         }
     } catch (e) {
@@ -219,14 +276,14 @@ async function runDroidExec(opts: {
         opts.onThinkingChange?.(false);
     }
 
-    // If exec produced no messages and we had a session ID, the session is likely
-    // broken (e.g. after abort). Clear it so the caller can retry with a fresh session.
-    if (messageCount === 0 && droidSessionId) {
+    // If exec produced no messages and we had a session ID, and this was NOT
+    // an abort, the session may be broken. Clear it so the caller retries fresh.
+    if (messageCount === 0 && droidSessionId && !opts.signal?.aborted) {
         logger.debug(`[droidRemote] Empty exec with session ${droidSessionId}, clearing session ID`);
         droidSessionId = null;
     }
 
-    return { droidSessionId, resultSubtype };
+    return { droidSessionId, resultSubtype, permissionInsufficient };
 }
 
 export async function droidRemote(opts: {
@@ -244,34 +301,33 @@ export async function droidRemote(opts: {
     onThinkingChange?: (thinking: boolean) => void,
     onMessage: (message: SDKMessage) => void,
     onCompletionEvent?: (message: string) => void,
-}) {
+}): Promise<{ finalSessionId: string | null }> {
     let droidSessionId: string | null = opts.sessionId;
     let autoResumeCount = 0;
     const MAX_AUTO_RESUMES = 5;
 
     const initial = await opts.nextMessage();
-    if (!initial) return;
+    if (!initial) return { finalSessionId: droidSessionId };
 
     let currentMessage = typeof initial.message === 'string'
         ? initial.message
         : flattenMultimodalToText(initial.message as Array<unknown>);
     let mode = initial.mode;
-    let isFirstMessage = true;
 
     while (true) {
-        if (opts.signal?.aborted) return;
+        if (opts.signal?.aborted) return { finalSessionId: droidSessionId };
 
-        // For the first message, prepend system instructions (knowledge base rules + options system)
-        // so Droid has the same context as Claude sessions.
+        // Prepend system instructions when starting a fresh session (no existing droid session).
+        // This covers: first message, resume failure (session cleared), and abort recovery.
+        // When resuming an existing session, the instructions are already in conversation history.
         let prompt = currentMessage;
-        if (isFirstMessage) {
+        if (!droidSessionId) {
             const parts: string[] = [];
             if (mode.appendSystemPrompt) parts.push(mode.appendSystemPrompt);
             if (opts.projectContext) parts.push(opts.projectContext);
             if (parts.length > 0) {
                 prompt = `<system_instructions>\n${parts.join('\n\n')}\n</system_instructions>\n\n<user_message>\n${currentMessage}\n</user_message>`;
             }
-            isFirstMessage = false;
         }
 
         const result = await runDroidExec({
@@ -303,15 +359,19 @@ export async function droidRemote(opts: {
             opts.onCompletionEvent?.('Reached auto-continue limit. Please send a message to continue.');
         }
 
+        if (result.permissionInsufficient) {
+            opts.onCompletionEvent?.('Tip: Switch permission mode to "High" or enable Auto-confirm to allow this operation, then retry.');
+        }
+
         autoResumeCount = 0;
 
-        if (opts.signal?.aborted) return;
+        if (opts.signal?.aborted) return { finalSessionId: droidSessionId };
 
         opts.onReady();
 
         // Wait for next user message
         const next = await opts.nextMessage();
-        if (!next) return;
+        if (!next) return { finalSessionId: droidSessionId };
 
         mode = next.mode;
         currentMessage = typeof next.message === 'string'

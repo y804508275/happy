@@ -1,6 +1,7 @@
 import { trimIdent } from "@/utils/trimIdent";
 import { shouldIncludeCoAuthoredBy } from "./claudeSettings";
 import { type ScannedProject, formatProjectsForPrompt } from "./projectScanner";
+import { type InstalledApp, buildAppSystemPrompt } from "@/apps";
 
 /**
  * Base system prompt shared across all configurations
@@ -76,13 +77,21 @@ const includeCoAuthored = shouldIncludeCoAuthoredBy();
  * Build system prompt with optional project list injection.
  * Used by claudeLocal and claudeRemote to include discovered projects in context.
  */
-export function buildSystemPrompt(projects: ScannedProject[], projectContext?: string | null): string {
+export function buildSystemPrompt(projects: ScannedProject[], projectContext?: string | null, installedApps?: InstalledApp[]): string {
   let prompt = BASE_SYSTEM_PROMPT;
 
   prompt += '\n\n' + MEMORY_INSTRUCTIONS;
 
   if (projectContext) {
     prompt += '\n\n' + projectContext;
+  }
+
+  // Inject installed app descriptions
+  if (installedApps && installedApps.length > 0) {
+    const appPrompt = buildAppSystemPrompt(installedApps);
+    if (appPrompt) {
+      prompt += '\n\n' + appPrompt;
+    }
   }
 
   if (includeCoAuthored) {

@@ -6,7 +6,7 @@
 import { apiSocket } from './apiSocket';
 import { sync } from './sync';
 import { storage } from './storage';
-import type { MachineMetadata, AutoConfirmMode } from './storageTypes';
+import type { MachineMetadata, Metadata, AutoConfirmMode } from './storageTypes';
 
 // Strict type definitions for all operations
 
@@ -139,7 +139,7 @@ export interface SpawnSessionOptions {
     directory: string;
     approvedNewDirectoryCreation?: boolean;
     token?: string;
-    agent?: 'codex' | 'claude' | 'gemini' | 'droid';
+    agent?: 'codex' | 'claude' | 'gemini' | 'droid' | 'opencode';
     // Environment variables from AI backend profile
     // Accepts any environment variables - daemon will pass them to the agent process
     // Common variables include:
@@ -169,7 +169,7 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
             directory: string
             approvedNewDirectoryCreation?: boolean,
             token?: string,
-            agent?: 'codex' | 'claude' | 'gemini' | 'droid',
+            agent?: 'codex' | 'claude' | 'gemini' | 'droid' | 'opencode',
             environmentVariables?: Record<string, string>;
         }>(
             machineId,
@@ -196,7 +196,7 @@ export async function machineReactivateSession(options: {
     happySessionId: string;
     directory: string;
     claudeSessionId?: string;
-    agent?: 'codex' | 'claude' | 'gemini' | 'droid';
+    agent?: 'codex' | 'claude' | 'gemini' | 'droid' | 'opencode';
 }): Promise<SpawnSessionResult> {
     const { machineId, ...params } = options;
     try {
@@ -223,7 +223,7 @@ export async function machineSwitchSessionAgent(options: {
     machineId: string;
     happySessionId: string;
     directory: string;
-    newAgent: 'claude' | 'codex' | 'gemini' | 'droid';
+    newAgent: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
     dataKey?: string;
 }): Promise<SpawnSessionResult> {
     const { machineId, ...params } = options;
@@ -355,6 +355,72 @@ export async function machineUpdateMetadata(
     }
 
     throw new Error('Unexpected error in machineUpdateMetadata');
+}
+
+/**
+ * Update session summary (name) with optimistic concurrency control and automatic retry
+ */
+export async function sessionUpdateSummary(
+    sessionId: string,
+    newName: string,
+    maxRetries: number = 3
+): Promise<{ success: boolean; message?: string }> {
+    const session = storage.getState().sessions[sessionId];
+    if (!session) {
+        return { success: false, message: 'Session not found' };
+    }
+
+    const sessionEncryption = sync.encryption.getSessionEncryption(sessionId);
+    if (!sessionEncryption) {
+        return { success: false, message: 'Session encryption not found' };
+    }
+
+    let currentVersion = session.metadataVersion;
+    let currentMetadata: Metadata = session.metadata || {} as Metadata;
+    let retryCount = 0;
+
+    while (retryCount < maxRetries) {
+        const updatedMetadata: Metadata = {
+            ...currentMetadata,
+            summary: {
+                text: newName,
+                updatedAt: Date.now()
+            }
+        };
+
+        const encryptedMetadata = await sessionEncryption.encryptMetadata(updatedMetadata);
+
+        const result = await apiSocket.emitWithAck<{
+            result: 'success' | 'version-mismatch' | 'error';
+            version?: number;
+            metadata?: string;
+            message?: string;
+        }>('update-metadata', {
+            sid: sessionId,
+            metadata: encryptedMetadata,
+            expectedVersion: currentVersion
+        });
+
+        if (result.result === 'success') {
+            return { success: true };
+        } else if (result.result === 'version-mismatch') {
+            currentVersion = result.version!;
+            if (result.metadata) {
+                const latestMetadata = await sessionEncryption.decryptMetadata(currentVersion, result.metadata);
+                if (latestMetadata) {
+                    currentMetadata = latestMetadata;
+                }
+            }
+            retryCount++;
+            if (retryCount >= maxRetries) {
+                return { success: false, message: 'Failed to update after retries due to version conflicts' };
+            }
+        } else {
+            return { success: false, message: result.message || 'Failed to update session name' };
+        }
+    }
+
+    return { success: false, message: 'Unexpected error' };
 }
 
 /**

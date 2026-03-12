@@ -120,7 +120,7 @@ export interface SpawnSessionOptions {
     directory: string;
     sessionId?: string;
     approvedNewDirectoryCreation?: boolean;
-    agent?: 'claude' | 'codex' | 'gemini' | 'droid';
+    agent?: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
     token?: string;
     /** Claude SDK session ID to resume (for graceful restart) */
     resumeClaudeSessionId?: string;

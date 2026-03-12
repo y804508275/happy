@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": 29,
+      "deployVersion": "2026.03.11.4",
+      "date": "2026-03-11",
+      "summary": "新增会话重命名功能，支持手动编辑会话名称。",
+      "changes": [
+        "会话详情页点击名称可直接编辑",
+        "右键菜单新增\"重命名会话\"选项",
+        "多项功能更新与 bug 修复"
+      ],
+      "rawMarkdown": "## Version 29 (2026.03.11.4) - 2026-03-11\n\n\n新增会话重命名功能，支持手动编辑会话名称。\n\n- 会话详情页点击名称可直接编辑\n- 右键菜单新增\"重命名会话\"选项\n- 多项功能更新与 bug 修复"
+    },
+    {
       "version": 28,
       "deployVersion": "2026.03.11.3",
       "date": "2026-03-11",
@@ -364,5 +376,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 28
+  "latestVersion": 29
 }

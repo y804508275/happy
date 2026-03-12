@@ -57,77 +57,60 @@ async function main() {
     return client;
   }
 
-  // Create STDIO MCP server
+  // Connect to HTTP MCP server first to discover all available tools
+  const initialClient = await ensureHttpClient();
+  const toolsResult = await initialClient.listTools();
+
+  // Create STDIO MCP server, passing through instructions from the HTTP server
   const server = new McpServer({
     name: 'Happy MCP Bridge',
     version: '1.0.0',
+  }, {
+    instructions: initialClient.getInstructions?.() || undefined,
   });
 
-  // Generic forwarder: register a tool that proxies to the HTTP MCP server
-  function registerForwardTool(
-    name: string,
-    description: string,
-    title: string,
-    inputSchema: Record<string, z.ZodTypeAny>,
-  ) {
-    server.registerTool(name, { description, title, inputSchema }, async (args) => {
-      try {
-        const client = await ensureHttpClient();
-        const response = await client.callTool({ name, arguments: args });
-        return response as any;
-      } catch (error) {
-        return {
-          content: [
-            { type: 'text', text: `Failed to call ${name}: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+  // Auto-register all tools discovered from the HTTP MCP server
+  for (const tool of toolsResult.tools) {
+    const inputSchema: Record<string, z.ZodTypeAny> = {};
+    const props = (tool.inputSchema as any)?.properties || {};
+    const required = new Set((tool.inputSchema as any)?.required || []);
+
+    for (const [key, val] of Object.entries(props)) {
+      const prop = val as any;
+      let zodType: z.ZodTypeAny;
+      switch (prop.type) {
+        case 'number': zodType = z.number(); break;
+        case 'boolean': zodType = z.boolean(); break;
+        case 'array': zodType = z.array(z.any()); break;
+        case 'object': zodType = z.object({}).passthrough(); break;
+        default: zodType = z.string(); break;
       }
-    });
+      if (prop.description) zodType = zodType.describe(prop.description);
+      if (!required.has(key)) zodType = zodType.optional();
+      inputSchema[key] = zodType;
+    }
+
+    server.registerTool(
+      tool.name,
+      { description: tool.description || tool.name, title: tool.name, inputSchema },
+      async (args) => {
+        try {
+          const client = await ensureHttpClient();
+          const response = await client.callTool({ name: tool.name, arguments: args });
+          return response as any;
+        } catch (error) {
+          return {
+            content: [
+              { type: 'text', text: `Failed to call ${tool.name}: ${error instanceof Error ? error.message : String(error)}` },
+            ],
+            isError: true,
+          };
+        }
+      }
+    );
   }
 
-  // Register tools and forward to HTTP MCP
-  registerForwardTool('change_title',
-    'Change the title of the current chat session',
-    'Change Chat Title',
-    { title: z.string().describe('The new title for the chat session') }
-  );
-
-  registerForwardTool('load_context',
-    'Load full content of knowledge base items by their IDs.',
-    'Load Context',
-    { ids: z.array(z.string()).min(1).max(20).describe('Array of knowledge base item IDs to load.') }
-  );
-
-  registerForwardTool('save_memory',
-    'Save a memory for future retrieval across sessions.',
-    'Save Memory',
-    {
-      content: z.string().describe('The memory content to save.'),
-      title: z.string().max(200).describe('A short, descriptive title.'),
-      scope: z.enum(['global', 'project']).default('project').describe('global or project scope.'),
-      tags: z.array(z.string()).optional().describe('Optional tags.'),
-      description: z.string().max(500).optional().describe('Brief summary for the directory listing.'),
-      alwaysApply: z.boolean().default(true).describe('true = always injected as a rule. false = on-demand reference.'),
-    }
-  );
-
-  registerForwardTool('save_md_reference',
-    'Save a markdown reference document for context injection. MD references are selectable context files that users can attach to conversations.',
-    'Save MD Reference',
-    {
-      content: z.string().describe('The markdown content of the reference document.'),
-      title: z.string().max(200).describe('A short, descriptive title for the reference.'),
-      scope: z.enum(['global', 'project']).default('project').describe('global or project scope.'),
-      description: z.string().max(500).optional().describe('Brief summary of the reference document.'),
-    }
-  );
-
-  registerForwardTool('delete_memory',
-    'Delete a memory by ID.',
-    'Delete Memory',
-    { id: z.string().describe('The ID of the memory to delete.') }
-  );
+  process.stderr.write(`[happy-mcp] Registered ${toolsResult.tools.length} tools from HTTP MCP server\n`);
 
   // Start STDIO transport
   const stdio = new StdioServerTransport();

@@ -5,17 +5,19 @@ import { useIsTablet } from '@/utils/responsive';
 import { SidebarView } from './SidebarView';
 import { Slot } from 'expo-router';
 import { useWindowDimensions } from 'react-native';
+import { useLocalSetting } from '@/sync/storage';
 
 export const SidebarNavigator = React.memo(() => {
     const auth = useAuth();
     const isTablet = useIsTablet();
+    const sidebarCollapsed = useLocalSetting('sidebarCollapsed');
     const showPermanentDrawer = auth.isAuthenticated && isTablet;
     const { width: windowWidth } = useWindowDimensions();
 
     // Calculate drawer width only when needed
     const drawerWidth = React.useMemo(() => {
         if (!showPermanentDrawer) return 280; // Default width for hidden drawer
-        return Math.min(Math.max(Math.floor(windowWidth * 0.3), 250), 360);
+        return Math.min(Math.max(Math.floor(windowWidth * 0.25), 220), 300);
     }, [windowWidth, showPermanentDrawer]);
 
     const drawerNavigationOptions = React.useMemo(() => {
@@ -41,7 +43,8 @@ export const SidebarNavigator = React.memo(() => {
             drawerStyle: {
                 backgroundColor: 'white',
                 borderRightWidth: 0,
-                width: drawerWidth,
+                width: sidebarCollapsed ? 0 : drawerWidth,
+                overflow: 'hidden' as const,
             },
             swipeEnabled: false,
             drawerActiveTintColor: 'transparent',
@@ -49,7 +52,7 @@ export const SidebarNavigator = React.memo(() => {
             drawerItemStyle: { display: 'none' as const },
             drawerLabelStyle: { display: 'none' as const },
         };
-    }, [showPermanentDrawer, drawerWidth]);
+    }, [showPermanentDrawer, drawerWidth, sidebarCollapsed]);
 
     // Always render SidebarView but hide it when not needed
     const drawerContent = React.useCallback(

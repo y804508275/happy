@@ -3,10 +3,9 @@ import { View, Pressable, FlatList, Platform } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Text } from '@/components/StyledText';
 import { usePathname } from 'expo-router';
-import { SessionListViewItem } from '@/sync/storage';
+import { SessionListViewItem, storage } from '@/sync/storage';
 import { Ionicons } from '@expo/vector-icons';
-import { getSessionName, useSessionStatus, getSessionSubtitle, getSessionAvatarId } from '@/utils/sessionUtils';
-import { Avatar } from './Avatar';
+import { getSessionName, useSessionStatus, getSessionSubtitle } from '@/utils/sessionUtils';
 import { ActiveSessionsGroup } from './ActiveSessionsGroup';
 import { ActiveSessionsGroupCompact } from './ActiveSessionsGroupCompact';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +17,7 @@ import { StatusDot } from './StatusDot';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { useIsTablet } from '@/utils/responsive';
 import { requestReview } from '@/utils/requestReview';
-import { UpdateBanner } from './UpdateBanner';
+
 import { layout } from './layout';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { t } from '@/text';
@@ -26,12 +25,12 @@ import { useRouter } from 'expo-router';
 import { Item } from './Item';
 import { ItemGroup } from './ItemGroup';
 import { useHappyAction } from '@/hooks/useHappyAction';
-import { sessionDelete } from '@/sync/ops';
+import { sessionDelete, sessionUpdateSummary } from '@/sync/ops';
 import { HappyError } from '@/utils/errors';
 import { Modal } from '@/modal';
 import { useSessionBadge } from '@/hooks/useSessionBadge';
 import { WebContextMenu, useWebContextMenu } from './WebContextMenu';
-import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+
 
 const stylesheet = StyleSheet.create((theme) => ({
     container: {
@@ -108,7 +107,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         ...Typography.default(),
     },
     sessionItem: {
-        height: 72,
+        height: 60,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
@@ -148,7 +147,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     },
     sessionContent: {
         flex: 1,
-        marginLeft: 16,
         justifyContent: 'center',
     },
     sessionTitleRow: {
@@ -190,33 +188,6 @@ const stylesheet = StyleSheet.create((theme) => ({
         fontWeight: '500',
         lineHeight: 16,
         ...Typography.default(),
-    },
-    avatarContainer: {
-        position: 'relative',
-        width: 48,
-        height: 48,
-    },
-    draftIconContainer: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 18,
-        height: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    draftIconOverlay: {
-        color: theme.colors.textSecondary,
-    },
-    sessionBadge: {
-        position: 'absolute',
-        top: -2,
-        right: -2,
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        borderWidth: 2,
-        borderColor: theme.colors.surface,
     },
     artifactsSection: {
         paddingHorizontal: 16,
@@ -358,20 +329,17 @@ export function SessionsList() {
 
     const HeaderComponent = React.useCallback(() => {
         return (
-            <>
-                <UpdateBanner />
-                <Pressable
-                    style={({ pressed, hovered }: any) => [
-                        styles.newSessionRow,
-                        pressed && styles.newSessionRowPressed,
-                        hovered && styles.newSessionRowHovered,
-                    ]}
-                    onPress={() => router.push('/new')}
-                >
-                    <Ionicons name="create-outline" size={14} style={styles.newSessionIcon} />
-                    <Text style={styles.newSessionText}>{t('newSession.title')}</Text>
-                </Pressable>
-            </>
+            <Pressable
+                style={({ pressed, hovered }: any) => [
+                    styles.newSessionRow,
+                    pressed && styles.newSessionRowPressed,
+                    hovered && styles.newSessionRowHovered,
+                ]}
+                onPress={() => router.push('/new')}
+            >
+                <Ionicons name="create-outline" size={14} style={styles.newSessionIcon} />
+                <Text style={styles.newSessionText}>{t('newSession.title')}</Text>
+            </Pressable>
         );
     }, [router]);
 
@@ -392,38 +360,6 @@ export function SessionsList() {
     );
 }
 
-// Badge dot component with optional pulse animation
-const SessionBadgeDot = React.memo(({ type, color }: { type: 'action' | 'info'; color: string }) => {
-    const styles = stylesheet;
-    const opacity = useSharedValue(1);
-
-    React.useEffect(() => {
-        if (type === 'action') {
-            opacity.value = withRepeat(
-                withTiming(0.3, { duration: 1000 }),
-                -1,
-                true
-            );
-        } else {
-            opacity.value = withTiming(1, { duration: 200 });
-        }
-    }, [type]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        opacity: opacity.value,
-    }));
-
-    return (
-        <Animated.View
-            style={[
-                styles.sessionBadge,
-                { backgroundColor: color },
-                type === 'action' && animatedStyle,
-            ]}
-        />
-    );
-});
-
 // Sub-component that handles session message logic
 const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }: {
     session: Session;
@@ -434,15 +370,38 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
 }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
-    const sessionStatus = useSessionStatus(session);
+    // Subscribe directly to store for real-time status updates (bypasses FlatList cell caching)
+    const liveSession = storage((state) => state.sessions[session.id]) ?? session;
+    const sessionStatus = useSessionStatus(liveSession);
     const sessionName = getSessionName(session);
     const sessionSubtitle = getSessionSubtitle(session);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
     const swipeableRef = React.useRef<Swipeable | null>(null);
     const swipeEnabled = Platform.OS !== 'web';
-    const badgeType = useSessionBadge(session);
     const { ref: contextMenuRef, contextMenu, close: closeContextMenu } = useWebContextMenu();
+
+    const [renamingSession, performRename] = useHappyAction(async () => {
+        const newName = await Modal.prompt(
+            t('sessionInfo.renameSession'),
+            undefined,
+            {
+                placeholder: t('sessionInfo.renameSessionPlaceholder'),
+                defaultValue: sessionName,
+            }
+        );
+        if (newName !== null && newName.trim() !== '' && newName.trim() !== sessionName) {
+            const result = await sessionUpdateSummary(session.id, newName.trim());
+            if (!result.success) {
+                throw new HappyError(result.message || 'Failed to rename session', false);
+            }
+        }
+    });
+
+    const handleRename = React.useCallback(() => {
+        closeContextMenu();
+        performRename();
+    }, [performRename, closeContextMenu]);
 
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
@@ -467,10 +426,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
         );
     }, [performDelete]);
 
-    const avatarId = React.useMemo(() => {
-        return getSessionAvatarId(session);
-    }, [session]);
-
     const itemContent = (
         <Pressable
             style={[
@@ -491,24 +446,6 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                 }
             }}
         >
-            <View style={styles.avatarContainer}>
-                <Avatar id={avatarId} size={48} monochrome={!sessionStatus.isConnected} flavor={session.metadata?.flavor} />
-                {session.draft && !badgeType && (
-                    <View style={styles.draftIconContainer}>
-                        <Ionicons
-                            name="create-outline"
-                            size={12}
-                            style={styles.draftIconOverlay}
-                        />
-                    </View>
-                )}
-                {badgeType && (
-                    <SessionBadgeDot
-                        type={badgeType}
-                        color={badgeType === 'action' ? theme.colors.badge.action : theme.colors.badge.info}
-                    />
-                )}
-            </View>
             <View style={styles.sessionContent}>
                 {/* Title line */}
                 <View style={styles.sessionTitleRow}>
@@ -556,6 +493,12 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                     visible={contextMenu !== null}
                     position={contextMenu || { x: 0, y: 0 }}
                     items={[
+                        {
+                            label: t('sessionInfo.renameSession'),
+                            icon: 'pencil-outline',
+                            onPress: handleRename,
+                            disabled: renamingSession,
+                        },
                         {
                             label: t('sessionInfo.deleteSession'),
                             icon: 'trash-outline',
@@ -655,6 +598,28 @@ const CompactSessionItem = React.memo(({ session, selected }: {
     const badgeType = useSessionBadge(session);
     const { ref: contextMenuRef, contextMenu, close: closeContextMenu } = useWebContextMenu();
 
+    const [renamingSession, performRename] = useHappyAction(async () => {
+        const newName = await Modal.prompt(
+            t('sessionInfo.renameSession'),
+            undefined,
+            {
+                placeholder: t('sessionInfo.renameSessionPlaceholder'),
+                defaultValue: sessionName,
+            }
+        );
+        if (newName !== null && newName.trim() !== '' && newName.trim() !== sessionName) {
+            const result = await sessionUpdateSummary(session.id, newName.trim());
+            if (!result.success) {
+                throw new HappyError(result.message || 'Failed to rename session', false);
+            }
+        }
+    });
+
+    const handleRename = React.useCallback(() => {
+        closeContextMenu();
+        performRename();
+    }, [performRename, closeContextMenu]);
+
     const [deletingSession, performDelete] = useHappyAction(async () => {
         const result = await sessionDelete(session.id);
         if (!result.success) {
@@ -718,6 +683,12 @@ const CompactSessionItem = React.memo(({ session, selected }: {
                     visible={contextMenu !== null}
                     position={contextMenu || { x: 0, y: 0 }}
                     items={[
+                        {
+                            label: t('sessionInfo.renameSession'),
+                            icon: 'pencil-outline',
+                            onPress: handleRename,
+                            disabled: renamingSession,
+                        },
                         {
                             label: t('sessionInfo.deleteSession'),
                             icon: 'trash-outline',

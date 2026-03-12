@@ -115,7 +115,7 @@ export function getHardcodedPermissionModes(flavor: AgentFlavor, translate: Tran
     if (flavor === 'codex') {
         return getCodexPermissionModes(translate);
     }
-    if (flavor === 'gemini') {
+    if (flavor === 'gemini' || flavor === 'opencode') {
         return getGeminiPermissionModes(translate);
     }
     if (flavor === 'droid') {
@@ -133,6 +133,9 @@ export function getHardcodedModelModes(flavor: AgentFlavor, translate: Translate
     }
     if (flavor === 'droid') {
         return getDroidModelModes();
+    }
+    if (flavor === 'opencode') {
+        return [];
     }
     return getClaudeModelModes();
 }
@@ -154,7 +157,7 @@ export function getAvailablePermissionModes(
     metadata: Metadata | null | undefined,
     translate: Translate,
 ): PermissionMode[] {
-    if (flavor === 'claude' || flavor === 'codex' || flavor === 'droid') {
+    if (flavor === 'claude' || flavor === 'codex' || flavor === 'droid' || flavor === 'opencode') {
         return hackModes(getHardcodedPermissionModes(flavor, translate));
     }
 
@@ -195,6 +198,9 @@ export function getDefaultModelKey(flavor: AgentFlavor): string {
     }
     if (flavor === 'droid') {
         return 'claude-opus-4-6';
+    }
+    if (flavor === 'opencode') {
+        return 'default';
     }
     return 'default';
 }

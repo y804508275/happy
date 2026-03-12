@@ -40,6 +40,16 @@ export const ru: TranslationStructure = {
         updates: 'Обновления',
     },
 
+    sessions: {
+        // Session list section headers
+        active: 'Активные',
+        recent: 'Недавние',
+        actionNeeded: 'Требуется действие',
+        unread: 'Непрочитано',
+        thinking: 'Думает',
+        draft: 'Черновик',
+    },
+
     common: {
         // Simple string constants
         cancel: 'Отмена',
@@ -351,6 +361,8 @@ export const ru: TranslationStructure = {
         cliVersionOutdatedMessage: ({ currentVersion, requiredVersion }: { currentVersion: string; requiredVersion: string }) =>
             `Установлена версия ${currentVersion}. Обновите до ${requiredVersion} или новее`,
         updateCliInstructions: 'Пожалуйста, выполните npm install -g happy-coder@latest',
+        renameSession: 'Переименовать сессию',
+        renameSessionPlaceholder: 'Введите название сессии',
         deleteSession: 'Удалить сессию',
         deleteSessionSubtitle: 'Удалить эту сессию навсегда',
         deleteSessionConfirm: 'Удалить сессию навсегда?',

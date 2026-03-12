@@ -62,9 +62,15 @@ export async function scanProjects(): Promise<ScannedProject[]> {
     logger.debug(`[projectScanner] Scanning for projects in ${home}`);
 
     const projects = await new Promise<ScannedProject[]>((resolve) => {
+        // Prune macOS protected directories to avoid TCC permission popups
+        const pruneArgs = [
+            'Library', 'Pictures', 'Music', 'Movies',
+            'Applications', 'Public', '.Trash',
+        ].flatMap(dir => ['-path', join(home, dir), '-prune', '-o']);
+
         execFile(
             'find',
-            [home, '-maxdepth', '4', '-name', '.git', '-type', 'd'],
+            [home, '-maxdepth', '4', ...pruneArgs, '-name', '.git', '-type', 'd', '-print'],
             { timeout: SCAN_TIMEOUT_MS, maxBuffer: 1024 * 1024 },
             (error, stdout) => {
                 if (error && !stdout) {

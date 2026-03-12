@@ -31,6 +31,16 @@ export const zhHant: TranslationStructure = {
         updates: '更新',
     },
 
+    sessions: {
+        // Session list section headers
+        active: '進行中',
+        recent: '最近',
+        actionNeeded: '需確認',
+        unread: '未讀',
+        thinking: '思考中',
+        draft: '草稿',
+    },
+
     common: {
         // Simple string constants
         cancel: '取消',
@@ -385,6 +395,8 @@ export const zhHant: TranslationStructure = {
         cliVersionOutdatedMessage: ({ currentVersion, requiredVersion }: { currentVersion: string; requiredVersion: string }) =>
             `已安裝版本 ${currentVersion}。請更新到 ${requiredVersion} 或更高版本`,
         updateCliInstructions: '請執行 npm install -g happy-coder@latest',
+        renameSession: '重新命名對話',
+        renameSessionPlaceholder: '輸入對話名稱',
         deleteSession: '刪除工作階段',
         deleteSessionSubtitle: '永久刪除此工作階段',
         deleteSessionConfirm: '永久刪除工作階段？',

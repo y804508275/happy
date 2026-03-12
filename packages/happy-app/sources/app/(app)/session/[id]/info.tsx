@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, Animated } from 'react-native';
+import { View, Text, Animated, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/constants/Typography';
@@ -11,7 +11,7 @@ import { useSession, useIsDataReady, storage } from '@/sync/storage';
 import { getSessionName, useSessionStatus, formatOSPlatform, formatPathRelativeToHome, getSessionAvatarId } from '@/utils/sessionUtils';
 import * as Clipboard from 'expo-clipboard';
 import { Modal } from '@/modal';
-import { sessionArchive, sessionDelete, sessionRestart } from '@/sync/ops';
+import { sessionArchive, sessionDelete, sessionRestart, sessionUpdateSummary } from '@/sync/ops';
 import { useUnistyles } from 'react-native-unistyles';
 import { layout } from '@/components/layout';
 import { t } from '@/text';
@@ -130,6 +130,25 @@ function SessionInfoContent({ session }: { session: Session }) {
     // Check if CLI version is outdated
     const isCliOutdated = session.metadata?.version && !isVersionSupported(session.metadata.version, MINIMUM_CLI_VERSION);
 
+    const handleRename = useCallback(async () => {
+        const newName = await Modal.prompt(
+            t('sessionInfo.renameSession'),
+            undefined,
+            {
+                placeholder: t('sessionInfo.renameSessionPlaceholder'),
+                defaultValue: sessionName,
+            }
+        );
+        if (newName !== null && newName.trim() !== '' && newName.trim() !== sessionName) {
+            const result = await sessionUpdateSummary(session.id, newName.trim());
+            if (!result.success) {
+                throw new HappyError(result.message || 'Failed to rename session', false);
+            }
+        }
+    }, [session.id, sessionName]);
+
+    const [renamingSession, performRename] = useHappyAction(handleRename);
+
     const handleCopySessionId = useCallback(async () => {
         if (!session) return;
         try {
@@ -246,16 +265,18 @@ function SessionInfoContent({ session }: { session: Session }) {
                 <View style={{ maxWidth: layout.maxWidth, alignSelf: 'center', width: '100%' }}>
                     <View style={{ alignItems: 'center', paddingVertical: 24, backgroundColor: theme.colors.surface, marginBottom: 8, borderRadius: 12, marginHorizontal: 16, marginTop: 16 }}>
                         <Avatar id={getSessionAvatarId(session)} size={80} monochrome={!sessionStatus.isConnected} flavor={session.metadata?.flavor} />
-                        <Text style={{
-                            fontSize: 20,
-                            fontWeight: '600',
-                            marginTop: 12,
-                            textAlign: 'center',
-                            color: theme.colors.text,
-                            ...Typography.default('semiBold')
-                        }}>
-                            {sessionName}
-                        </Text>
+                        <Pressable onPress={performRename} disabled={renamingSession}>
+                            <Text style={{
+                                fontSize: 20,
+                                fontWeight: '600',
+                                marginTop: 12,
+                                textAlign: 'center',
+                                color: theme.colors.text,
+                                ...Typography.default('semiBold')
+                            }}>
+                                {sessionName}
+                            </Text>
+                        </Pressable>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
                             <StatusDot color={sessionStatus.statusDotColor} isPulsing={sessionStatus.isPulsing} size={10} />
                             <Text style={{
@@ -405,6 +426,8 @@ function SessionInfoContent({ session }: { session: Session }) {
                                 if (flavor === 'claude') return 'Claude';
                                 if (flavor === 'gpt' || flavor === 'openai') return 'Codex';
                                 if (flavor === 'gemini') return 'Gemini';
+                                if (flavor === 'opencode') return 'OpenCode';
+                                if (flavor === 'droid') return 'Droid';
                                 return flavor;
                             })()}
                             icon={<Ionicons name="sparkles-outline" size={29} color="#5856D6" />}

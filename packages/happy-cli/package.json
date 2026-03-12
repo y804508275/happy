@@ -45,6 +45,14 @@
         "types": "./dist/codex/happyMcpStdioBridge.d.mts",
         "default": "./dist/codex/happyMcpStdioBridge.mjs"
       }
+    },
+    "./capabilities/standaloneServer": {
+      "require": {
+        "default": "./dist/capabilities/standaloneServer.cjs"
+      },
+      "import": {
+        "default": "./dist/capabilities/standaloneServer.mjs"
+      }
     }
   },
   "files": [
@@ -90,6 +98,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.14.1",
     "@anthropic-ai/sandbox-runtime": "^0.0.37",
+    "@browserbasehq/sdk": "^2.7.0",
+    "@e2b/desktop": "^2.2.2",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "@paralleldrive/cuid2": "^2.2.2",
     "@slopus/happy-wire": "^0.1.0",
@@ -105,6 +115,7 @@
     "axios": "^1.13.2",
     "chalk": "^5.6.2",
     "cross-spawn": "^7.0.6",
+    "e2b": "^2.14.0",
     "expo-server-sdk": "^3.15.0",
     "fastify": "^5.6.2",
     "fastify-type-provider-zod": "4.0.2",
@@ -113,6 +124,7 @@
     "ink": "^6.5.1",
     "inquirer": "^13.2.2",
     "open": "^10.2.0",
+    "playwright": "^1.58.2",
     "ps-list": "^8.1.1",
     "qrcode-terminal": "^0.12.0",
     "react": "^19.2.0",

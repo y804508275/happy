@@ -20,7 +20,14 @@ export interface SessionStatus {
  */
 export function useSessionStatus(session: Session): SessionStatus {
     const isOnline = session.presence === "online";
-    const hasPermissions = (session.agentState?.requests && Object.keys(session.agentState.requests).length > 0 ? true : false);
+
+    // Filter out stale permission requests at render time to avoid ghost "needs permission" status.
+    // Requests are stale if: session is offline, missing createdAt, or older than 1 minute.
+    const STALE_THRESHOLD_MS = 60 * 1000;
+    const now = Date.now();
+    const hasPermissions = isOnline && !!session.agentState?.requests && Object.values(session.agentState.requests).some(
+        r => !!r.createdAt && (now - r.createdAt < STALE_THRESHOLD_MS)
+    );
 
     const vibingMessage = React.useMemo(() => {
         return vibingMessages[Math.floor(Math.random() * vibingMessages.length)].toLowerCase() + '…';
@@ -37,19 +44,8 @@ export function useSessionStatus(session: Session): SessionStatus {
         };
     }
 
-    // Check if permission is required
-    if (hasPermissions) {
-        return {
-            state: 'permission_required',
-            isConnected: true,
-            statusText: t('status.permissionRequired'),
-            shouldShowStatus: true,
-            statusColor: '#FF9500',
-            statusDotColor: '#FF9500',
-            isPulsing: true
-        };
-    }
-
+    // Thinking takes priority: if session is actively thinking, any leftover
+    // permission requests in agentState.requests are already handled (stale).
     if (session.thinking === true) {
         return {
             state: 'thinking',
@@ -58,6 +54,19 @@ export function useSessionStatus(session: Session): SessionStatus {
             shouldShowStatus: true,
             statusColor: '#007AFF',
             statusDotColor: '#007AFF',
+            isPulsing: true
+        };
+    }
+
+    // Check if permission is required (only when not thinking)
+    if (hasPermissions) {
+        return {
+            state: 'permission_required',
+            isConnected: true,
+            statusText: t('status.permissionRequired'),
+            shouldShowStatus: true,
+            statusColor: '#FF9500',
+            statusDotColor: '#FF9500',
             isPulsing: true
         };
     }
@@ -79,15 +88,8 @@ export function useSessionStatus(session: Session): SessionStatus {
 export function getSessionName(session: Session): string {
     if (session.metadata?.summary) {
         return session.metadata.summary.text;
-    } else if (session.metadata) {
-        const segments = session.metadata.path.split('/').filter(Boolean);
-        const lastSegment = segments.pop();
-        if (!lastSegment) {
-            return t('status.unknown');
-        }
-        return lastSegment;
     }
-    return t('status.unknown');
+    return t('machine.untitledSession');
 }
 
 /**

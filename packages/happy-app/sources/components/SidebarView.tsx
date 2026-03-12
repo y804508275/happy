@@ -14,6 +14,9 @@ import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
 import { useInboxHasContent } from '@/hooks/useInboxHasContent';
 import { Ionicons } from '@expo/vector-icons';
+import { useChangelog } from '@/hooks/useChangelog';
+import { useUpdates } from '@/hooks/useUpdates';
+import { useNativeUpdate } from '@/hooks/useNativeUpdate';
 
 const stylesheet = StyleSheet.create((theme, runtime) => ({
     container: {
@@ -121,6 +124,10 @@ export const SidebarView = React.memo(() => {
     const realtimeStatus = useRealtimeStatus();
     const friendRequests = useFriendRequests();
     const inboxHasContent = useInboxHasContent();
+    const { hasUnread: hasChangelogUnread, markAsRead: markChangelogRead } = useChangelog();
+    const { updateAvailable } = useUpdates();
+    const nativeUpdateUrl = useNativeUpdate();
+    const hasUpdateNotification = hasChangelogUnread || updateAvailable || !!nativeUpdateUrl;
 
     // Compute connection status once per render (theme-reactive, no stale memoization)
     const connectionStatus = (() => {
@@ -207,6 +214,21 @@ export const SidebarView = React.memo(() => {
                     hitSlop={15}
                 >
                     <Ionicons name="settings-outline" size={20} color={theme.colors.header.tint} />
+                </Pressable>
+                <Pressable
+                    onPress={() => {
+                        router.push('/changelog');
+                        if (hasChangelogUnread) {
+                            setTimeout(() => markChangelogRead(), 1000);
+                        }
+                    }}
+                    hitSlop={15}
+                    style={styles.bottomButton}
+                >
+                    <Ionicons name="sparkles-outline" size={20} color={theme.colors.header.tint} />
+                    {hasUpdateNotification && (
+                        <View style={styles.indicatorDot} />
+                    )}
                 </Pressable>
                 <Pressable
                     onPress={() => router.push('/(app)/knowledge')}

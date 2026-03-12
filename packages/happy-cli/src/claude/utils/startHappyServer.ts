@@ -15,6 +15,14 @@ import { randomUUID } from "node:crypto";
 import { type ScannedProject, scanProjects, readProjectCache, findProjectForPath } from "./projectScanner";
 import axios from "axios";
 import { configuration } from "@/configuration";
+import { registerCapabilityTools, cleanupCapabilitySandbox, type PreviewEmitter } from "@/capabilities/registerCapabilityTools";
+import { createEnvelope } from '@slopus/happy-wire';
+import { listInstalledApps, registerAllAppTools, buildAppSystemPrompt, getAppAuthCookie } from "@/apps";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
+import { URL as NodeURL } from "node:url";
+import { Socket } from "node:net";
+import { connect as tlsConnect } from "node:tls";
 
 export async function startHappyServer(client: ApiSessionClient, projects: ScannedProject[] = [], workingDirectory?: string) {
     logger.debug(`[happyMCP] server:start sessionId=${client.sessionId}`);
@@ -40,9 +48,15 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
     // Create the MCP server
     //
 
+    // Load installed apps early so we can set MCP instructions
+    const installedApps = listInstalledApps();
+    const appInstructions = buildAppSystemPrompt(installedApps);
+
     const mcp = new McpServer({
         name: "Happy MCP",
         version: "1.0.0",
+    }, {
+        instructions: appInstructions || undefined,
     });
 
     mcp.registerTool('change_title', {
@@ -411,6 +425,209 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
         }
     });
 
+    // Register cloud capability tools (browser, sandbox file I/O, code execution) if E2B_API_KEY is set
+    const previewEmitter: PreviewEmitter = {
+        sendPreview(preview) {
+            logger.debug(`[happyMCP] sendPreview called: kind=${preview.kind}, url=${preview.url}, hasBody=${!!preview.body}`);
+            try {
+                const envelope = createEnvelope('agent', {
+                    t: 'preview',
+                    kind: preview.kind,
+                    ...(preview.url ? { url: preview.url } : {}),
+                    ...(preview.title ? { title: preview.title } : {}),
+                    ...(preview.body ? { body: preview.body } : {}),
+                });
+                client.sendSessionProtocolMessage(envelope);
+                logger.debug(`[happyMCP] preview envelope sent successfully`);
+            } catch (error: any) {
+                logger.debug(`[happyMCP] sendPreview error: ${error.message}`);
+            }
+        },
+    };
+    const capabilityToolNames = registerCapabilityTools(mcp, previewEmitter);
+
+    // Register installed app tools (Happy App Protocol)
+    const appToolNames = registerAllAppTools(mcp, installedApps);
+    if (installedApps.length > 0) {
+        logger.debug(`[happyMCP] Loaded ${installedApps.length} app(s), ${appToolNames.length} tool(s)`);
+    }
+
+    // Register open_app tool for apps with embed config
+    // Start per-app proxy servers with full HTTP + WebSocket support
+    const appProxyUrls = new Map<string, string>();
+    const appProxyServers: ReturnType<typeof createServer>[] = [];
+    const embeddableApps = installedApps.filter(a => a.manifest.embed);
+
+    for (const app of embeddableApps) {
+        const appProxyServer = createServer(async (req, res) => {
+            try {
+                const cookie = await getAppAuthCookie(app);
+                const targetPath = req.url || '/';
+                const target = new NodeURL(targetPath, app.manifest.baseUrl);
+                const isHttps = target.protocol === 'https:';
+                const makeRequest = isHttps ? httpsRequest : httpRequest;
+
+                const proxyHeaders: Record<string, string> = {};
+                for (const key of ['accept', 'content-type', 'accept-language', 'accept-encoding', 'referer', 'user-agent', 'content-length']) {
+                    if (req.headers[key]) proxyHeaders[key] = req.headers[key] as string;
+                }
+                proxyHeaders['host'] = target.host;
+                if (cookie) proxyHeaders['cookie'] = cookie;
+
+                const proxyReq = makeRequest(target.toString(), {
+                    method: req.method,
+                    headers: proxyHeaders,
+                }, (proxyRes) => {
+                    const headers: Record<string, string | string[]> = {};
+                    for (const [key, val] of Object.entries(proxyRes.headers)) {
+                        if (!val) continue;
+                        if (key.toLowerCase() === 'transfer-encoding') continue;
+                        // Strip restrictive frame/CSP headers from proxied response
+                        if (key.toLowerCase() === 'x-frame-options') continue;
+                        if (key.toLowerCase() === 'content-security-policy') continue;
+                        headers[key] = val as any;
+                    }
+                    res.writeHead(proxyRes.statusCode || 200, headers);
+                    proxyRes.pipe(res);
+                });
+
+                proxyReq.on('error', (err) => {
+                    logger.debug(`[happyMCP] App proxy error for ${app.manifest.id}: ${err.message}`);
+                    if (!res.headersSent) res.writeHead(502).end('Proxy error');
+                });
+
+                req.pipe(proxyReq);
+            } catch (error: any) {
+                logger.debug(`[happyMCP] App proxy error for ${app.manifest.id}: ${error.message}`);
+                if (!res.headersSent) res.writeHead(500).end('Internal proxy error');
+            }
+        });
+
+        // WebSocket upgrade handling
+        appProxyServer.on('upgrade', async (req, clientSocket, head) => {
+            try {
+                const cookie = await getAppAuthCookie(app);
+                const targetPath = req.url || '/';
+                const target = new NodeURL(targetPath, app.manifest.baseUrl);
+                const isHttps = target.protocol === 'https:';
+                const port = parseInt(target.port) || (isHttps ? 443 : 80);
+
+                const connectFn = isHttps
+                    ? () => tlsConnect({ host: target.hostname, port, servername: target.hostname })
+                    : () => new Socket();
+
+                const serverSocket = connectFn();
+                if (!isHttps) {
+                    (serverSocket as Socket).connect(port, target.hostname);
+                }
+
+                serverSocket.on('connect', () => {
+                    const headers = [
+                        `GET ${target.pathname}${target.search} HTTP/1.1`,
+                        `Host: ${target.host}`,
+                        `Upgrade: websocket`,
+                        `Connection: Upgrade`,
+                    ];
+                    // Forward WebSocket-specific headers
+                    for (const key of ['sec-websocket-key', 'sec-websocket-version', 'sec-websocket-extensions', 'sec-websocket-protocol']) {
+                        if (req.headers[key]) headers.push(`${key}: ${req.headers[key]}`);
+                    }
+                    if (cookie) headers.push(`Cookie: ${cookie}`);
+                    headers.push('', '');
+
+                    serverSocket.write(headers.join('\r\n'));
+                    if (head.length > 0) serverSocket.write(head);
+
+                    serverSocket.pipe(clientSocket);
+                    clientSocket.pipe(serverSocket);
+                });
+
+                serverSocket.on('error', (err) => {
+                    logger.debug(`[happyMCP] WS proxy error for ${app.manifest.id}: ${err.message}`);
+                    clientSocket.destroy();
+                });
+
+                clientSocket.on('error', () => serverSocket.destroy());
+            } catch (error: any) {
+                logger.debug(`[happyMCP] WS upgrade error for ${app.manifest.id}: ${error.message}`);
+                clientSocket.destroy();
+            }
+        });
+
+        const proxyUrl = await new Promise<string>((resolve) => {
+            appProxyServer.listen(0, '127.0.0.1', () => {
+                const addr = appProxyServer.address() as AddressInfo;
+                resolve(`http://127.0.0.1:${addr.port}`);
+            });
+        });
+
+        appProxyUrls.set(app.manifest.id, proxyUrl);
+        appProxyServers.push(appProxyServer);
+        logger.debug(`[happyMCP] App proxy for "${app.manifest.name}" at ${proxyUrl} (HTTP+WS)`);
+    }
+
+    if (embeddableApps.length > 0) {
+        const appChoices = embeddableApps.map(a => a.manifest.id);
+
+        // Build description including pathTemplate params for each app
+        const appDescs = embeddableApps.map(a => {
+            const tpl = a.manifest.embed?.pathTemplate;
+            if (tpl) {
+                const params = (tpl.match(/:([a-zA-Z_]+)/g) || []).map(p => p.slice(1));
+                return `${a.manifest.id} (${a.manifest.name}, pathTemplate: "${tpl}", params: ${params.join(', ')})`;
+            }
+            return `${a.manifest.id} (${a.manifest.name})`;
+        }).join('; ');
+
+        mcp.registerTool('open_app', {
+            description: `Open an installed app in the side panel. Available: ${appDescs}. To open a specific page, pass the pathTemplate params (e.g. spaceSlug, slugId from search results). Without params, opens the app home page.`,
+            title: 'Open App',
+            inputSchema: {
+                appId: z.string().describe(`App ID to open. One of: ${appChoices.join(', ')}`),
+                params: z.record(z.string()).optional().describe('Key-value pairs to fill the pathTemplate (e.g. {"spaceSlug": "general", "slugId": "TGiuZmsa1N"})'),
+            },
+        }, async (args: { appId: string; params?: Record<string, string> }) => {
+            const app = embeddableApps.find(a => a.manifest.id === args.appId);
+            if (!app || !app.manifest.embed) {
+                return {
+                    content: [{ type: 'text' as const, text: `App "${args.appId}" not found or has no embed config.` }],
+                    isError: true,
+                };
+            }
+
+            let appPath: string;
+            if (args.params && app.manifest.embed.pathTemplate) {
+                appPath = app.manifest.embed.pathTemplate.replace(/:([a-zA-Z_]+)/g, (_, key) => {
+                    return args.params![key] || `:${key}`;
+                });
+            } else {
+                appPath = app.manifest.embed.defaultPath || '/';
+            }
+            // Use proxy URL with auth injection + WebSocket support
+            const proxyBase = appProxyUrls.get(app.manifest.id);
+            if (!proxyBase) {
+                return {
+                    content: [{ type: 'text' as const, text: `Proxy not available for "${app.manifest.name}".` }],
+                    isError: true,
+                };
+            }
+            const embedUrl = `${proxyBase}${appPath}`;
+
+            previewEmitter.sendPreview({
+                kind: 'url',
+                url: embedUrl,
+                title: app.manifest.name,
+            });
+
+            return {
+                content: [{ type: 'text' as const, text: `Opened ${app.manifest.name} in side panel: ${embedUrl}` }],
+                isError: false,
+            };
+        });
+        appToolNames.push('open_app');
+        logger.debug(`[happyMCP] Registered open_app tool for ${embeddableApps.length} embeddable app(s)`);
+    }
+
     const transport = new StreamableHTTPServerTransport({
         // NOTE: Returning session id here will result in claude
         // sdk spawn to fail with `Invalid Request: Server already initialized`
@@ -442,11 +659,16 @@ export async function startHappyServer(client: ApiSessionClient, projects: Scann
 
     logger.debug(`[happyMCP] server:ready sessionId=${client.sessionId} url=${baseUrl.toString()}`);
 
+    const baseToolNames = ['change_title', 'list_projects', 'load_context', 'save_memory', 'save_md_reference', 'delete_memory', 'notify_rule_applied'];
+
     return {
         url: baseUrl.toString(),
-        toolNames: ['change_title', 'list_projects', 'load_context', 'save_memory', 'save_md_reference', 'delete_memory', 'notify_rule_applied'],
+        toolNames: [...baseToolNames, ...capabilityToolNames, ...appToolNames],
+        installedApps,
         stop: () => {
             logger.debug(`[happyMCP] server:stop sessionId=${client.sessionId}`);
+            cleanupCapabilitySandbox().catch(e => logger.debug('[happyMCP] sandbox cleanup error:', e));
+            appProxyServers.forEach(s => s.close());
             mcp.close();
             server.close();
         }

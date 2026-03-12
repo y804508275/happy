@@ -72,6 +72,7 @@ module.exports = {
                 HAPPY_WEBAPP_URL: "http://localhost:8082",
                 DEBUG: "1",
                 NODE_NO_WARNINGS: "1",
+                OPENROUTER_API_KEY: "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",
             },
             autorestart: true,
             max_restarts: 10,

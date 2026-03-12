@@ -1,0 +1,164 @@
+{
+  "id": "docmost",
+  "name": "Docmost",
+  "description": "Team wiki and documentation platform. Use this to read, write, search, and comment on documents.",
+  "version": "1.0.0",
+  "baseUrl": "https://docs.superlinear.studio",
+  "tools": [
+    {
+      "name": "list_spaces",
+      "description": "List all available spaces (collections of documents)",
+      "parameters": [],
+      "confirmation": "auto",
+      "api": {
+        "method": "POST",
+        "path": "/api/spaces/",
+        "responseField": "data.items"
+      }
+    },
+    {
+      "name": "list_pages",
+      "description": "List pages in a space sidebar tree. Returns page titles and IDs.",
+      "parameters": [
+        { "name": "spaceId", "type": "string", "description": "Space ID to list pages from", "required": true },
+        { "name": "page", "type": "number", "description": "Page number for pagination", "required": false },
+        { "name": "limit", "type": "number", "description": "Number of results per page (default 50)", "required": false }
+      ],
+      "confirmation": "auto",
+      "api": {
+        "method": "POST",
+        "path": "/api/pages/sidebar-pages",
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "get_page",
+      "description": "Get a page's full content by ID. Returns title and markdown content.",
+      "parameters": [
+        { "name": "pageId", "type": "string", "description": "The page ID", "required": true }
+      ],
+      "confirmation": "auto",
+      "api": {
+        "method": "POST",
+        "path": "/api/pages/info",
+        "defaultBody": { "format": "markdown" },
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "search_pages",
+      "description": "Full-text search across all documents. Returns matching pages with highlighted snippets.",
+      "parameters": [
+        { "name": "query", "type": "string", "description": "Search query text", "required": true },
+        { "name": "spaceId", "type": "string", "description": "Optional: limit search to a specific space", "required": false }
+      ],
+      "confirmation": "auto",
+      "api": {
+        "method": "POST",
+        "path": "/api/search",
+        "responseField": "data.items"
+      }
+    },
+    {
+      "name": "create_page",
+      "description": "Create a new page in a space",
+      "parameters": [
+        { "name": "spaceId", "type": "string", "description": "Space ID to create the page in", "required": true },
+        { "name": "title", "type": "string", "description": "Page title", "required": true },
+        { "name": "content", "type": "string", "description": "Page content in markdown format", "required": false },
+        { "name": "parentPageId", "type": "string", "description": "Optional: parent page ID for nesting", "required": false }
+      ],
+      "confirmation": "confirm",
+      "api": {
+        "method": "POST",
+        "path": "/api/pages/create",
+        "defaultBody": { "format": "markdown" },
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "update_page",
+      "description": "Update a page's content (replaces existing content)",
+      "parameters": [
+        { "name": "pageId", "type": "string", "description": "The page ID to update", "required": true },
+        { "name": "title", "type": "string", "description": "New page title", "required": false },
+        { "name": "content", "type": "string", "description": "New content in markdown format", "required": false }
+      ],
+      "confirmation": "confirm",
+      "api": {
+        "method": "POST",
+        "path": "/api/pages/update",
+        "defaultBody": { "format": "markdown", "operation": "replace" },
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "delete_page",
+      "description": "Move a page to trash",
+      "parameters": [
+        { "name": "pageId", "type": "string", "description": "The page ID to delete", "required": true }
+      ],
+      "confirmation": "confirm",
+      "api": {
+        "method": "POST",
+        "path": "/api/pages/delete",
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "get_page_history",
+      "description": "Get version history of a page",
+      "parameters": [
+        { "name": "pageId", "type": "string", "description": "The page ID", "required": true }
+      ],
+      "confirmation": "auto",
+      "api": {
+        "method": "POST",
+        "path": "/api/pages/history",
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "list_comments",
+      "description": "List all comments on a page",
+      "parameters": [
+        { "name": "pageId", "type": "string", "description": "The page ID", "required": true }
+      ],
+      "confirmation": "auto",
+      "api": {
+        "method": "POST",
+        "path": "/api/comments/",
+        "responseField": "data"
+      }
+    },
+    {
+      "name": "add_comment",
+      "description": "Add a comment to a page",
+      "parameters": [
+        { "name": "pageId", "type": "string", "description": "The page ID to comment on", "required": true },
+        { "name": "content", "type": "object", "description": "Comment content in Tiptap JSON format", "required": true }
+      ],
+      "confirmation": "once",
+      "api": {
+        "method": "POST",
+        "path": "/api/comments/create",
+        "responseField": "data"
+      }
+    }
+  ],
+  "events": [
+    { "name": "page_updated", "description": "A page was edited by a user" },
+    { "name": "page_created", "description": "A new page was created" },
+    { "name": "comment_added", "description": "A comment was added to a page" }
+  ],
+  "embed": {
+    "url": "https://docs.superlinear.studio",
+    "defaultPath": "/",
+    "width": 700
+  },
+  "auth": {
+    "type": "cookie",
+    "loginEndpoint": "/api/auth/login",
+    "fields": ["authToken"]
+  }
+}

@@ -6,6 +6,7 @@ interface CLIAvailability {
     codex: boolean | null;
     gemini: boolean | null;
     droid: boolean | null;
+    opencode: boolean | null;
     isDetecting: boolean; // Explicit loading state
     timestamp: number; // When detection completed
     error?: string; // Detection error message (for debugging)
@@ -39,13 +40,14 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
         codex: null,
         gemini: null,
         droid: null,
+        opencode: null,
         isDetecting: false,
         timestamp: 0,
     });
 
     useEffect(() => {
         if (!machineId) {
-            setAvailability({ claude: null, codex: null, gemini: null, droid: null, isDetecting: false, timestamp: 0 });
+            setAvailability({ claude: null, codex: null, gemini: null, droid: null, opencode: null, isDetecting: false, timestamp: 0 });
             return;
         }
 
@@ -59,12 +61,16 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
             try {
                 // Use single bash command to check both CLIs efficiently
                 // command -v is POSIX compliant and more reliable than which
+                // Prepend common user bin dirs to PATH so daemon (launchd) can find CLIs
+                // installed in ~/.local/bin, ~/bin, ~/.cargo/bin, etc.
                 const result = await machineBash(
                     machineId,
+                    'export PATH="$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH" && ' +
                     '(command -v claude >/dev/null 2>&1 && echo "claude:true" || echo "claude:false") && ' +
                     '(command -v codex >/dev/null 2>&1 && echo "codex:true" || echo "codex:false") && ' +
                     '(command -v gemini >/dev/null 2>&1 && echo "gemini:true" || echo "gemini:false") && ' +
-                    '(command -v droid >/dev/null 2>&1 && echo "droid:true" || echo "droid:false")',
+                    '(command -v droid >/dev/null 2>&1 && echo "droid:true" || echo "droid:false") && ' +
+                    '(command -v opencode >/dev/null 2>&1 && echo "opencode:true" || echo "opencode:false")',
                     '/'
                 );
 
@@ -72,14 +78,14 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                 console.log('[useCLIDetection] Result:', { success: result.success, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr });
 
                 if (result.success && result.exitCode === 0) {
-                    // Parse output: "claude:true\ncodex:false\ngemini:false"
+                    // Parse output: "claude:true\ncodex:false\ngemini:false\ndroid:true\nopencode:true"
                     const lines = result.stdout.trim().split('\n');
-                    const cliStatus: { claude?: boolean; codex?: boolean; gemini?: boolean; droid?: boolean } = {};
+                    const cliStatus: { claude?: boolean; codex?: boolean; gemini?: boolean; droid?: boolean; opencode?: boolean } = {};
 
                     lines.forEach(line => {
                         const [cli, status] = line.split(':');
                         if (cli && status) {
-                            cliStatus[cli.trim() as 'claude' | 'codex' | 'gemini' | 'droid'] = status.trim() === 'true';
+                            cliStatus[cli.trim() as 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode'] = status.trim() === 'true';
                         }
                     });
 
@@ -89,6 +95,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                         codex: cliStatus.codex ?? null,
                         gemini: cliStatus.gemini ?? null,
                         droid: cliStatus.droid ?? null,
+                        opencode: cliStatus.opencode ?? null,
                         isDetecting: false,
                         timestamp: Date.now(),
                     });
@@ -100,6 +107,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                         codex: null,
                         gemini: null,
                         droid: null,
+                        opencode: null,
                         isDetecting: false,
                         timestamp: 0,
                         error: `Detection failed: ${result.stderr || 'Unknown error'}`,
@@ -115,6 +123,7 @@ export function useCLIDetection(machineId: string | null): CLIAvailability {
                     codex: null,
                     gemini: null,
                     droid: null,
+                    opencode: null,
                     isDetecting: false,
                     timestamp: 0,
                     error: error instanceof Error ? error.message : 'Detection error',

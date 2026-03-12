@@ -489,6 +489,10 @@ import { formatSecretKeyForBackup } from './utils/backupKey'
           startedBy = args[++i] as 'daemon' | 'terminal';
           continue;
         }
+        if (!customCommandMode && args[i] === '--happy-starting-mode') {
+          i++; // skip the value (e.g. 'remote')
+          continue;
+        }
         if (!customCommandMode && args[i] === '--verbose') {
           verbose = true;
           continue;

@@ -37,7 +37,8 @@ vi.mock('./utils/path', () => ({
 }));
 
 vi.mock('./utils/systemPrompt', () => ({
-    systemPrompt: 'test-system-prompt'
+    systemPrompt: 'test-system-prompt',
+    buildSystemPrompt: vi.fn(() => 'test-system-prompt'),
 }));
 
 vi.mock('node:fs', () => ({

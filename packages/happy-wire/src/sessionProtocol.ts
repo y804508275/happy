@@ -64,6 +64,14 @@ export const sessionStopEventSchema = z.object({
   t: z.literal('stop'),
 });
 
+export const sessionPreviewEventSchema = z.object({
+  t: z.literal('preview'),
+  kind: z.enum(['screenshot', 'url', 'html', 'text']),
+  url: z.string().optional(),
+  title: z.string().optional(),
+  body: z.string().optional(),
+});
+
 export const sessionEventSchema = z.discriminatedUnion('t', [
   sessionTextEventSchema,
   sessionServiceMessageEventSchema,
@@ -74,6 +82,7 @@ export const sessionEventSchema = z.discriminatedUnion('t', [
   sessionStartEventSchema,
   sessionTurnEndEventSchema,
   sessionStopEventSchema,
+  sessionPreviewEventSchema,
 ]);
 
 export type SessionEvent = z.infer<typeof sessionEventSchema>;

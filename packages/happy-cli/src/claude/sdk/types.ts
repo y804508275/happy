@@ -175,6 +175,8 @@ export interface QueryOptions {
     canCallTool?: CanCallToolCallback
     /** Path to a settings JSON file to pass to Claude via --settings */
     settingsPath?: string
+    /** Callback for streaming text deltas extracted from Anthropic SSE responses via fd 3 */
+    onStreamDelta?: (text: string) => void
 }
 
 /**

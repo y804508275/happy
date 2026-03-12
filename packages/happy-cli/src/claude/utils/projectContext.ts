@@ -2,6 +2,7 @@ import axios from 'axios';
 import { configuration } from '@/configuration';
 import { logger } from '@/ui/logger';
 import { type ScannedProject } from './projectScanner';
+import { listInstalledApps, buildAppSystemPrompt } from '@/apps';
 
 /**
  * Load knowledge base items and build a context prompt for system prompt injection.
@@ -41,6 +42,12 @@ export async function loadContextForInjection(
         });
 
         if (matchingItems.length === 0) {
+            // Even without rules, inject app descriptions if apps are installed
+            const installedApps = listInstalledApps();
+            const appPrompt = buildAppSystemPrompt(installedApps);
+            if (appPrompt) {
+                return { contextPrompt: appPrompt, rulesCount: 0, refsCount: 0 };
+            }
             return { contextPrompt: null, rulesCount: 0, refsCount: 0 };
         }
 
@@ -106,6 +113,13 @@ export async function loadContextForInjection(
                 }
                 prompt += `- [${item.id}] "${item.name}"${tagsStr}${descStr} [${scopeLabel}]\n`;
             }
+        }
+
+        // Inject installed app descriptions (Happy App Protocol)
+        const installedApps = listInstalledApps();
+        const appPrompt = buildAppSystemPrompt(installedApps);
+        if (appPrompt) {
+            prompt += '\n\n' + appPrompt;
         }
 
         return { contextPrompt: prompt.trim(), rulesCount: alwaysWithContent.length, refsCount: onDemandItems.length };

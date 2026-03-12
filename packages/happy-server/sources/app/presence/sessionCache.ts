@@ -64,7 +64,7 @@ class ActivityCache {
                 where: { id: sessionId, accountId: userId }
             });
             
-            if (session && !session.archived) {
+            if (session) {
                 // Cache the result
                 this.sessionCache.set(sessionId, {
                     validUntil: now + this.CACHE_TTL,
@@ -183,13 +183,13 @@ class ActivityCache {
             }
         }
         
-        // Batch update sessions (skip archived sessions)
+        // Batch update sessions (un-archive if needed — reactivation sends keepAlive)
         if (sessionUpdates.length > 0) {
             try {
                 await Promise.all(sessionUpdates.map(update =>
                     db.session.updateMany({
-                        where: { id: update.id, archived: false },
-                        data: { lastActiveAt: new Date(update.timestamp), active: true }
+                        where: { id: update.id },
+                        data: { lastActiveAt: new Date(update.timestamp), active: true, archived: false }
                     })
                 ));
                 

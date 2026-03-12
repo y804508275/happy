@@ -29,6 +29,16 @@ export const ca: TranslationStructure = {
         updates: 'Actualitzacions',
     },
 
+    sessions: {
+        // Session list section headers
+        active: 'Actives',
+        recent: 'Recents',
+        actionNeeded: 'Acció requerida',
+        unread: 'No llegit',
+        thinking: 'Pensant',
+        draft: 'Esborrany',
+    },
+
     common: {
         // Simple string constants
         cancel: 'Cancel·la',
@@ -384,6 +394,8 @@ export const ca: TranslationStructure = {
         cliVersionOutdatedMessage: ({ currentVersion, requiredVersion }: { currentVersion: string; requiredVersion: string }) =>
             `Versió ${currentVersion} instal·lada. Actualitzeu a ${requiredVersion} o posterior`,
         updateCliInstructions: 'Si us plau executeu npm install -g happy-coder@latest',
+        renameSession: 'Reanomena la sessió',
+        renameSessionPlaceholder: 'Introdueix el nom de la sessió',
         deleteSession: 'Elimina la sessió',
         deleteSessionSubtitle: 'Elimina permanentment aquesta sessió',
         deleteSessionConfirm: 'Eliminar la sessió permanentment?',

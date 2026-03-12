@@ -11,6 +11,7 @@ import { getProjectPath } from "./utils/path";
 import { awaitFileExist } from "@/modules/watcher/awaitFileExist";
 import { buildSystemPrompt } from "./utils/systemPrompt";
 import type { ScannedProject } from "./utils/projectScanner";
+import type { InstalledApp } from "@/apps";
 import { PermissionResult } from "./sdk/types";
 import type { JsRuntime } from "./runClaude";
 
@@ -33,6 +34,8 @@ export async function claudeRemote(opts: {
     projects?: ScannedProject[],
     /** Pre-loaded project knowledge base context */
     projectContext?: string | null,
+    /** Installed Happy apps */
+    installedApps?: InstalledApp[],
 
     // Dynamic parameters
     nextMessage: () => Promise<{ message: string | Array<unknown>, mode: EnhancedMode } | null>,
@@ -42,6 +45,7 @@ export async function claudeRemote(opts: {
     // Callbacks
     onSessionFound: (id: string) => void,
     onThinkingChange?: (thinking: boolean) => void,
+    onStreamDelta?: (text: string) => void,
     onMessage: (message: SDKMessage) => void,
     onCompletionEvent?: (message: string) => void,
     onSessionReset?: () => void
@@ -123,7 +127,7 @@ export async function claudeRemote(opts: {
 
     // Prepare SDK options
     let mode = initial.mode;
-    const builtPrompt = buildSystemPrompt(opts.projects ?? [], opts.projectContext);
+    const builtPrompt = buildSystemPrompt(opts.projects ?? [], opts.projectContext, opts.installedApps);
     const sdkOptions: QueryOptions = {
         cwd: opts.path,
         resume: startFrom ?? undefined,
@@ -138,6 +142,7 @@ export async function claudeRemote(opts: {
         canCallTool: (toolName: string, input: unknown, options: { signal: AbortSignal }) => opts.canCallTool(toolName, input, mode, options),
         executable: opts.jsRuntime ?? 'node',
         abort: opts.signal,
+        onStreamDelta: opts.onStreamDelta,
         pathToClaudeCodeExecutable: (() => {
             return resolve(join(projectPath(), 'scripts', 'claude_remote_launcher.cjs'));
         })(),

@@ -57,8 +57,17 @@ export function parseMessageAsEvent(msg: NormalizedMessage): AgentEvent | null {
         }
     }
 
-    // Additional parsing logic can be added here
-    // For example, checking specific metadata patterns or other message types
+    // Check for preview events (from cloud capabilities)
+    if (msg.role === 'event' && msg.content.type === 'preview') {
+        console.log('[PREVIEW] parseMessageAsEvent converting preview:', msg.id, (msg.content as any).url);
+        return {
+            type: 'preview',
+            kind: (msg.content as any).kind,
+            url: (msg.content as any).url,
+            title: (msg.content as any).title,
+            body: (msg.content as any).body,
+        } as AgentEvent;
+    }
 
     // No event conversion needed
     return null;

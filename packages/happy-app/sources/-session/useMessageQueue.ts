@@ -18,6 +18,13 @@ export interface QueuedMessage {
 }
 
 /**
+ * Module-level cache that persists queued messages across component
+ * unmount/remount cycles (e.g. when the user switches sessions and
+ * comes back). Keyed by sessionId.
+ */
+const queueCache = new Map<string, QueuedMessage[]>();
+
+/**
  * Manages a local message queue for messages sent while the AI is thinking.
  * Messages are queued in React state and automatically flushed (sent via
  * sync.sendMessage) when the session transitions to 'waiting' state.
@@ -30,10 +37,19 @@ export interface QueuedMessage {
  * - Does NOT flush on: thinking→permission_required, thinking→disconnected
  */
 export function useMessageQueue(sessionId: string, sessionState: SessionState) {
-    const [queue, setQueue] = React.useState<QueuedMessage[]>([]);
+    const [queue, setQueue] = React.useState<QueuedMessage[]>(() => queueCache.get(sessionId) ?? []);
     const prevStateRef = React.useRef<SessionState>(sessionState);
     const queueRef = React.useRef<QueuedMessage[]>(queue);
     queueRef.current = queue;
+
+    // Keep the module-level cache in sync with React state
+    React.useEffect(() => {
+        if (queue.length > 0) {
+            queueCache.set(sessionId, queue);
+        } else {
+            queueCache.delete(sessionId);
+        }
+    }, [sessionId, queue]);
 
     // Guard against double-flush: flush reads from queueRef (sync) but
     // setQueue([]) is async (React batch), so a second effect in the same

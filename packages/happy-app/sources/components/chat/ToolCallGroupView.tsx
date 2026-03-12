@@ -206,7 +206,7 @@ const CompactToolLine = React.memo<CompactToolLineProps>((props) => {
                 );
                 break;
             case 'completed':
-                statusIcon = <Ionicons name="checkmark-circle" size={16} color="#34C759" />;
+                statusIcon = <Ionicons name="checkmark" size={14} color={theme.colors.textSecondary} />;
                 break;
             case 'error':
                 statusIcon = <Ionicons name="close-circle" size={16} color={theme.colors.warning} />;

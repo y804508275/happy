@@ -11,6 +11,7 @@ import { projectPath } from "@/projectPath";
 import { buildSystemPrompt } from "./utils/systemPrompt";
 import type { SandboxConfig } from "@/persistence";
 import type { ScannedProject } from "./utils/projectScanner";
+import type { InstalledApp } from "@/apps";
 import { initializeSandbox, wrapCommand } from "@/sandbox/manager";
 
 /**
@@ -41,6 +42,7 @@ export async function claudeLocal(opts: {
     path: string,
     onSessionFound: (id: string) => void,
     onThinkingChange?: (thinking: boolean) => void,
+    onStreamDelta?: (text: string) => void,
     claudeEnvVars?: Record<string, string>,
     claudeArgs?: string[],
     allowedTools?: string[],
@@ -51,6 +53,8 @@ export async function claudeLocal(opts: {
     projects?: ScannedProject[],
     /** Pre-loaded project knowledge base context */
     projectContext?: string | null,
+    /** Installed Happy apps */
+    installedApps?: InstalledApp[],
 }) {
 
     // Ensure project directory exists
@@ -214,7 +218,7 @@ export async function claudeLocal(opts: {
             }
             // If hasResumeFlag && !startFrom: --resume is in claudeArgs, let Claude handle it
 
-            args.push('--append-system-prompt', buildSystemPrompt(opts.projects ?? [], opts.projectContext));
+            args.push('--append-system-prompt', buildSystemPrompt(opts.projects ?? [], opts.projectContext, opts.installedApps));
 
             if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
                 args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));
@@ -343,6 +347,12 @@ export async function claudeLocal(opts: {
                                             }
                                             stopThinkingTimeout = null;
                                         }, 500); // Small delay to avoid flickering
+                                    }
+                                    break;
+
+                                case 'text-delta':
+                                    if (message.text && opts.onStreamDelta) {
+                                        opts.onStreamDelta(message.text);
                                     }
                                     break;
 

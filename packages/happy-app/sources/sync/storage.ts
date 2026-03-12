@@ -18,6 +18,7 @@ import { sync } from "./sync";
 import { getCurrentRealtimeSessionId, getVoiceSession } from '@/realtime/RealtimeSession';
 import { isMutableTool } from "@/components/tools/knownTools";
 import { projectManager } from "./projectManager";
+import { t } from '@/text';
 import { DecryptedArtifact } from "./artifactTypes";
 import { FeedItem } from "./feedTypes";
 import type { SharedItemSummary, TeamSummary } from "./sharedItemTypes";
@@ -62,7 +63,7 @@ interface SessionMessages {
 
 // Unified list item type for SessionsList component
 export type SessionListViewItem =
-    | { type: 'header'; title: string }
+    | { type: 'header'; title: string; icon?: string }
     | { type: 'active-sessions'; sessions: Session[] }
     | { type: 'project-group'; displayPath: string; machine: Machine }
     | { type: 'session'; session: Session; variant?: 'default' | 'no-path' };
@@ -193,77 +194,21 @@ function buildSessionListViewData(
     activeSessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
     inactiveSessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
 
-    // Build unified list view data
+    // Build unified list view data with two sections: Active and Recent
     const listData: SessionListViewItem[] = [];
 
-    // Add active sessions as a single item at the top (if any)
+    // Add active sessions section
     if (activeSessions.length > 0) {
+        listData.push({ type: 'header', title: t('sessions.active'), icon: 'pulse-outline' });
         listData.push({ type: 'active-sessions', sessions: activeSessions });
     }
 
-    // Group inactive sessions by date
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-
-    let currentDateGroup: Session[] = [];
-    let currentDateString: string | null = null;
-
-    for (const session of inactiveSessions) {
-        const sessionDate = new Date(session.sortTimestamp);
-        const dateString = sessionDate.toDateString();
-
-        if (currentDateString !== dateString) {
-            // Process previous group
-            if (currentDateGroup.length > 0 && currentDateString) {
-                const groupDate = new Date(currentDateString);
-                const sessionDateOnly = new Date(groupDate.getFullYear(), groupDate.getMonth(), groupDate.getDate());
-
-                let headerTitle: string;
-                if (sessionDateOnly.getTime() === today.getTime()) {
-                    headerTitle = 'Today';
-                } else if (sessionDateOnly.getTime() === yesterday.getTime()) {
-                    headerTitle = 'Yesterday';
-                } else {
-                    const diffTime = today.getTime() - sessionDateOnly.getTime();
-                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                    headerTitle = `${diffDays} days ago`;
-                }
-
-                listData.push({ type: 'header', title: headerTitle });
-                currentDateGroup.forEach(sess => {
-                    listData.push({ type: 'session', session: sess });
-                });
-            }
-
-            // Start new group
-            currentDateString = dateString;
-            currentDateGroup = [session];
-        } else {
-            currentDateGroup.push(session);
+    // Add inactive sessions as a flat list under "Recent"
+    if (inactiveSessions.length > 0) {
+        listData.push({ type: 'header', title: t('sessions.recent'), icon: 'time-outline' });
+        for (const session of inactiveSessions) {
+            listData.push({ type: 'session', session });
         }
-    }
-
-    // Process final group
-    if (currentDateGroup.length > 0 && currentDateString) {
-        const groupDate = new Date(currentDateString);
-        const sessionDateOnly = new Date(groupDate.getFullYear(), groupDate.getMonth(), groupDate.getDate());
-
-        let headerTitle: string;
-        if (sessionDateOnly.getTime() === today.getTime()) {
-            headerTitle = 'Today';
-        } else if (sessionDateOnly.getTime() === yesterday.getTime()) {
-            headerTitle = 'Yesterday';
-        } else {
-            const diffTime = today.getTime() - sessionDateOnly.getTime();
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            headerTitle = `${diffDays} days ago`;
-        }
-
-        listData.push({ type: 'header', title: headerTitle });
-        currentDateGroup.forEach(sess => {
-            listData.push({ type: 'session', session: sess });
-        });
     }
 
     return listData;
@@ -381,17 +326,18 @@ export const storage = create<StorageState>()((set, get) => {
 
                 // Clear stale agentState.requests to prevent non-functional
                 // "needs permission" UI after CLI process death/restart.
-                // Two cases:
+                // Three cases:
                 //   1. Session is offline → all pending requests are stale
-                //   2. Session is online but requests are old (>5 min) → CLI lost them
+                //   2. Session is online but requests are old (>1 min) → CLI lost them
+                //   3. Request has no createdAt → treat as stale (can't verify age)
                 if (session.agentState?.requests && Object.keys(session.agentState.requests).length > 0) {
-                    const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+                    const STALE_THRESHOLD_MS = 60 * 1000; // 1 minute
                     const now = Date.now();
                     const isOffline = presence !== "online";
 
                     const staleIds: string[] = [];
                     for (const [id, request] of Object.entries(session.agentState.requests)) {
-                        if (isOffline || (request.createdAt && now - request.createdAt > STALE_THRESHOLD_MS)) {
+                        if (isOffline || !request.createdAt || (now - request.createdAt > STALE_THRESHOLD_MS)) {
                             staleIds.push(id);
                         }
                     }

@@ -44,6 +44,16 @@ export const en: TranslationStructure = {
         updates: 'Updates',
     },
 
+    sessions: {
+        // Session list section headers
+        active: 'Active',
+        recent: 'Recent',
+        actionNeeded: 'Action needed',
+        unread: 'Unread',
+        thinking: 'Thinking',
+        draft: 'Draft',
+    },
+
     common: {
         // Simple string constants
         cancel: 'Cancel',
@@ -399,6 +409,8 @@ export const en: TranslationStructure = {
         cliVersionOutdatedMessage: ({ currentVersion, requiredVersion }: { currentVersion: string; requiredVersion: string }) =>
             `Version ${currentVersion} installed. Update to ${requiredVersion} or later`,
         updateCliInstructions: 'Please run npm install -g happy-coder@latest',
+        renameSession: 'Rename Session',
+        renameSessionPlaceholder: 'Enter session name',
         deleteSession: 'Delete Session',
         deleteSessionSubtitle: 'Permanently remove this session',
         deleteSessionConfirm: 'Delete Session Permanently?',

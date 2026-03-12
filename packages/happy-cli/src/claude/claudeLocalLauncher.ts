@@ -112,6 +112,7 @@ export async function claudeLocalLauncher(session: Session): Promise<LauncherRes
                     sessionId: session.sessionId,
                     onSessionFound: handleSessionStart,
                     onThinkingChange: session.onThinkingChange,
+                    onStreamDelta: (text) => session.client.emitStreamDelta(text),
                     abort: processAbortController.signal,
                     claudeEnvVars: session.claudeEnvVars,
                     claudeArgs: session.claudeArgs,
@@ -121,6 +122,7 @@ export async function claudeLocalLauncher(session: Session): Promise<LauncherRes
                     sandboxConfig: session.sandboxConfig,
                     projects: session.projects,
                     projectContext: session.projectContext,
+                    installedApps: session.installedApps,
                 });
 
                 // Consume one-time Claude flags after spawn

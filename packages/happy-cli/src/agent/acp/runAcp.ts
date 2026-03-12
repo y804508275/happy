@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { ApiClient } from '@/api/api';
 import type { ApiSessionClient } from '@/api/apiSession';
 import type { AgentMessage } from '@/agent/core';
@@ -15,7 +15,7 @@ import { Credentials, readSettings } from '@/persistence';
 import { initialMachineMetadata } from '@/daemon/run';
 import { createSessionMetadata } from '@/utils/createSessionMetadata';
 import { configuration } from '@/configuration';
-import { encodeBase64 } from '@/api/encryption';
+import { encodeBase64, decodeBase64 } from '@/api/encryption';
 import { setupOfflineReconnection } from '@/utils/setupOfflineReconnection';
 import { notifyDaemonSessionStarted } from '@/daemon/controlClient';
 import { registerKillSessionHandler } from '@/claude/registerKillSessionHandler';
@@ -30,7 +30,7 @@ import {
   extractModelStateFromPayload,
   mergeAcpSessionConfigIntoMetadata,
 } from './sessionConfigMetadata';
-import type { SessionConfigOption, SessionModeState, SessionModelState } from '@agentclientprotocol/sdk';
+import type { SessionConfigOption, SessionModeState, SessionModelState, ContentBlock } from '@agentclientprotocol/sdk';
 
 const TURN_TIMEOUT_MS = 5 * 60 * 1000;
 const ACP_EVENT_PREVIEW_CHARS = 240;
@@ -477,7 +477,33 @@ export async function runAcp(opts: {
     startedBy: opts.startedBy,
     sandbox: settings.sandboxConfig,
   });
-  const response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+
+  // Check for restart: if HAPPY_RESTART_FILE is set, reconnect to existing session
+  const restartFilePath = process.env.HAPPY_RESTART_FILE;
+  let response: Awaited<ReturnType<typeof api.getOrCreateSession>>;
+  if (restartFilePath) {
+    try {
+      const restartData = JSON.parse(readFileSync(restartFilePath, 'utf-8'));
+      logger.debug(`[acp] Reconnecting to existing session ${restartData.sessionId}`);
+      response = {
+        id: restartData.sessionId,
+        seq: restartData.seq || 0,
+        encryptionKey: decodeBase64(restartData.encryptionKey),
+        encryptionVariant: restartData.encryptionVariant,
+        metadata,
+        metadataVersion: 0,
+        agentState: state,
+        agentStateVersion: 0,
+      };
+      try { unlinkSync(restartFilePath); } catch {}
+    } catch (error) {
+      logger.debug('[acp] Failed to read restart file, creating new session:', error);
+      response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+    }
+  } else {
+    response = await api.getOrCreateSession({ tag: sessionTag, metadata, state });
+  }
+
   if (response) {
     logAcp('muted', `Happy Session ID: ${response.id}`);
   }
@@ -499,6 +525,20 @@ export async function runAcp(opts: {
   });
   session = initialSession;
 
+  // If reconnecting via restart file, push current metadata to server
+  // (server may have stale metadata from the previous agent)
+  if (restartFilePath && response) {
+    try {
+      session.updateMetadata((currentMetadata) => ({
+        ...currentMetadata,
+        ...metadata,
+      }));
+      logger.debug('[acp] Pushed updated metadata to server after restart file reconnection');
+    } catch (error) {
+      logger.debug('[acp] Failed to push updated metadata after reconnection:', error);
+    }
+  }
+
   if (response) {
     // Write persistent session info file for crash recovery / respawn
     const sessionsDir = join(configuration.happyHomeDir, 'sessions');
@@ -514,6 +554,8 @@ export async function runAcp(opts: {
         directory: process.cwd(),
         pid: process.pid,
         startedAt: Date.now(),
+        agent: opts.agentName,
+        lastSeq: session.getLastSeq(),
       }), { mode: 0o600 });
       logger.debug(`[acp] Wrote session info file: ${sessionInfoFilePath}`);
     } catch (error) {
@@ -856,7 +898,12 @@ export async function runAcp(opts: {
       ? message.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
       : message.content.text;
 
-    if (!messageText) {
+    // Determine what to push to the queue:
+    // - For multimodal (array with images/documents), push the array as-is for ACP
+    // - For text-only, push the text string (backward compatible)
+    const queueContent = Array.isArray(message.content) ? message.content : messageText;
+
+    if (!queueContent) {
       return;
     }
 
@@ -870,7 +917,7 @@ export async function runAcp(opts: {
       logger.debug(`[${opts.agentName}] Requested ACP model: ${currentModel ?? 'null'}`);
     }
 
-    messageQueue.push(messageText, {
+    messageQueue.push(queueContent, {
       permissionMode: currentPermissionMode,
       model: currentModel,
     });
@@ -880,6 +927,32 @@ export async function runAcp(opts: {
   const keepAliveInterval = setInterval(() => {
     session.keepAlive(thinking, 'remote');
   }, 2000);
+
+  // Persist lastSeq to session info file periodically for crash recovery
+  let lastPersistedSeq = session.getLastSeq();
+  const persistLastSeq = () => {
+    if (!response) return;
+    const currentSeq = session.getLastSeq();
+    if (currentSeq === lastPersistedSeq) return;
+    lastPersistedSeq = currentSeq;
+    try {
+      const sessionsDir = join(configuration.happyHomeDir, 'sessions');
+      const sessionInfoFilePath = join(sessionsDir, `${response.id}.json`);
+      writeFileSync(sessionInfoFilePath, JSON.stringify({
+        sessionId: response.id,
+        encryptionKey: encodeBase64(response.encryptionKey),
+        encryptionVariant: response.encryptionVariant,
+        directory: process.cwd(),
+        pid: process.pid,
+        startedAt: Date.now(),
+        agent: opts.agentName,
+        lastSeq: currentSeq,
+      }), { mode: 0o600 });
+    } catch (error) {
+      logger.debug('[acp] Failed to persist lastSeq:', error);
+    }
+  };
+  const lastSeqSyncInterval = setInterval(persistLastSeq, 5000);
 
   async function handleAbort() {
     try {
@@ -945,7 +1018,10 @@ export async function runAcp(opts: {
         if (typeof batch.mode.model === 'string' && batch.mode.model.length > 0) {
           await switchModelIfRequested(batch.mode.model);
         }
-        await backend.sendPrompt(acpSessionId, typeof batch.message === 'string' ? batch.message : String(batch.message));
+
+        // Convert mobile message content to ACP ContentBlock format
+        const contentBlocks = convertToContentBlocks(batch.message);
+        await backend.sendPrompt(acpSessionId, contentBlocks);
         await turnEnded;
         sendEnvelopes(sessionManager.endTurn('completed'));
         session.sendSessionEvent({ type: 'ready' });
@@ -962,6 +1038,8 @@ export async function runAcp(opts: {
     }
   } finally {
     clearInterval(keepAliveInterval);
+    clearInterval(lastSeqSyncInterval);
+    persistLastSeq();
     reconnectionHandle?.cancel();
     clearPendingTurn(new Error('ACP runner shutting down'));
 
@@ -1000,4 +1078,59 @@ export async function runAcp(opts: {
       try { unlinkSync(join(configuration.happyHomeDir, 'sessions', `${response.id}.json`)); } catch {}
     }
   }
+}
+
+type MobileContentBlock = {
+  type: 'text' | 'image' | 'document';
+  text?: string;
+  source?: {
+    type: 'base64';
+    media_type: string;
+    data: string;
+  };
+};
+
+function convertToContentBlocks(message: unknown): ContentBlock[] {
+  // If it's a string, wrap in text block
+  if (typeof message === 'string') {
+    return [{ type: 'text', text: message }];
+  }
+
+  // If it's not an array, convert to string
+  if (!Array.isArray(message)) {
+    return [{ type: 'text', text: String(message) }];
+  }
+
+  // Convert each block
+  const blocks: ContentBlock[] = [];
+  for (const block of message) {
+    const mobileBlock = block as MobileContentBlock;
+
+    if (mobileBlock.type === 'text' && mobileBlock.text) {
+      blocks.push({ type: 'text', text: mobileBlock.text });
+    } else if (mobileBlock.type === 'image' && mobileBlock.source?.type === 'base64') {
+      blocks.push({
+        type: 'image',
+        data: mobileBlock.source.data,
+        mimeType: mobileBlock.source.media_type,
+      });
+    } else if (mobileBlock.type === 'document' && mobileBlock.source?.type === 'base64') {
+      // Pass documents (PDF etc.) as ACP EmbeddedResource with BlobResourceContents
+      try {
+        const mimeType = mobileBlock.source.media_type || 'application/octet-stream';
+        blocks.push({
+          type: 'resource',
+          resource: {
+            blob: mobileBlock.source.data,
+            mimeType,
+            uri: `attachment://document.${mimeType === 'application/pdf' ? 'pdf' : 'bin'}`,
+          },
+        } as any);
+      } catch {
+        blocks.push({ type: 'text', text: '[Attached document: failed to process]' });
+      }
+    }
+  }
+
+  return blocks;
 }

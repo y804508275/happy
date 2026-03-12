@@ -10,6 +10,7 @@ import { formatClaudeMessageForInk } from "@/ui/messageFormatterInk";
 import { logger } from "@/ui/logger";
 import { SDKToLogConverter } from "@/claude/utils/sdkToLogConverter";
 import { OutgoingMessageQueue } from "@/claude/utils/OutgoingMessageQueue";
+import { buildCapabilitySystemPrompt } from "@/capabilities/capabilityPrompt";
 
 export async function droidRemoteLauncher(session: DroidSession): Promise<'switch' | 'exit'> {
     logger.debug('[droidRemoteLauncher] Starting remote launcher');
@@ -182,11 +183,16 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
             let modeHash: string | null = null;
 
             try {
-                await droidRemote({
+                const capabilityPrompt = buildCapabilitySystemPrompt();
+                const fullProjectContext = capabilityPrompt
+                    ? [session.projectContext, capabilityPrompt].filter(Boolean).join('\n\n')
+                    : session.projectContext;
+
+                const remoteResult = await droidRemote({
                     sessionId: session.sessionId,
                     path: session.path,
                     projects: session.projects,
-                    projectContext: session.projectContext,
+                    projectContext: fullProjectContext,
                     nextMessage: async () => {
                         if (pending) {
                             let p = pending;
@@ -227,12 +233,16 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
                     signal: abortController.signal,
                 });
 
+                // Sync droid session ID back — it may have been cleared if the
+                // droid binary couldn't resume the old session (e.g. after kill).
+                if (remoteResult && remoteResult.finalSessionId !== session.sessionId) {
+                    session.sessionId = remoteResult.finalSessionId;
+                    logger.debug(`[droid-remote] Synced session ID: ${session.sessionId}`);
+                }
+
                 if (!exitReason && abortController.signal.aborted) {
                     session.client.closeClaudeSessionTurn('cancelled');
                     session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
-                    // Reset droid binary session ID after abort — the binary can't reliably
-                    // resume an interrupted session, so start fresh on next message.
-                    session.sessionId = null;
                 }
             } catch (e) {
                 logger.debug('[droid-remote]: launch error', e);
@@ -240,7 +250,6 @@ export async function droidRemoteLauncher(session: DroidSession): Promise<'switc
                     if (abortController?.signal.aborted) {
                         session.client.closeClaudeSessionTurn('cancelled');
                         session.client.sendSessionEvent({ type: 'message', message: 'Aborted by user' });
-                        session.sessionId = null;
                     } else {
                         const errorMsg = e instanceof Error ? e.message : 'Unknown error';
                         session.client.closeClaudeSessionTurn('failed');

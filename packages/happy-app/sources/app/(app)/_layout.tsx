@@ -160,6 +160,14 @@ export default function RootLayout() {
                 }}
             />
             <Stack.Screen
+                name="knowledge"
+                options={{
+                    headerShown: true,
+                    headerTitle: t('knowledgeBase.title'),
+                    headerBackTitle: t('common.back'),
+                }}
+            />
+            <Stack.Screen
                 name="changelog"
                 options={{
                     headerShown: true,
@@ -206,12 +214,7 @@ export default function RootLayout() {
                     headerTitle: 'Tool Views Demo',
                 }}
             />
-            <Stack.Screen
-                name="dev/masked-progress"
-                options={{
-                    headerTitle: 'Masked Progress',
-                }}
-            />
+
             <Stack.Screen
                 name="dev/shimmer-demo"
                 options={{

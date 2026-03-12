@@ -7,7 +7,6 @@ import { useIsTablet } from '@/utils/responsive';
 import { useRouter } from 'expo-router';
 import { EmptySessionsTablet } from './EmptySessionsTablet';
 import { SessionsList } from './SessionsList';
-import { FABWide } from './FABWide';
 import { TabBar, TabType } from './TabBar';
 import { InboxView } from './InboxView';
 import { SettingsViewWrapper } from './SettingsViewWrapper';
@@ -223,9 +222,6 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
     // NOTE: Zen tab removed - the feature never got to a useful state
     const [activeTab, setActiveTab] = React.useState<TabType>('sessions');
 
-    const handleNewSession = React.useCallback(() => {
-        router.push('/new');
-    }, [router]);
 
     const handleTabPress = React.useCallback((tab: TabType) => {
         setActiveTab(tab);
@@ -301,9 +297,6 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
                     )}
                 </View>
                 {renderTabContent()}
-                {activeTab === 'sessions' && (
-                    <FABWide onPress={handleNewSession} extraBottomOffset={50} />
-                )}
             </View>
             <TabBar
                 activeTab={activeTab}

@@ -32,6 +32,16 @@ export const ja: TranslationStructure = {
         updates: '更新',
     },
 
+    sessions: {
+        // Session list section headers
+        active: '進行中',
+        recent: '最近',
+        actionNeeded: '要確認',
+        unread: '未読',
+        thinking: '思考中',
+        draft: '下書き',
+    },
+
     common: {
         // Simple string constants
         cancel: 'キャンセル',
@@ -416,6 +426,8 @@ export const ja: TranslationStructure = {
         cliVersionOutdatedMessage: ({ currentVersion, requiredVersion }: { currentVersion: string; requiredVersion: string }) =>
             `バージョン ${currentVersion} がインストールされています。${requiredVersion} 以降に更新してください`,
         updateCliInstructions: 'npm install -g happy-coder@latest を実行してください',
+        renameSession: 'セッション名を変更',
+        renameSessionPlaceholder: 'セッション名を入力',
         deleteSession: 'セッションを削除',
         deleteSessionSubtitle: 'このセッションを完全に削除',
         deleteSessionConfirm: 'セッションを完全に削除しますか？',

@@ -12,7 +12,7 @@ import { StatusDot } from './StatusDot';
 import { useAllMachines, useSetting } from '@/sync/storage';
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { isMachineOnline } from '@/utils/machineUtils';
-import { machineSpawnNewSession, sessionArchive, sessionDelete } from '@/sync/ops';
+import { machineSpawnNewSession, sessionArchive, sessionDelete, sessionUpdateSummary } from '@/sync/ops';
 import { storage } from '@/sync/storage';
 import { Modal } from '@/modal';
 import { CompactGitStatus } from './CompactGitStatus';
@@ -385,7 +385,9 @@ const ActiveSessionBadgeDot = React.memo(({ type, color }: { type: 'action' | 'i
 const CompactSessionRow = React.memo(({ session, selected, showBorder }: { session: Session; selected?: boolean; showBorder?: boolean }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
-    const sessionStatus = useSessionStatus(session);
+    // Subscribe directly to store for real-time status updates (bypasses FlatList cell caching)
+    const liveSession = storage((state) => state.sessions[session.id]) ?? session;
+    const sessionStatus = useSessionStatus(liveSession);
     const sessionName = getSessionName(session);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
@@ -407,6 +409,28 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
             throw new HappyError(result.message || t('sessionInfo.failedToDeleteSession'), false);
         }
     });
+
+    const [renamingSession, performRename] = useHappyAction(async () => {
+        const newName = await Modal.prompt(
+            t('sessionInfo.renameSession'),
+            undefined,
+            {
+                placeholder: t('sessionInfo.renameSessionPlaceholder'),
+                defaultValue: sessionName,
+            }
+        );
+        if (newName !== null && newName.trim() !== '' && newName.trim() !== sessionName) {
+            const result = await sessionUpdateSummary(session.id, newName.trim());
+            if (!result.success) {
+                throw new HappyError(result.message || 'Failed to rename session', false);
+            }
+        }
+    });
+
+    const handleRename = React.useCallback(() => {
+        closeContextMenu();
+        performRename();
+    }, [performRename, closeContextMenu]);
 
     const handleArchive = React.useCallback(() => {
         swipeableRef.current?.close();
@@ -551,6 +575,12 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                     visible={contextMenu !== null}
                     position={contextMenu || { x: 0, y: 0 }}
                     items={[
+                        {
+                            label: t('sessionInfo.renameSession'),
+                            icon: 'pencil-outline',
+                            onPress: handleRename,
+                            disabled: renamingSession,
+                        },
                         {
                             label: t('sessionInfo.archiveSession'),
                             icon: 'archive-outline',

@@ -5,6 +5,7 @@ import { logger } from "@/ui/logger";
 import type { JsRuntime } from "./runClaude";
 import type { SandboxConfig } from "@/persistence";
 import type { ScannedProject } from "./utils/projectScanner";
+import type { InstalledApp } from "@/apps";
 
 export class Session {
     readonly path: string;
@@ -26,6 +27,8 @@ export class Session {
     readonly projects: ScannedProject[];
     /** Project knowledge base context (reloaded before each query) */
     projectContext?: string | null;
+    /** Installed Happy apps */
+    readonly installedApps: InstalledApp[];
 
     sessionId: string | null;
     mode: 'local' | 'remote' = 'local';
@@ -58,6 +61,8 @@ export class Session {
         projects?: ScannedProject[],
         /** Pre-loaded project knowledge base context */
         projectContext?: string | null,
+        /** Installed Happy apps */
+        installedApps?: InstalledApp[],
     }) {
         this.path = opts.path;
         this.api = opts.api;
@@ -75,6 +80,7 @@ export class Session {
         this.jsRuntime = opts.jsRuntime ?? 'node';
         this.projects = opts.projects ?? [];
         this.projectContext = opts.projectContext;
+        this.installedApps = opts.installedApps ?? [];
 
         // Start keep alive
         this.client.keepAlive(this.thinking, this.mode);

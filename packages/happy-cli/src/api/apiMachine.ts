@@ -73,14 +73,15 @@ export interface ReactivateSessionOptions {
     happySessionId: string;
     directory: string;
     claudeSessionId?: string;
-    agent?: 'claude' | 'codex' | 'gemini' | 'droid';
+    agent?: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
     dataKey?: string; // base64-encoded data encryption key from the app
+    lastSeq?: number; // last message seq known by the app, used to skip old messages on reconnect
 }
 
 export interface SwitchSessionAgentOptions {
     happySessionId: string;
     directory: string;
-    newAgent: 'claude' | 'codex' | 'gemini' | 'droid';
+    newAgent: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode';
     dataKey?: string;
 }
 
@@ -176,14 +177,14 @@ export class ApiMachineClient {
 
         // Register reactivate session handler
         this.rpcHandlerManager.registerHandler('reactivate-session', async (params: any) => {
-            const { happySessionId, directory, claudeSessionId, agent, dataKey } = params || {};
+            const { happySessionId, directory, claudeSessionId, agent, dataKey, lastSeq } = params || {};
             logger.debug(`[API MACHINE] Reactivating session with params: ${JSON.stringify(params)}`);
 
             if (!happySessionId) {
                 throw new Error('Happy session ID is required');
             }
 
-            const result = await reactivateSession({ happySessionId, directory, claudeSessionId, agent, dataKey });
+            const result = await reactivateSession({ happySessionId, directory, claudeSessionId, agent, dataKey, lastSeq });
 
             switch (result.type) {
                 case 'success':

@@ -35,14 +35,17 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
     private sdkMessages: AsyncIterableIterator<SDKMessage>
     private inputStream = new Stream<SDKMessage>()
     private canCallTool?: CanCallToolCallback
+    private onStreamDelta?: (text: string) => void
 
     constructor(
         private childStdin: Writable | null,
         private childStdout: NodeJS.ReadableStream,
         private processExitPromise: Promise<void>,
-        canCallTool?: CanCallToolCallback
+        canCallTool?: CanCallToolCallback,
+        onStreamDelta?: (text: string) => void
     ) {
         this.canCallTool = canCallTool
+        this.onStreamDelta = onStreamDelta
         this.readMessages()
         this.sdkMessages = this.readSdkMessages()
     }
@@ -103,6 +106,19 @@ export class Query implements AsyncIterableIterator<SDKMessage> {
                             continue
                         } else if (message.type === 'control_cancel_request') {
                             this.handleControlCancelRequest(message as unknown as ControlCancelRequest)
+                            continue
+                        } else if (message.type === 'stream_event') {
+                            // Handle streaming text deltas from --include-partial-messages
+                            // Only emit top-level response text (not sub-agent tool calls)
+                            if (this.onStreamDelta) {
+                                const streamEvent = message as any
+                                if (!streamEvent.parent_tool_use_id) {
+                                    const event = streamEvent.event
+                                    if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
+                                        this.onStreamDelta(event.delta.text)
+                                    }
+                                }
+                            }
                             continue
                         }
 
@@ -288,7 +304,9 @@ export function query(config: {
     }
 
     // Build command arguments
+    const onStreamDelta = config.options?.onStreamDelta
     const args = ['--output-format', 'stream-json', '--verbose']
+    if (onStreamDelta) args.push('--include-partial-messages')
 
     if (customSystemPrompt) args.push('--system-prompt', customSystemPrompt)
     if (appendSystemPrompt) args.push('--append-system-prompt', appendSystemPrompt)
@@ -396,7 +414,7 @@ export function query(config: {
     })
 
     // Create query instance
-    const query = new Query(childStdin, child.stdout, processExitPromise, canCallTool)
+    const query = new Query(childStdin, child.stdout, processExitPromise, canCallTool, onStreamDelta)
 
     // Handle process errors
     child.on('error', (error) => {

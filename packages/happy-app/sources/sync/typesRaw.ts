@@ -37,6 +37,12 @@ const agentEventSchema = z.discriminatedUnion('type', [z.object({
     endsAt: z.number(),
 }), z.object({
     type: z.literal('ready'),
+}), z.object({
+    type: z.literal('preview'),
+    kind: z.enum(['screenshot', 'url', 'html', 'text']),
+    url: z.string().optional(),
+    title: z.string().optional(),
+    body: z.string().optional(),
 })]);
 export type AgentEvent = z.infer<typeof agentEventSchema>;
 
@@ -95,6 +101,14 @@ const sessionStopEventSchema = z.object({
     t: z.literal('stop'),
 });
 
+const sessionPreviewEventSchema = z.object({
+    t: z.literal('preview'),
+    kind: z.enum(['screenshot', 'url', 'html', 'text']),
+    url: z.string().optional(),
+    title: z.string().optional(),
+    body: z.string().optional(),
+});
+
 const sessionEventSchema = z.discriminatedUnion('t', [
     sessionTextEventSchema,
     sessionServiceMessageEventSchema,
@@ -105,6 +119,7 @@ const sessionEventSchema = z.discriminatedUnion('t', [
     sessionStartEventSchema,
     sessionTurnEndEventSchema,
     sessionStopEventSchema,
+    sessionPreviewEventSchema,
 ]);
 
 const sessionEnvelopeSchema = z.object({
@@ -561,7 +576,8 @@ function normalizeSessionEnvelope(
 ): NormalizedMessage | null {
     // Session protocol requires turn id on all agent-originated envelopes.
     // Drop malformed agent events without turn to avoid attaching stray messages.
-    if (envelope.role === 'agent' && !envelope.turn) {
+    // Exception: preview events are standalone and don't need a turn.
+    if (envelope.role === 'agent' && !envelope.turn && envelope.ev.t !== 'preview') {
         return null;
     }
 
@@ -691,6 +707,25 @@ function normalizeSessionEnvelope(
                 uuid: contentUUID,
                 parentUUID
             }],
+            meta
+        } satisfies NormalizedMessage;
+    }
+
+    if (envelope.ev.t === 'preview') {
+        console.log('[PREVIEW] normalizeSessionEnvelope received preview event:', messageId, envelope.ev.kind, envelope.ev.url, 'hasBody:', !!envelope.ev.body);
+        return {
+            id: messageId,
+            localId,
+            createdAt: messageCreatedAt,
+            role: 'event',
+            isSidechain: false,
+            content: {
+                type: 'preview',
+                kind: envelope.ev.kind,
+                url: envelope.ev.url,
+                title: envelope.ev.title,
+                body: envelope.ev.body,
+            },
             meta
         } satisfies NormalizedMessage;
     }

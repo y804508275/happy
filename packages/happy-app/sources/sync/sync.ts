@@ -646,8 +646,9 @@ class Sync {
                 happySessionId: sessionId,
                 directory: session.metadata!.path,
                 claudeSessionId: session.metadata!.claudeSessionId,
-                agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini' | 'droid') || undefined,
+                agent: (session.metadata!.flavor as 'codex' | 'claude' | 'gemini' | 'droid' | 'opencode') || undefined,
                 dataKey: dataKeyBase64,
+                lastSeq: this.sessionLastSeq.get(sessionId) ?? 0,
             };
 
             log.log(`Session reactivation: trying machines [${machineIdsToTry.join(', ')}] for session ${sessionId}`);
@@ -705,7 +706,7 @@ class Sync {
      * Builds a conversation summary for context handoff, stops the old agent,
      * and spawns a new one that reconnects to the same Happy session.
      */
-    switchSessionAgent = async (sessionId: string, newAgent: 'claude' | 'codex' | 'gemini' | 'droid'): Promise<{ success: boolean; error?: string }> => {
+    switchSessionAgent = async (sessionId: string, newAgent: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode'): Promise<{ success: boolean; error?: string }> => {
         const session = storage.getState().sessions[sessionId];
         if (!session || !session.metadata?.machineId || !session.metadata?.path) {
             return { success: false, error: 'Session not found or missing metadata' };
@@ -749,16 +750,31 @@ class Sync {
 
         log.log(`Session agent switch: trying machines [${machineIdsToTry.join(', ')}] for session ${sessionId}`);
 
+        // Guard against auto-reactivate during the switch (old process gets killed, session goes inactive)
+        this.reactivatingSessionIds.add(sessionId);
+
         for (const machineId of machineIdsToTry) {
             try {
                 const result = await apiSocket.machineRPC(machineId, 'switch-session-agent', params);
                 log.log(`Session agent switch succeeded on machine ${machineId}: ${JSON.stringify(result)}`);
+
+                // NOTE: Don't update session.metadata.flavor here via storage.setState.
+                // It triggers the localFlavor cleanup effect prematurely (serverFlavor matches localFlavor),
+                // then server pushes stale metadata (old flavor), overriding the cleared localFlavor.
+                // Instead, SessionView's localFlavor handles optimistic UI until server catches up.
+
+                // Release guard after a delay to let the new process connect
+                setTimeout(() => {
+                    this.reactivatingSessionIds.delete(sessionId);
+                }, 15_000);
+
                 return { success: true };
             } catch (error) {
                 log.log(`Session agent switch failed on machine ${machineId}: ${error}`);
             }
         }
 
+        this.reactivatingSessionIds.delete(sessionId);
         this.pendingAgentSwitchHistory.delete(sessionId);
         return { success: false, error: 'Failed to switch agent on all available machines' };
     }
@@ -1901,7 +1917,7 @@ class Sync {
 
                 if (normalizedMessages.length > 0) {
                     totalNormalized += normalizedMessages.length;
-                    this.enqueueMessages(sessionId, normalizedMessages);
+                    this.applyMessages(sessionId, normalizedMessages);
                 }
 
                 this.sessionLastSeq.set(sessionId, maxSeq);

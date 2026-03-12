@@ -1037,9 +1037,14 @@ export class AcpBackend implements AgentBackend {
   private idleResolver: (() => void) | null = null;
   private waitingForResponse = false;
 
-  async sendPrompt(sessionId: SessionId, prompt: string): Promise<void> {
+  async sendPrompt(sessionId: SessionId, prompt: string | ContentBlock[]): Promise<void> {
+    // Convert prompt to string for change_title check
+    const promptString = typeof prompt === 'string'
+      ? prompt
+      : prompt.filter((b: ContentBlock) => b.type === 'text').map((b: ContentBlock) => (b as { text: string }).text).join('\n');
+
     // Check if prompt contains change_title instruction (via optional callback)
-    const promptHasChangeTitle = this.options.hasChangeTitleInstruction?.(prompt) ?? false;
+    const promptHasChangeTitle = this.options.hasChangeTitleInstruction?.(promptString) ?? false;
 
     // Reset tool call counter and set flag
     this.toolCallCountSincePrompt = 0;
@@ -1060,17 +1065,17 @@ export class AcpBackend implements AgentBackend {
     this.waitingForResponse = true;
 
     try {
-      logger.debug(`[AcpBackend] Sending prompt (length: ${prompt.length}): ${prompt.substring(0, 100)}...`);
-      logger.debug(`[AcpBackend] Full prompt: ${prompt}`);
-      
-      const contentBlock: ContentBlock = {
-        type: 'text',
-        text: prompt,
-      };
+      // Build content blocks: if prompt is a string, wrap in text block; otherwise use as-is
+      const contentBlocks: ContentBlock[] = typeof prompt === 'string'
+        ? [{ type: 'text', text: prompt }]
+        : prompt;
 
+      logger.debug(`[AcpBackend] Sending prompt with ${contentBlocks.length} content block(s)`);
+      logger.debug(`[AcpBackend] Full prompt: ${typeof prompt === 'string' ? prompt : JSON.stringify(prompt)}`);
+      
       const promptRequest: PromptRequest = {
         sessionId: this.acpSessionId,
-        prompt: [contentBlock],
+        prompt: contentBlocks,
       };
 
       logger.debug(`[AcpBackend] Prompt request:`, JSON.stringify(promptRequest, null, 2));

@@ -336,6 +336,7 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                     jsRuntime: session.jsRuntime,
                     projects: session.projects,
                     projectContext: session.projectContext,
+                    installedApps: session.installedApps,
                     canCallTool: permissionHandler.handleToolCall,
                     isAborted: (toolCallId: string) => {
                         return permissionHandler.isAborted(toolCallId);
@@ -377,6 +378,23 @@ export async function claudeRemoteLauncher(session: Session): Promise<'switch' |
                         session.onSessionFound(sessionId);
                     },
                     onThinkingChange: session.onThinkingChange,
+                    onStreamDelta: (() => {
+                        let buffer = '';
+                        let timer: ReturnType<typeof setTimeout> | null = null;
+                        const flush = () => {
+                            if (buffer) {
+                                session.client.emitStreamDelta(buffer);
+                                buffer = '';
+                            }
+                            timer = null;
+                        };
+                        return (text: string) => {
+                            buffer += text;
+                            if (!timer) {
+                                timer = setTimeout(flush, 50);
+                            }
+                        };
+                    })(),
                     claudeEnvVars: session.claudeEnvVars,
                     claudeArgs: session.claudeArgs,
                     onMessage,

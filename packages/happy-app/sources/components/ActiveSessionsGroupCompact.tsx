@@ -1,142 +1,61 @@
 import React from 'react';
-import { View, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { View, Pressable, Platform } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Text } from '@/components/StyledText';
-import { router, useRouter } from 'expo-router';
-import { Session, Machine } from '@/sync/storageTypes';
-import { Ionicons } from '@expo/vector-icons';
-import { getSessionName, useSessionStatus, getSessionAvatarId, formatPathRelativeToHome } from '@/utils/sessionUtils';
-import { Avatar } from './Avatar';
-import { Typography } from '@/constants/Typography';
-import { StatusDot } from './StatusDot';
-import { useAllMachines, useSetting } from '@/sync/storage';
-import { StyleSheet, useUnistyles } from 'react-native-unistyles';
-import { isMachineOnline } from '@/utils/machineUtils';
-import { machineSpawnNewSession, sessionArchive, sessionDelete } from '@/sync/ops';
-import { resolveAbsolutePath } from '@/utils/pathUtils';
+import { Session } from '@/sync/storageTypes';
 import { storage } from '@/sync/storage';
+import { Ionicons } from '@expo/vector-icons';
+import { getSessionName, useSessionStatus } from '@/utils/sessionUtils';
+import { Typography } from '@/constants/Typography';
+
+import { StyleSheet, useUnistyles } from 'react-native-unistyles';
+import { sessionArchive, sessionDelete, sessionUpdateSummary } from '@/sync/ops';
 import { Modal } from '@/modal';
 import { t } from '@/text';
 import { useNavigateToSession } from '@/hooks/useNavigateToSession';
 import { useIsTablet } from '@/utils/responsive';
-import { ProjectGitStatus } from './ProjectGitStatus';
 import { useHappyAction } from '@/hooks/useHappyAction';
 import { HappyError } from '@/utils/errors';
 import { useSessionBadge } from '@/hooks/useSessionBadge';
 import { WebContextMenu, useWebContextMenu } from './WebContextMenu';
 
-const stylesheet = StyleSheet.create((theme, runtime) => ({
+const stylesheet = StyleSheet.create((theme) => ({
     container: {
         backgroundColor: theme.colors.groupped.background,
-        paddingTop: 8,
-    },
-    projectCard: {
-        backgroundColor: theme.colors.surface,
-        marginBottom: 8,
-        marginHorizontal: Platform.select({ ios: 16, default: 12 }),
-        borderRadius: Platform.select({ ios: 10, default: 16 }),
-        overflow: 'hidden',
-        shadowColor: theme.colors.shadow.color,
-        shadowOffset: { width: 0, height: 0.33 },
-        shadowOpacity: theme.colors.shadow.opacity,
-        shadowRadius: 0,
-        elevation: 1,
-    },
-    sectionHeader: {
-        paddingTop: 12,
-        paddingBottom: Platform.select({ ios: 6, default: 8 }),
-        paddingHorizontal: Platform.select({ ios: 32, default: 24 }),
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    sectionHeaderLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        flex: 1,
-        marginRight: 8,
-    },
-    sectionHeaderAvatar: {
-        marginRight: 8,
-    },
-    sectionHeaderPath: {
-        ...Typography.default('regular'),
-        color: theme.colors.groupped.sectionTitle,
-        fontSize: Platform.select({ ios: 13, default: 14 }),
-        lineHeight: Platform.select({ ios: 18, default: 20 }),
-        letterSpacing: Platform.select({ ios: -0.08, default: 0.1 }),
-        fontWeight: Platform.select({ ios: 'normal', default: '500' }),
-        flex: 1,
     },
     sessionRow: {
-        height: 56,
+        height: 36,
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        backgroundColor: theme.colors.surface,
-    },
-    sessionRowWithBorder: {
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: theme.colors.divider,
+        paddingHorizontal: 24,
+        backgroundColor: theme.colors.groupped.background,
     },
     sessionRowSelected: {
         backgroundColor: theme.colors.surfaceSelected,
+        borderRadius: 8,
     },
-    sessionContent: {
-        flex: 1,
-        justifyContent: 'center',
+    sessionRowHovered: {
+        backgroundColor: theme.colors.surfaceSelected,
+        borderRadius: 8,
     },
-    sessionTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    statusTag: {
+        marginLeft: 8,
+        fontSize: 11,
+        ...Typography.default(),
     },
     sessionTitle: {
-        fontSize: 15,
+        fontSize: 13,
         flex: 1,
         ...Typography.default('regular'),
     },
     sessionTitleConnected: {
-        color: theme.colors.text,
+        color: theme.colors.textSecondary,
     },
     sessionTitleDisconnected: {
         color: theme.colors.textSecondary,
     },
-    statusDotContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 16,
-        height: 16,
-    },
-    newSessionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        height: 56,
-        paddingHorizontal: 16,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: theme.colors.divider,
-        backgroundColor: theme.colors.surface,
-    },
-    newSessionButtonDisabled: {
-        opacity: 0.4,
-    },
-    newSessionButtonContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    newSessionButtonIcon: {
-        marginRight: 8,
-        width: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    newSessionButtonText: {
-        fontSize: 15,
-        color: theme.colors.textSecondary,
-        ...Typography.default('regular'),
-    },
     swipeAction: {
-        width: 112,
+        width: 80,
         height: '100%',
         alignItems: 'center',
         justifyContent: 'center',
@@ -156,147 +75,34 @@ interface ActiveSessionsGroupProps {
     selectedSessionId?: string;
 }
 
-
 export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: ActiveSessionsGroupProps) {
     const styles = stylesheet;
-    const machines = useAllMachines();
 
-    const machinesMap = React.useMemo(() => {
-        const map: Record<string, Machine> = {};
-        machines.forEach(machine => {
-            map[machine.id] = machine;
-        });
-        return map;
-    }, [machines]);
-
-    // Group sessions by project, then associate with machine
-    const projectGroups = React.useMemo(() => {
-        const groups = new Map<string, {
-            path: string;
-            displayPath: string;
-            machines: Map<string, {
-                machine: Machine | null;
-                machineName: string;
-                sessions: Session[];
-            }>;
-        }>();
-
-        sessions.forEach(session => {
-            const projectPath = session.metadata?.path || '';
-            const unknownText = t('status.unknown');
-            const machineId = session.metadata?.machineId || unknownText;
-
-            // Get machine info
-            const machine = machineId !== unknownText ? machinesMap[machineId] : null;
-            const machineName = machine?.metadata?.displayName ||
-                machine?.metadata?.host ||
-                (machineId !== unknownText ? machineId : `<${unknownText}>`);
-
-            // Get or create project group
-            let projectGroup = groups.get(projectPath);
-            if (!projectGroup) {
-                const displayPath = formatPathRelativeToHome(projectPath, session.metadata?.homeDir);
-                projectGroup = {
-                    path: projectPath,
-                    displayPath,
-                    machines: new Map()
-                };
-                groups.set(projectPath, projectGroup);
-            }
-
-            // Get or create machine group within project
-            let machineGroup = projectGroup.machines.get(machineId);
-            if (!machineGroup) {
-                machineGroup = {
-                    machine,
-                    machineName,
-                    sessions: []
-                };
-                projectGroup.machines.set(machineId, machineGroup);
-            }
-
-            // Add session to machine group
-            machineGroup.sessions.push(session);
-        });
-
-        // Sort sessions within each machine group by updated time (newest activity first)
-        groups.forEach(projectGroup => {
-            projectGroup.machines.forEach(machineGroup => {
-                machineGroup.sessions.sort((a, b) => b.sortTimestamp - a.sortTimestamp);
-            });
-        });
-
-        return groups;
-    }, [sessions, machinesMap]);
-
-    // Sort project groups by latest activity (newest first)
-    const sortedProjectGroups = React.useMemo(() => {
-        return Array.from(projectGroups.entries()).sort(([, groupA], [, groupB]) => {
-            const latestA = Math.max(...Array.from(groupA.machines.values()).flatMap(m => m.sessions.map(s => s.sortTimestamp)));
-            const latestB = Math.max(...Array.from(groupB.machines.values()).flatMap(m => m.sessions.map(s => s.sortTimestamp)));
-            return latestB - latestA;
-        });
-    }, [projectGroups]);
+    // Flatten all sessions and sort by activity (newest first)
+    const sortedSessions = React.useMemo(() => {
+        return [...sessions].sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+    }, [sessions]);
 
     return (
         <View style={styles.container}>
-            {sortedProjectGroups.map(([projectPath, projectGroup]) => {
-
-                // Get the avatar ID from the first session
-                const firstSession = Array.from(projectGroup.machines.values())[0]?.sessions[0];
-                const avatarId = firstSession ? getSessionAvatarId(firstSession) : undefined;
-
-                return (
-                    <View key={projectPath}>
-                        {/* Section header on grouped background */}
-                        <View style={styles.sectionHeader}>
-                            <View style={styles.sectionHeaderLeft}>
-                                {avatarId && (
-                                    <View style={styles.sectionHeaderAvatar}>
-                                        <Avatar id={avatarId} size={24} flavor={firstSession?.metadata?.flavor} />
-                                    </View>
-                                )}
-                                <Text style={styles.sectionHeaderPath}>
-                                    {projectGroup.displayPath}
-                                </Text>
-                            </View>
-                            {/* Show git status instead of machine name */}
-                            {firstSession ? (
-                                <ProjectGitStatus sessionId={firstSession.id} />
-                            ) : null}
-                        </View>
-
-                        {/* Card with just the sessions */}
-                        <View style={styles.projectCard}>
-                            {/* Sessions grouped by machine within the card */}
-                            {Array.from(projectGroup.machines.entries())
-                                .sort(([, machineA], [, machineB]) => machineA.machineName.localeCompare(machineB.machineName))
-                                .map(([machineId, machineGroup]) => (
-                                    <View key={`${projectPath}-${machineId}`}>
-                                        {machineGroup.sessions.map((session, index) => (
-                                            <CompactSessionRow
-                                                key={session.id}
-                                                session={session}
-                                                selected={selectedSessionId === session.id}
-                                                showBorder={index < machineGroup.sessions.length - 1 ||
-                                                    Array.from(projectGroup.machines.keys()).indexOf(machineId) < projectGroup.machines.size - 1}
-                                            />
-                                        ))}
-                                    </View>
-                                ))}
-                        </View>
-                    </View>
-                );
-            })}
+            {sortedSessions.map((session) => (
+                <CompactSessionRow
+                    key={session.id}
+                    session={session}
+                    selected={selectedSessionId === session.id}
+                />
+            ))}
         </View>
     );
 }
 
-// Compact session row component with status line
-const CompactSessionRow = React.memo(({ session, selected, showBorder }: { session: Session; selected?: boolean; showBorder?: boolean }) => {
+// Compact session row - Claude-style minimal design
+const CompactSessionRow = React.memo(({ session, selected }: { session: Session; selected?: boolean }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
-    const sessionStatus = useSessionStatus(session);
+    // Subscribe directly to store for real-time status updates (bypasses FlatList cell caching)
+    const liveSession = storage((state) => state.sessions[session.id]) ?? session;
+    const sessionStatus = useSessionStatus(liveSession);
     const sessionName = getSessionName(session);
     const navigateToSession = useNavigateToSession();
     const isTablet = useIsTablet();
@@ -318,6 +124,28 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
             throw new HappyError(result.message || t('sessionInfo.failedToDeleteSession'), false);
         }
     });
+
+    const [renamingSession, performRename] = useHappyAction(async () => {
+        const newName = await Modal.prompt(
+            t('sessionInfo.renameSession'),
+            undefined,
+            {
+                placeholder: t('sessionInfo.renameSessionPlaceholder'),
+                defaultValue: sessionName,
+            }
+        );
+        if (newName !== null && newName.trim() !== '' && newName.trim() !== sessionName) {
+            const result = await sessionUpdateSummary(session.id, newName.trim());
+            if (!result.success) {
+                throw new HappyError(result.message || 'Failed to rename session', false);
+            }
+        }
+    });
+
+    const handleRename = React.useCallback(() => {
+        closeContextMenu();
+        performRename();
+    }, [performRename, closeContextMenu]);
 
     const handleArchive = React.useCallback(() => {
         swipeableRef.current?.close();
@@ -350,12 +178,30 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
         );
     }, [performDelete]);
 
+    // Badge indicator (notification dot) - shown after title
+    // Trailing status tag - concise text label for session state
+    const statusTag = (() => {
+        if (badgeType === 'action') {
+            return { text: t('sessions.actionNeeded'), color: theme.colors.badge.action };
+        }
+        if (badgeType === 'info') {
+            return { text: t('sessions.unread'), color: theme.colors.badge.info };
+        }
+        if (sessionStatus.state === 'thinking') {
+            return { text: t('sessions.thinking'), color: sessionStatus.statusDotColor };
+        }
+        if (sessionStatus.state === 'waiting' && session.draft) {
+            return { text: t('sessions.draft'), color: theme.colors.textSecondary };
+        }
+        return null;
+    })();
+
     const itemContent = (
         <Pressable
-            style={[
+            style={({ hovered }: any) => [
                 styles.sessionRow,
-                showBorder && styles.sessionRowWithBorder,
-                selected && styles.sessionRowSelected
+                selected && styles.sessionRowSelected,
+                !selected && hovered && styles.sessionRowHovered,
             ]}
             onPressIn={() => {
                 if (isTablet) {
@@ -368,83 +214,20 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                 }
             }}
         >
-            <View style={styles.sessionContent}>
-                {/* Title line with status */}
-                <View style={styles.sessionTitleRow}>
-                    {/* Status dot or draft icon on the left */}
-                    {(() => {
-                        // Badge takes priority: show badge-colored dot
-                        if (badgeType === 'action') {
-                            return (
-                                <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                                    <StatusDot
-                                        color={theme.colors.badge.action}
-                                        isPulsing={true}
-                                    />
-                                </View>
-                            );
-                        }
-                        if (badgeType === 'info') {
-                            return (
-                                <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                                    <StatusDot
-                                        color={theme.colors.badge.info}
-                                        isPulsing={false}
-                                    />
-                                </View>
-                            );
-                        }
-
-                        // Show draft icon when online with draft
-                        if (sessionStatus.state === 'waiting' && session.draft) {
-                            return (
-                                <Ionicons
-                                    name="create-outline"
-                                    size={14}
-                                    color={theme.colors.textSecondary}
-                                    style={{ marginRight: 8 }}
-                                />
-                            );
-                        }
-
-                        // Show status dot only for thinking state
-                        if (sessionStatus.state === 'thinking') {
-                            return (
-                                <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                                    <StatusDot
-                                        color={sessionStatus.statusDotColor}
-                                        isPulsing={sessionStatus.isPulsing}
-                                    />
-                                </View>
-                            );
-                        }
-
-                        // Show grey dot for online without draft
-                        if (sessionStatus.state === 'waiting') {
-                            return (
-                                <View style={[styles.statusDotContainer, { marginRight: 8 }]}>
-                                    <StatusDot
-                                        color={theme.colors.textSecondary}
-                                        isPulsing={false}
-                                    />
-                                </View>
-                            );
-                        }
-
-                        return null;
-                    })()}
-
-                    <Text
-                        style={[
-                            styles.sessionTitle,
-                            sessionStatus.isConnected ? styles.sessionTitleConnected : styles.sessionTitleDisconnected
-                        ]}
-                        numberOfLines={2}
-                    >
-                        {sessionName}
-                    </Text>
-                </View>
-            </View>
+            <Text
+                style={[
+                    styles.sessionTitle,
+                    sessionStatus.isConnected ? styles.sessionTitleConnected : styles.sessionTitleDisconnected
+                ]}
+                numberOfLines={1}
+            >
+                {sessionName}
+            </Text>
+            {statusTag && (
+                <Text style={[styles.statusTag, { color: statusTag.color }]}>
+                    {statusTag.text}
+                </Text>
+            )}
         </Pressable>
     );
 
@@ -456,6 +239,12 @@ const CompactSessionRow = React.memo(({ session, selected, showBorder }: { sessi
                     visible={contextMenu !== null}
                     position={contextMenu || { x: 0, y: 0 }}
                     items={[
+                        {
+                            label: t('sessionInfo.renameSession'),
+                            icon: 'pencil-outline',
+                            onPress: handleRename,
+                            disabled: renamingSession,
+                        },
                         {
                             label: t('sessionInfo.archiveSession'),
                             icon: 'archive-outline',

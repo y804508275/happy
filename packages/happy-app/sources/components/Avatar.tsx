@@ -27,6 +27,7 @@ const flavorIcons = {
     codex: require('@/assets/images/icon-gpt.png'),
     gemini: require('@/assets/images/icon-gemini.png'),
     droid: require('@/assets/images/icon-factory.png'),
+    opencode: require('@/assets/images/icon-opencode.png'),
 };
 
 const styles = StyleSheet.create((theme) => ({

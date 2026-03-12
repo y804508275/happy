@@ -31,6 +31,16 @@ export const zhHans: TranslationStructure = {
         updates: '更新',
     },
 
+    sessions: {
+        // Session list section headers
+        active: '进行中',
+        recent: '最近',
+        actionNeeded: '需确认',
+        unread: '未读',
+        thinking: '思考中',
+        draft: '草稿',
+    },
+
     common: {
         // Simple string constants
         cancel: '取消',
@@ -386,6 +396,8 @@ export const zhHans: TranslationStructure = {
         cliVersionOutdatedMessage: ({ currentVersion, requiredVersion }: { currentVersion: string; requiredVersion: string }) =>
             `已安装版本 ${currentVersion}。请更新到 ${requiredVersion} 或更高版本`,
         updateCliInstructions: '请运行 npm install -g happy-coder@latest',
+        renameSession: '重命名会话',
+        renameSessionPlaceholder: '输入会话名称',
         deleteSession: '删除会话',
         deleteSessionSubtitle: '永久删除此会话',
         deleteSessionConfirm: '永久删除会话？',
