@@ -339,7 +339,7 @@ export const settingsDefaults: Settings = {
     agentInputEnterToSend: true,
     avatarStyle: 'brutalist',
     showFlavorIcons: false,
-    compactSessionView: false,
+    compactSessionView: true,
     hideInactiveSessions: false,
     reviewPromptAnswered: false,
     reviewPromptLikedApp: null,
