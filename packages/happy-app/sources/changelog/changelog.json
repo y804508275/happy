@@ -1,6 +1,21 @@
 {
   "entries": [
     {
+      "version": 32,
+      "deployVersion": "2026.03.11.7",
+      "date": "2026-03-11",
+      "summary": "多用户会话隔离功能，不同飞书用户登录后拥有独立的会话空间。",
+      "changes": [
+        "新增共享机器功能，daemon 可通过 HAPPY_MACHINE_SHARED=true 标记机器为共享",
+        "不同用户只能看到自己的会话，历史会话与原始用户关联",
+        "共享机器上创建的会话自动归属于创建者账户",
+        "支持跨用户 RPC 路由，允许任意用户使用共享机器的 daemon",
+        "CLI 支持通过环境变量 HAPPY_AUTH_TOKEN/HAPPY_AUTH_SECRET 委托认证",
+        "机器选择器中共享机器显示\"共享\"标识"
+      ],
+      "rawMarkdown": "## Version 32 (2026.03.11.7) - 2026-03-11\n\n\n多用户会话隔离功能，不同飞书用户登录后拥有独立的会话空间。\n\n- 新增共享机器功能，daemon 可通过 HAPPY_MACHINE_SHARED=true 标记机器为共享\n- 不同用户只能看到自己的会话，历史会话与原始用户关联\n- 共享机器上创建的会话自动归属于创建者账户\n- 支持跨用户 RPC 路由，允许任意用户使用共享机器的 daemon\n- CLI 支持通过环境变量 HAPPY_AUTH_TOKEN/HAPPY_AUTH_SECRET 委托认证\n- 机器选择器中共享机器显示\"共享\"标识"
+    },
+    {
       "version": 31,
       "deployVersion": "2026.03.11.6",
       "date": "2026-03-11",
@@ -401,5 +416,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 31
+  "latestVersion": 32
 }
