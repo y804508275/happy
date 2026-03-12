@@ -574,6 +574,14 @@ export const pl: TranslationStructure = {
             initializing: 'Inicjalizacja agenta...',
             moreTools: ({ count }: { count: number }) => `+${count} ${plural({ count, one: 'więcej narzędzie', few: 'więcej narzędzia', many: 'więcej narzędzi' })}`,
         },
+        taskViewFull: {
+            taskPrompt: 'Opis zadania',
+            executionDetails: 'Szczegóły wykonania',
+            result: 'Wynik',
+            noDetails: 'Brak szczegółów wykonania',
+            agentResponse: 'Agent',
+            userMessage: 'Użytkownik',
+        },
         multiEdit: {
             editNumber: ({ index, total }: { index: number; total: number }) => `Edycja ${index} z ${total}`,
             replaceAll: 'Zamień wszystkie',

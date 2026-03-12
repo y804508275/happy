@@ -564,6 +564,14 @@ export const ca: TranslationStructure = {
             initializing: 'Inicialitzant l\'agent...',
             moreTools: ({ count }: { count: number }) => `+${count} més ${plural({ count, singular: 'eina', plural: 'eines' })}`,
         },
+        taskViewFull: {
+            taskPrompt: 'Descripció de la tasca',
+            executionDetails: 'Detalls d\'execució',
+            result: 'Resultat',
+            noDetails: 'No hi ha detalls d\'execució disponibles',
+            agentResponse: 'Agent',
+            userMessage: 'Usuari',
+        },
         multiEdit: {
             editNumber: ({ index, total }: { index: number; total: number }) => `Edició ${index} de ${total}`,
             replaceAll: 'Reemplaça tot',

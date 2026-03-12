@@ -593,6 +593,14 @@ export const it: TranslationStructure = {
             initializing: 'Inizializzazione agente...',
             moreTools: ({ count }: { count: number }) => `+${count} altri ${plural({ count, singular: 'strumento', plural: 'strumenti' })}`,
         },
+        taskViewFull: {
+            taskPrompt: 'Descrizione del compito',
+            executionDetails: 'Dettagli di esecuzione',
+            result: 'Risultato',
+            noDetails: 'Nessun dettaglio di esecuzione disponibile',
+            agentResponse: 'Agent',
+            userMessage: 'Utente',
+        },
         askUserQuestion: {
             submit: 'Invia risposta',
             multipleQuestions: ({ count }: { count: number }) => `${count} ${plural({ count, singular: 'domanda', plural: 'domande' })}`,

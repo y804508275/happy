@@ -564,6 +564,14 @@ export const en = {
             initializing: 'Initializing agent...',
             moreTools: ({ count }: { count: number }) => `+${count} more ${plural({ count, singular: 'tool', plural: 'tools' })}`,
         },
+        taskViewFull: {
+            taskPrompt: 'Task Prompt',
+            executionDetails: 'Execution Details',
+            result: 'Result',
+            noDetails: 'No execution details available',
+            agentResponse: 'Agent',
+            userMessage: 'User',
+        },
         multiEdit: {
             editNumber: ({ index, total }: { index: number; total: number }) => `Edit ${index} of ${total}`,
             replaceAll: 'Replace All',

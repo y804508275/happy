@@ -564,6 +564,14 @@ export const es: TranslationStructure = {
             initializing: 'Inicializando agente...',
             moreTools: ({ count }: { count: number }) => `+${count} más ${plural({ count, singular: 'herramienta', plural: 'herramientas' })}`,
         },
+        taskViewFull: {
+            taskPrompt: 'Descripción de la tarea',
+            executionDetails: 'Detalles de ejecución',
+            result: 'Resultado',
+            noDetails: 'No hay detalles de ejecución disponibles',
+            agentResponse: 'Agent',
+            userMessage: 'Usuario',
+        },
         multiEdit: {
             editNumber: ({ index, total }: { index: number; total: number }) => `Edición ${index} de ${total}`,
             replaceAll: 'Reemplazar todo',

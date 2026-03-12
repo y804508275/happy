@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": 30,
+      "deployVersion": "2026.03.11.5",
+      "date": "2026-03-11",
+      "summary": "新增 Task 工具完整展开视图组件。",
+      "changes": [
+        "新增 TaskViewFull 组件，支持查看任务 prompt、执行时间线和最终结果",
+        "添加 taskViewFull 相关的多语言翻译（中/英/日/西/俄/葡等 11 种语言）",
+        "在 toolFullViewRegistry 中注册 Task 视图"
+      ],
+      "rawMarkdown": "## Version 30 (2026.03.11.5) - 2026-03-11\n\n\n新增 Task 工具完整展开视图组件。\n\n- 新增 TaskViewFull 组件，支持查看任务 prompt、执行时间线和最终结果\n- 添加 taskViewFull 相关的多语言翻译（中/英/日/西/俄/葡等 11 种语言）\n- 在 toolFullViewRegistry 中注册 Task 视图"
+    },
+    {
       "version": 29,
       "deployVersion": "2026.03.11.4",
       "date": "2026-03-11",
@@ -376,5 +388,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 29
+  "latestVersion": 30
 }

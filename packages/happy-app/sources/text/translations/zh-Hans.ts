@@ -566,6 +566,14 @@ export const zhHans: TranslationStructure = {
             initializing: '正在初始化 agent...',
             moreTools: ({ count }: { count: number }) => `+${count} 个更多${plural({ count, singular: '工具', plural: '工具' })}`,
         },
+        taskViewFull: {
+            taskPrompt: '任务描述',
+            executionDetails: '执行详情',
+            result: '执行结果',
+            noDetails: '暂无执行详情',
+            agentResponse: 'Agent',
+            userMessage: '用户',
+        },
         multiEdit: {
             editNumber: ({ index, total }: { index: number; total: number }) => `编辑 ${index}/${total}`,
             replaceAll: '全部替换',

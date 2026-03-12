@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 30 (2026.03.11.5) - 2026-03-11
+
+新增 Task 工具完整展开视图组件。
+
+- 新增 TaskViewFull 组件，支持查看任务 prompt、执行时间线和最终结果
+- 添加 taskViewFull 相关的多语言翻译（中/英/日/西/俄/葡等 11 种语言）
+- 在 toolFullViewRegistry 中注册 Task 视图
+
 ## Version 29 (2026.03.11.4) - 2026-03-11
 
 新增会话重命名功能，支持手动编辑会话名称。
