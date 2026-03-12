@@ -21,6 +21,10 @@ export const LocalSettingsSchema = z.object({
     notifyIdleTimeoutMinutes: z.number().describe('Idle timeout threshold in minutes'),
     // Browser preview
     lastPreviewUrl: z.string().describe('Last URL used in the browser preview panel'),
+    previewClosedSessions: z.record(z.string(), z.boolean()).describe('Sessions where user manually closed the preview panel'),
+    // Sidebar
+    sidebarCollapsed: z.boolean().describe('Whether the sidebar is collapsed (web only)'),
+    chatPosition: z.enum(['left', 'right']).describe('Chat panel position relative to preview panel (web only)'),
 });
 
 //
@@ -49,6 +53,9 @@ export const localSettingsDefaults: LocalSettings = {
     notifyIdleTimeout: false,
     notifyIdleTimeoutMinutes: 10,
     lastPreviewUrl: '',
+    previewClosedSessions: {},
+    sidebarCollapsed: false,
+    chatPosition: 'left' as const,
 };
 Object.freeze(localSettingsDefaults);
 

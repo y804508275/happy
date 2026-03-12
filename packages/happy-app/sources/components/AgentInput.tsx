@@ -9,6 +9,7 @@ import { PermissionMode, ModelMode } from './PermissionModeSelector';
 import { hapticsLight, hapticsError } from './haptics';
 import { Shaker, ShakeInstance } from './Shaker';
 import { StatusDot } from './StatusDot';
+import { BouncingDots } from './BouncingDots';
 import { useActiveWord } from './autocomplete/useActiveWord';
 import { useActiveSuggestions } from './autocomplete/useActiveSuggestions';
 import { AgentInputAutocomplete } from './AgentInputAutocomplete';
@@ -974,14 +975,18 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 11 }}>
                             {props.connectionStatus && (
                                 <>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <StatusDot
-                                            color={props.connectionStatus.dotColor}
-                                            isPulsing={props.connectionStatus.isPulsing}
-                                            size={6}
-                                        />
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                        {props.connectionStatus.isPulsing ? (
+                                            <BouncingDots color={props.connectionStatus.dotColor} size={5} />
+                                        ) : (
+                                            <StatusDot
+                                                color={props.connectionStatus.dotColor}
+                                                size={6}
+                                            />
+                                        )}
                                         <Text style={{
-                                            fontSize: 11,
+                                            fontSize: props.connectionStatus.isPulsing ? 14 : 11,
+                                            fontWeight: props.connectionStatus.isPulsing ? '500' : '400',
                                             color: props.connectionStatus.color,
                                             ...Typography.default()
                                         }}>

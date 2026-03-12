@@ -20,7 +20,7 @@ import { ChatHeaderView } from '@/components/ChatHeaderView';
 import { ChatList } from '@/components/ChatList';
 import { Deferred } from '@/components/Deferred';
 import { EmptyMessages } from '@/components/EmptyMessages';
-import { PreviewPanel } from '@/components/PreviewPanel';
+import { PreviewPanel, type PreviewData } from '@/components/PreviewPanel';
 import { VoiceAssistantStatusBar } from '@/components/VoiceAssistantStatusBar';
 import { useDraft } from '@/hooks/useDraft';
 import { useMessageQueue } from '@/-session/useMessageQueue';
@@ -131,28 +131,8 @@ export const SessionView = React.memo((props: { id: string }) => {
                 }} />
             )}
 
-            {/* Header - always shown on desktop/Mac, hidden in landscape mode only on actual phones */}
-            {!(isLandscape && deviceType === 'phone' && Platform.OS !== 'web') && (
-                <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    zIndex: 1000
-                }}>
-                    <ChatHeaderView
-                        {...headerProps}
-                        onBackPress={() => router.back()}
-                    />
-                    {/* Voice status bar below header - not on tablet (shown in sidebar) */}
-                    {!isTablet && realtimeStatus !== 'disconnected' && (
-                        <VoiceAssistantStatusBar variant="full" />
-                    )}
-                </View>
-            )}
-
             {/* Content based on state */}
-            <View style={{ flex: 1, paddingTop: !(isLandscape && deviceType === 'phone' && Platform.OS !== 'web') ? safeArea.top + headerHeight + (!isTablet && realtimeStatus !== 'disconnected' ? 48 : 0) : 0 }}>
+            <View style={{ flex: 1 }}>
                 {!isDataReady ? (
                     // Loading state
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -167,7 +147,16 @@ export const SessionView = React.memo((props: { id: string }) => {
                     </View>
                 ) : (
                     // Normal session view
-                    <SessionViewLoaded key={sessionId} sessionId={sessionId} session={session} />
+                    <SessionViewLoaded
+                        key={sessionId}
+                        sessionId={sessionId}
+                        session={session}
+                        headerProps={headerProps}
+                        onBackPress={() => router.back()}
+                        showHeader={!(isLandscape && deviceType === 'phone' && Platform.OS !== 'web')}
+                        headerPaddingTop={safeArea.top + headerHeight + (!isTablet && realtimeStatus !== 'disconnected' ? 48 : 0)}
+                        showVoiceBar={!isTablet && realtimeStatus !== 'disconnected'}
+                    />
                 )}
             </View>
         </>
@@ -175,14 +164,28 @@ export const SessionView = React.memo((props: { id: string }) => {
 });
 
 
-function SessionViewLoaded({ sessionId, session }: { sessionId: string, session: Session }) {
+function SessionViewLoaded({ sessionId, session, headerProps, onBackPress, showHeader, headerPaddingTop, showVoiceBar }: {
+    sessionId: string;
+    session: Session;
+    headerProps: any;
+    onBackPress: () => void;
+    showHeader: boolean;
+    headerPaddingTop: number;
+    showVoiceBar: boolean;
+}) {
     const { theme } = useUnistyles();
     const router = useRouter();
     const safeArea = useSafeAreaInsets();
     const isLandscape = useIsLandscape();
     const deviceType = useDeviceType();
     const [message, setMessage] = React.useState('');
+    const previewClosedSessions = useLocalSetting('previewClosedSessions');
     const [previewVisible, setPreviewVisible] = React.useState(false);
+    const [previewData, setPreviewData] = React.useState<PreviewData | null>(null);
+    const [previewHistory, setPreviewHistory] = React.useState<PreviewData[]>([]);
+    const userClosedPreview = !!previewClosedSessions[sessionId];
+    const sidebarCollapsed = useLocalSetting('sidebarCollapsed');
+    const chatPosition = useLocalSetting('chatPosition');
     const [attachedImages, setAttachedImages] = React.useState<Array<{
         uri: string;
         base64: string;
@@ -244,6 +247,32 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const workingDirectory = session?.metadata?.path || '';
     const mdRefs = useMdReferences(credentials, workingDirectory);
     const [showMdRefSelector, setShowMdRefSelector] = React.useState(false);
+
+    // Collect all preview events and always show the latest one.
+    const prevPreviewCountRef = React.useRef(0);
+    React.useEffect(() => {
+        if (!messages || messages.length === 0) return;
+        const all: PreviewData[] = [];
+        let totalAgentEvents = 0;
+        for (const msg of messages) {
+            if (msg.kind === 'agent-event') {
+                totalAgentEvents++;
+                if (msg.event.type === 'preview') {
+                    const ev = msg.event as any;
+                    all.push({ kind: ev.kind, url: ev.url, title: ev.title, body: ev.body });
+                }
+            }
+        }
+        console.log('[PREVIEW] SessionView effect: messages=', messages.length, 'agentEvents=', totalAgentEvents, 'previews=', all.length, 'prev=', prevPreviewCountRef.current);
+        if (all.length > 0 && all.length !== prevPreviewCountRef.current) {
+            prevPreviewCountRef.current = all.length;
+            setPreviewHistory(all);
+            setPreviewData(all[all.length - 1]);
+            if (Platform.OS === 'web' && !userClosedPreview) {
+                setPreviewVisible(true);
+            }
+        }
+    }, [messages]);
 
     // Use draft hook for auto-saving message drafts
     const { clearDraft } = useDraft(sessionId, message, setMessage);
@@ -385,7 +414,7 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     const serverFlavor = session.metadata?.flavor || null;
     const [localFlavor, setLocalFlavor] = React.useState<string | null>(null);
     const effectiveFlavor = localFlavor ?? serverFlavor;
-    // Clear local override when server catches up
+    // Clear local override when server catches up (server flavor matches what we requested)
     React.useEffect(() => {
         if (localFlavor !== null && serverFlavor === localFlavor) {
             setLocalFlavor(null);
@@ -405,10 +434,11 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
         droid: 'Droid',
         codex: 'Codex',
         gemini: 'Gemini',
+        opencode: 'OpenCode',
     }), []);
     const [isSwitchingAgent, setIsSwitchingAgent] = React.useState(false);
 
-    const handleSwitchAgent = React.useCallback(async (agent: 'claude' | 'codex' | 'gemini' | 'droid') => {
+    const handleSwitchAgent = React.useCallback(async (agent: 'claude' | 'codex' | 'gemini' | 'droid' | 'opencode') => {
         const label = agentLabels[agent] || agent;
         const confirmed = await Modal.confirm(
             t('session.switchAgentConfirm', { agent: label }),
@@ -596,7 +626,17 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
             attachedFiles={attachedFiles}
             onFilePaste={Platform.OS === 'web' ? handleFilePaste : undefined}
             onRemoveFile={handleRemoveFile}
-            onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => !v) : undefined}
+            onPreviewPress={Platform.OS === 'web' ? () => setPreviewVisible(v => {
+                const closing = !(!v);
+                if (closing) {
+                    storage.getState().applyLocalSettings({ previewClosedSessions: { ...previewClosedSessions, [sessionId]: true } });
+                } else {
+                    const next = { ...previewClosedSessions };
+                    delete next[sessionId];
+                    storage.getState().applyLocalSettings({ previewClosedSessions: next });
+                }
+                return !v;
+            }) : undefined}
             onFileViewerPress={experiments ? () => router.push(`/session/${sessionId}/files`) : undefined}
             autoConfirmMode={autoConfirmMode}
             onAutoConfirmModeChange={handleAutoConfirmModeChange}
@@ -644,13 +684,84 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
     );
 
 
+    const sidebarWidth = React.useMemo(() => {
+        if (typeof window === 'undefined') return 300;
+        return Math.min(Math.max(Math.floor(window.innerWidth * 0.3), 250), 360);
+    }, []);
+    const defaultChatWidth = sidebarWidth;
+    const [dragChatWidth, setDragChatWidth] = React.useState<number | null>(null);
+    const [isDragging, setIsDragging] = React.useState(false);
+    const chatWidth = previewVisible && Platform.OS === 'web'
+        ? (dragChatWidth ?? defaultChatWidth)
+        : undefined;
+
+    const isRowLayout = previewVisible && Platform.OS === 'web';
+
+    const dragRef = React.useRef<{ startX: number; startWidth: number; isRight: boolean } | null>(null);
+
+    const handleResizeStart = React.useCallback(() => {
+        dragRef.current = {
+            startX: 0,
+            startWidth: dragChatWidth ?? defaultChatWidth,
+            isRight: chatPosition === 'right',
+        };
+        setIsDragging(true);
+
+        const onMove = (ev: MouseEvent) => {
+            if (!dragRef.current) return;
+            if (dragRef.current.startX === 0) {
+                dragRef.current.startX = ev.clientX;
+                return;
+            }
+            const delta = ev.clientX - dragRef.current.startX;
+            const newWidth = dragRef.current.isRight
+                ? dragRef.current.startWidth - delta
+                : dragRef.current.startWidth + delta;
+            setDragChatWidth(Math.max(280, Math.min(newWidth, window.innerWidth * 0.7)));
+        };
+        const onUp = () => {
+            dragRef.current = null;
+            setIsDragging(false);
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }, [dragChatWidth, defaultChatWidth, chatPosition]);
+    const flexDir = isRowLayout
+        ? (chatPosition === 'right' ? 'row-reverse' as const : 'row' as const)
+        : 'column' as const;
+
     return (
         <View style={{
             flex: 1,
-            flexDirection: previewVisible && Platform.OS === 'web' ? 'row' : 'column',
+            flexDirection: flexDir,
         }}>
             {/* Left side: chat area */}
-            <View style={{ flex: 1 }}>
+            <View style={chatWidth ? { width: chatWidth } : { flex: 1 }}>
+                {/* Header inside the chat column so it matches chat width */}
+                {showHeader && (
+                    <View style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 1000
+                    }}>
+                        <ChatHeaderView
+                            {...headerProps}
+                            onBackPress={onBackPress}
+                            onSidebarToggle={Platform.OS === 'web' ? () => storage.getState().applyLocalSettings({ sidebarCollapsed: !sidebarCollapsed }) : undefined}
+                            sidebarCollapsed={sidebarCollapsed}
+                            onChatPositionToggle={previewVisible && Platform.OS === 'web' ? () => storage.getState().applyLocalSettings({ chatPosition: chatPosition === 'left' ? 'right' : 'left' }) : undefined}
+                            chatPosition={chatPosition}
+                        />
+                        {showVoiceBar && (
+                            <VoiceAssistantStatusBar variant="full" />
+                        )}
+                    </View>
+                )}
+                <View style={{ flex: 1, paddingTop: showHeader ? headerPaddingTop : 0 }}>
                 {/* CLI Version Warning Overlay - Subtle centered pill */}
                 {shouldShowCliWarning && !(isLandscape && deviceType === 'phone') && (
                     <Pressable
@@ -737,15 +848,46 @@ function SessionViewLoaded({ sessionId, session }: { sessionId: string, session:
                         </Pressable>
                     )
                 }
+                </View>
             </View>
+
+            {/* Resize handle between chat and preview */}
+            {isRowLayout && (
+                <Pressable
+                    onPressIn={handleResizeStart}
+                    style={{
+                        width: 6,
+                        cursor: 'col-resize' as any,
+                        backgroundColor: isDragging ? theme.colors.textSecondary : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10,
+                    }}
+                >
+                    <View style={{
+                        width: 2,
+                        height: 32,
+                        borderRadius: 1,
+                        backgroundColor: theme.colors.textSecondary,
+                        opacity: isDragging ? 1 : 0.4,
+                    }} />
+                </Pressable>
+            )}
 
             {/* Right side: preview panel (web only) */}
             {previewVisible && Platform.OS === 'web' && session.metadata?.machineId && (
-                <PreviewPanel
-                    sessionId={sessionId}
-                    machineId={session.metadata.machineId}
-                    onClose={() => setPreviewVisible(false)}
-                />
+                <View style={{ flex: 1 }}>
+                    {isDragging && (
+                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 }} />
+                    )}
+                    <PreviewPanel
+                        sessionId={sessionId}
+                        machineId={session.metadata.machineId}
+                        onClose={() => { storage.getState().applyLocalSettings({ previewClosedSessions: { ...previewClosedSessions, [sessionId]: true } }); setPreviewVisible(false); setPreviewData(null); setPreviewHistory([]); }}
+                        previewData={previewData}
+                        history={previewHistory}
+                    />
+                </View>
             )}
         </View>
     )
