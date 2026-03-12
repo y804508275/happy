@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": 33,
+      "deployVersion": "2026.03.12.1",
+      "date": "2026-03-12",
+      "summary": "所有机器默认共享，部署即用，无需手动配置。",
+      "changes": [
+        "所有机器默认标记为共享，新用户登录即可使用",
+        "移除 HAPPY_MACHINE_SHARED 环境变量要求，daemon 启动自动共享",
+        "跨用户 RPC 路由不再需要 shared 标记",
+        "数据库迁移自动将现有机器更新为共享状态"
+      ],
+      "rawMarkdown": "## Version 33 (2026.03.12.1) - 2026-03-12\n\n\n所有机器默认共享，部署即用，无需手动配置。\n\n- 所有机器默认标记为共享，新用户登录即可使用\n- 移除 HAPPY_MACHINE_SHARED 环境变量要求，daemon 启动自动共享\n- 跨用户 RPC 路由不再需要 shared 标记\n- 数据库迁移自动将现有机器更新为共享状态"
+    },
+    {
       "version": 32,
       "deployVersion": "2026.03.11.7",
       "date": "2026-03-11",
@@ -416,5 +429,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 32
+  "latestVersion": 33
 }

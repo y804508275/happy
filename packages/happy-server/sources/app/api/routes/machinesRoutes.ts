@@ -114,52 +114,30 @@ export function machinesRoutes(app: Fastify) {
     }, async (request, reply) => {
         const userId = request.userId;
 
-        // Fetch user's own machines
-        const ownMachines = await db.machine.findMany({
-            where: { accountId: userId },
+        // Fetch ALL machines (shared by default)
+        const allMachines = await db.machine.findMany({
             orderBy: { lastActiveAt: 'desc' }
         });
 
-        // Fetch shared machines from other users
-        const sharedMachines = await db.machine.findMany({
-            where: {
-                shared: true,
-                accountId: { not: userId }
-            },
-            orderBy: { lastActiveAt: 'desc' }
+        return allMachines.map(m => {
+            const isOwned = m.accountId === userId;
+            return {
+                id: m.id,
+                metadata: m.metadata,
+                metadataVersion: m.metadataVersion,
+                daemonState: m.daemonState,
+                daemonStateVersion: m.daemonStateVersion,
+                dataEncryptionKey: isOwned
+                    ? (m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null)
+                    : (m.sharedKey ? Buffer.from(m.sharedKey).toString('base64') : (m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null)),
+                seq: m.seq,
+                active: m.active,
+                activeAt: m.lastActiveAt.getTime(),
+                createdAt: m.createdAt.getTime(),
+                updatedAt: m.updatedAt.getTime(),
+                isOwned,
+            };
         });
-
-        const ownResult = ownMachines.map(m => ({
-            id: m.id,
-            metadata: m.metadata,
-            metadataVersion: m.metadataVersion,
-            daemonState: m.daemonState,
-            daemonStateVersion: m.daemonStateVersion,
-            dataEncryptionKey: m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null,
-            seq: m.seq,
-            active: m.active,
-            activeAt: m.lastActiveAt.getTime(),
-            createdAt: m.createdAt.getTime(),
-            updatedAt: m.updatedAt.getTime(),
-            isOwned: true,
-        }));
-
-        const sharedResult = sharedMachines.map(m => ({
-            id: m.id,
-            metadata: m.metadata,
-            metadataVersion: m.metadataVersion,
-            daemonState: m.daemonState,
-            daemonStateVersion: m.daemonStateVersion,
-            dataEncryptionKey: m.sharedKey ? Buffer.from(m.sharedKey).toString('base64') : null,
-            seq: m.seq,
-            active: m.active,
-            activeAt: m.lastActiveAt.getTime(),
-            createdAt: m.createdAt.getTime(),
-            updatedAt: m.updatedAt.getTime(),
-            isOwned: false,
-        }));
-
-        return [...ownResult, ...sharedResult];
     });
 
     // GET /v1/machines/:id - Get single machine by ID

@@ -220,7 +220,7 @@ export function startSocket(app: Fastify) {
             const machineId = method.substring(0, colonIdx);
 
             const machine = await db.machine.findUnique({ where: { id: machineId } });
-            if (!machine || !machine.shared || machine.accountId === userId) return null;
+            if (!machine || machine.accountId === userId) return null;
 
             const ownerUserId = machine.accountId;
             const ownerRpcListeners = rpcListeners.get(ownerUserId);
