@@ -129,7 +129,7 @@ export function machinesRoutes(app: Fastify) {
                 daemonStateVersion: m.daemonStateVersion,
                 dataEncryptionKey: isOwned
                     ? (m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null)
-                    : (m.sharedKey ? Buffer.from(m.sharedKey).toString('base64') : (m.dataEncryptionKey ? Buffer.from(m.dataEncryptionKey).toString('base64') : null)),
+                    : (m.sharedKey ? Buffer.from(m.sharedKey).toString('base64') : null),
                 seq: m.seq,
                 active: m.active,
                 activeAt: m.lastActiveAt.getTime(),

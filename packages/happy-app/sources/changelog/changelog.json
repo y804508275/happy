@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": 36,
+      "deployVersion": "2026.03.12.4",
+      "date": "2026-03-12",
+      "summary": "修复新用户无法看到共享机器的问题。",
+      "changes": [
+        "修复服务端对非拥有者机器返回错误加密 key 的 bug",
+        "客户端增加共享机器 key 解码的错误处理，避免崩溃",
+        "跳过尚未上传 sharedKey 的共享机器，避免误显示"
+      ],
+      "rawMarkdown": "## Version 36 (2026.03.12.4) - 2026-03-12\n\n\n修复新用户无法看到共享机器的问题。\n\n- 修复服务端对非拥有者机器返回错误加密 key 的 bug\n- 客户端增加共享机器 key 解码的错误处理，避免崩溃\n- 跳过尚未上传 sharedKey 的共享机器，避免误显示"
+    },
+    {
       "version": 35,
       "deployVersion": "2026.03.12.3",
       "date": "2026-03-12",
@@ -455,5 +467,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 35
+  "latestVersion": 36
 }

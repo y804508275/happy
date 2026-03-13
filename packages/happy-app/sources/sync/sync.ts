@@ -1421,7 +1421,12 @@ class Sync {
                     decryptedKey = await this.encryption.decryptEncryptionKey(machine.dataEncryptionKey);
                 } else {
                     // Shared machine: key is raw (just base64 decode)
-                    decryptedKey = this.encryption.decodeSharedEncryptionKey(machine.dataEncryptionKey);
+                    try {
+                        decryptedKey = this.encryption.decodeSharedEncryptionKey(machine.dataEncryptionKey);
+                    } catch (e) {
+                        console.warn(`Failed to decode shared machine key, skipping: ${machine.id}`);
+                        continue;
+                    }
                 }
                 if (!decryptedKey) {
                     console.error(`Failed to decrypt data encryption key for machine ${machine.id}`);
@@ -1430,6 +1435,11 @@ class Sync {
                 machineKeysMap.set(machine.id, decryptedKey);
                 this.machineDataKeys.set(machine.id, decryptedKey);
             } else {
+                if (!isOwned) {
+                    // Shared machine with no sharedKey yet uploaded by owner, skip
+                    console.warn(`Shared machine ${machine.id} has no sharedKey, skipping`);
+                    continue;
+                }
                 machineKeysMap.set(machine.id, null);
             }
         }
