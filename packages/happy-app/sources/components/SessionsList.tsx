@@ -89,6 +89,18 @@ const stylesheet = StyleSheet.create((theme) => ({
         letterSpacing: 0.1,
         ...Typography.default('semiBold'),
     },
+    emptyState: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 64,
+        paddingBottom: 32,
+    },
+    emptyStateText: {
+        fontSize: 14,
+        color: theme.colors.textSecondary,
+        ...Typography.default(),
+    },
     projectGroup: {
         paddingHorizontal: 16,
         paddingVertical: 10,
@@ -345,6 +357,14 @@ export function SessionsList() {
 
     // Footer removed - all sessions now shown inline
 
+    const EmptyComponent = React.useCallback(() => {
+        return (
+            <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>{t('components.emptyMainScreen.noSessions')}</Text>
+            </View>
+        );
+    }, []);
+
     return (
         <View style={styles.container}>
             <View style={styles.contentContainer}>
@@ -354,6 +374,7 @@ export function SessionsList() {
                     keyExtractor={keyExtractor}
                     contentContainerStyle={{ paddingBottom: safeArea.bottom + 128, maxWidth: layout.maxWidth }}
                     ListHeaderComponent={HeaderComponent}
+                    ListEmptyComponent={EmptyComponent}
                 />
             </View>
         </View>

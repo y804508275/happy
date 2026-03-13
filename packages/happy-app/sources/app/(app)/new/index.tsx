@@ -554,6 +554,29 @@ function NewSessionWizard() {
         }
     }, [machineIdParam, machines, recentMachinePaths, selectedMachineId]);
 
+    // Auto-select first available machine when machines load asynchronously
+    // This handles the case where machines aren't available at mount time (e.g. new user with shared machines)
+    React.useEffect(() => {
+        if (selectedMachineId !== null || machines.length === 0) {
+            return;
+        }
+        // Try recent machines first
+        if (recentMachinePaths.length > 0) {
+            for (const recent of recentMachinePaths) {
+                if (machines.find(m => m.id === recent.machineId)) {
+                    setSelectedMachineId(recent.machineId);
+                    setSelectedPath(getRecentPathForMachine(recent.machineId, recentMachinePaths));
+                    return;
+                }
+            }
+        }
+        // Prefer first online machine, fall back to first machine
+        const onlineMachine = machines.find(m => isMachineOnline(m));
+        const machine = onlineMachine || machines[0];
+        setSelectedMachineId(machine.id);
+        setSelectedPath(getRecentPathForMachine(machine.id, recentMachinePaths));
+    }, [selectedMachineId, machines, recentMachinePaths]);
+
     // Handle path route param from picker screens (main's navigation pattern)
     React.useEffect(() => {
         if (typeof pathParam !== 'string') {

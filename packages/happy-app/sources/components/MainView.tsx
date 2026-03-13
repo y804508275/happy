@@ -5,7 +5,7 @@ import { useFriendRequests, useSocketStatus, useRealtimeStatus } from '@/sync/st
 import { useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
 import { useIsTablet } from '@/utils/responsive';
 import { useRouter } from 'expo-router';
-import { EmptySessionsTablet } from './EmptySessionsTablet';
+
 import { SessionsList } from './SessionsList';
 import { TabBar, TabType } from './TabBar';
 import { InboxView } from './InboxView';
@@ -253,18 +253,7 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
             );
         }
 
-        // Empty state
-        if (sessionListViewData.length === 0) {
-            return (
-                <View style={styles.sidebarContentContainer}>
-                    <View style={styles.emptyStateContainer}>
-                        <EmptySessionsTablet />
-                    </View>
-                </View>
-            );
-        }
-
-        // Sessions list
+        // Sessions list (also handles empty state via ListEmptyComponent)
         return (
             <View style={styles.sidebarContentContainer}>
                 <SessionsList />
