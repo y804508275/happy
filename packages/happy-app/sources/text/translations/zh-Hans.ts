@@ -459,6 +459,8 @@ export const zhHans: TranslationStructure = {
             runIt: '运行它',
             scanQrCode: '扫描二维码',
             openCamera: '打开相机',
+            noSessions: '暂无对话',
+            startFirst: '开始你的第一个对话',
         },
     },
 

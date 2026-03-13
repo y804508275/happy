@@ -489,6 +489,8 @@ export const ja: TranslationStructure = {
             runIt: '実行する',
             scanQrCode: 'QRコードをスキャン',
             openCamera: 'カメラを開く',
+            noSessions: '会話はまだありません',
+            startFirst: '最初のセッションを開始しましょう',
         },
     },
 

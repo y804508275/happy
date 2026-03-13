@@ -423,6 +423,8 @@ export const ru: TranslationStructure = {
             runIt: 'Запустите его',
             scanQrCode: 'Отсканируйте QR-код',
             openCamera: 'Открыть камеру',
+            noSessions: 'Нет диалогов',
+            startFirst: 'Начните свою первую сессию',
         },
     },
 

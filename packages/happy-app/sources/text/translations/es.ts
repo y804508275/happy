@@ -457,6 +457,8 @@ export const es: TranslationStructure = {
             runIt: 'Ejecútelo',
             scanQrCode: 'Escanee el código QR',
             openCamera: 'Abrir cámara',
+            noSessions: 'Sin conversaciones aún',
+            startFirst: 'Inicia tu primera sesión',
         },
     },
 

@@ -472,6 +472,8 @@ export const en: TranslationStructure = {
             runIt: 'Run it',
             scanQrCode: 'Scan the QR code',
             openCamera: 'Open Camera',
+            noSessions: 'No conversations yet',
+            startFirst: 'Start your first session',
         },
     },
 

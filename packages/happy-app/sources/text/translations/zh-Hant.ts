@@ -458,6 +458,8 @@ export const zhHant: TranslationStructure = {
             runIt: '執行它',
             scanQrCode: '掃描 QR Code',
             openCamera: '開啟相機',
+            noSessions: '暫無對話',
+            startFirst: '開始你的第一個對話',
         },
     },
 

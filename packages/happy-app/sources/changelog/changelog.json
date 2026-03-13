@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "version": 34,
+      "deployVersion": "2026.03.12.2",
+      "date": "2026-03-12",
+      "summary": "优化新用户空状态页面，添加创建新对话按钮。",
+      "changes": [
+        "新用户登录后显示\"暂无对话\"空状态和\"开始新对话\"按钮",
+        "移除手机端空状态的 CLI 安装引导，改为简洁的创建对话入口",
+        "平板端空状态始终显示\"开始新对话\"按钮，不再依赖机器在线状态",
+        "更新所有语言的翻译文件"
+      ],
+      "rawMarkdown": "## Version 34 (2026.03.12.2) - 2026-03-12\n\n\n优化新用户空状态页面，添加创建新对话按钮。\n\n- 新用户登录后显示\"暂无对话\"空状态和\"开始新对话\"按钮\n- 移除手机端空状态的 CLI 安装引导，改为简洁的创建对话入口\n- 平板端空状态始终显示\"开始新对话\"按钮，不再依赖机器在线状态\n- 更新所有语言的翻译文件"
+    },
+    {
       "version": 33,
       "deployVersion": "2026.03.12.1",
       "date": "2026-03-12",
@@ -429,5 +442,5 @@
       "rawMarkdown": "## Version 1 (2025.05.12.1) - 2025-05-12\n\n\nWelcome to Happy - your secure, encrypted mobile companion for Claude Code. This inaugural release establishes the foundation for private, powerful AI interactions on the go.\n\n- Implemented end-to-end encrypted session management ensuring complete privacy\n- Integrated intelligent voice assistant with natural conversation capabilities\n- Added experimental file manager with syntax highlighting and tree navigation\n- Built seamless real-time synchronization across all your devices\n- Established native support for iOS, Android, and responsive web interfaces"
     }
   ],
-  "latestVersion": 33
+  "latestVersion": 34
 }

@@ -486,6 +486,8 @@ export const it: TranslationStructure = {
             runIt: 'Avviala',
             scanQrCode: 'Scansiona il codice QR',
             openCamera: 'Apri fotocamera',
+            noSessions: 'Nessuna conversazione',
+            startFirst: 'Inizia la tua prima sessione',
         },
     },
 
